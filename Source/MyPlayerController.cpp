@@ -56,8 +56,10 @@ AMyPlayerController::AMyPlayerController()
 	const auto ChatInterface = OnlineSub->GetChatInterface();
 	check(ChatInterface.IsValid());
 
-	const auto TournamentInterface = OnlineSub->GetTournamentInterface();
-	check(TournamentInterface.IsValid());
+	// Requires the OSS additions and patched engine.
+	// Install it for full functionality support.
+	//const auto TournamentInterface = OnlineSub->GetTournamentInterface();
+	//check(TournamentInterface.IsValid());
 
 	FriendsInterface->AddOnFriendsChangeDelegate_Handle(0, FOnFriendsChangeDelegate::CreateUObject(this, &AMyPlayerController::OnFriendsChange));
 	FriendsInterface->AddOnInviteReceivedDelegate_Handle(FOnInviteReceivedDelegate::CreateUObject(this, &AMyPlayerController::OnFriendInviteReceivedComplete));
@@ -70,10 +72,12 @@ AMyPlayerController::AMyPlayerController()
 
 	ChatInterface->AddOnChatRoomMessageReceivedDelegate_Handle(FOnChatRoomMessageReceivedDelegate::CreateUObject(this, &AMyPlayerController::OnChatRoomMessageReceivedComplete));
 	ChatInterface->AddOnChatPrivateMessageReceivedDelegate_Handle(FOnChatPrivateMessageReceivedDelegate::CreateUObject(this, &AMyPlayerController::OnChatPrivateMessageReceivedComplete));
-	ChatInterface->AddOnChatRoomListReadCompleteDelegate_Handle(FOnChatRoomListReadCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnChatRoomListReadComplete));
 
-	TournamentInterface->AddOnTournamentListDataChangedDelegate_Handle(FOnTournamentListDataChangedDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentListDataChanged));
-	TournamentInterface->AddOnTournamentDetailsReadDelegate_Handle(FOnTournamentDetailsReadDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentDetailsReadComplete));
+	// Requires the OSS additions and patched engine.
+	// Install it for full functionality support.
+	//ChatInterface->AddOnChatRoomListReadCompleteDelegate_Handle(FOnChatRoomListReadCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnChatRoomListReadComplete));
+	//TournamentInterface->AddOnTournamentListDataChangedDelegate_Handle(FOnTournamentListDataChangedDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentListDataChanged));
+	//TournamentInterface->AddOnTournamentDetailsReadDelegate_Handle(FOnTournamentDetailsReadDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentDetailsReadComplete));
 
 	// Bind delegates into the OSS
 	OnReadFriendsListCompleteDelegate = FOnReadFriendsListComplete::CreateUObject(this, &AMyPlayerController::OnReadFriendsComplete);
@@ -206,6 +210,14 @@ bool AMyPlayerController::RequestBeginPlay_Validate()
 }
 
 
+// only here because oss functionality is missing.
+// USE the enhaced OSS for serious projects.
+void AMyPlayerController::QueryFriends() {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::QueryFriends"));
+	const auto OnlineSub = IOnlineSubsystem::Get();
+	OnlineSub->GetFriendsInterface()->ReadFriendsList(0, "default", OnReadFriendsListCompleteDelegate);
+}
+
 void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnReadFriendsComplete"));
@@ -267,8 +279,8 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 				TEXT("GetFriendsList(%d) failed"), LocalPlayer);
 		}
 	}
-	// this is causing duplicates
-	//OnFriendsChanged.Broadcast();
+	// this is causing duplicates?
+	OnFriendsChanged.Broadcast();
 
 	// Can't have this in here.
 	//OnFriendsChange();
@@ -398,6 +410,26 @@ void AMyPlayerController::AcceptFriendInvite(const FString& senderUserKeyId)
 	const TSharedPtr<const FUniqueNetId> SenderUserId = OnlineSub->GetIdentityInterface()->CreateUniquePlayerId(senderUserKeyId);
 
 	OnlineSub->GetFriendsInterface()->AcceptInvite(0, *SenderUserId, "default");
+}
+
+
+// This is only here because we need functionality that does not exist in the stock OSS.
+// Why is there no Query Friends list or OnFriendsListChanged?
+// Hacky workaround is to use a room exit delegate instead
+void AMyPlayerController::QueryChatChannels() {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::QueryChatChannels"));
+	const auto OnlineSub = IOnlineSubsystem::Get();
+	if (OnlineSub)
+	{
+		ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
+		TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
+		if (UserId.IsValid())
+		{
+			OnlineSub->GetChatInterface()->TriggerOnChatRoomExitDelegates(*UserId, FChatRoomId("unused"), true, "unused");
+		}
+		
+	}
+	
 }
 
 void AMyPlayerController::CreateParty(const FString& PartyTitle, const FString& TournamentKeyId, bool TournamentParty)
@@ -680,6 +712,23 @@ void AMyPlayerController::OnPartyDataReceivedComplete(const FUniqueNetId& LocalU
 	OnPartyDataReceivedUETopiaDisplayUI.Broadcast();
 }
 
+// This is only here because we need functionality that does not exist in the stock OSS.
+// Use the OSS enhanced branch to get rid of this nonsense
+void AMyPlayerController::RefreshLocalChatChannelList()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::RefreshLocalChatChannelList"));
+	const auto OnlineSub = IOnlineSubsystem::Get();
+	if (OnlineSub)
+	{
+		ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
+		TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
+		if (UserId.IsValid())
+		{
+			RefreshChatChannelList(*UserId);
+		}
+
+	}
+}
 
 void AMyPlayerController::RefreshChatChannelList(const FUniqueNetId& LocalUserId)
 {
@@ -803,180 +852,187 @@ void AMyPlayerController::OnChatPrivateMessageReceivedComplete(const FUniqueNetI
 	OnChatPrivateMessageReceivedDisplayUIDelegate.Broadcast(SenderUserKeyId, ChatMessageCombined);
 }
 
+
+// Requires the OSS additions and patched engine.
+// Install it for full functionality support.
+/*
+
 void AMyPlayerController::FetchJoinableTournaments()
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::FetchJoinableTournaments"));
-	const auto OnlineSub = IOnlineSubsystem::Get();
-	OnlineSub->GetTournamentInterface()->FetchJoinableTournaments();
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::FetchJoinableTournaments"));
+const auto OnlineSub = IOnlineSubsystem::Get();
+OnlineSub->GetTournamentInterface()->FetchJoinableTournaments();
 }
 
 void AMyPlayerController::CreateTournament(const FString& TournamentTitle, const FString& GameMode, const FString& Region, int32 TeamMin, int32 TeamMax, int32 donationAmount, int32 playerBuyIn)
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::CreateTournament"));
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::CreateTournament"));
 
-	const auto OnlineSub = IOnlineSubsystem::Get();
-	FOnlinePartyTypeId PartyTypeId;
+const auto OnlineSub = IOnlineSubsystem::Get();
+FOnlinePartyTypeId PartyTypeId;
 
-	FTournamentConfiguration TournamentConfiguration = FTournamentConfiguration();
-	TournamentConfiguration.GameMode = GameMode;
-	TournamentConfiguration.MinTeams = TeamMin;
-	TournamentConfiguration.MaxTeams = TeamMax;
-	TournamentConfiguration.Region = Region;
-	TournamentConfiguration.Title = TournamentTitle;
-	TournamentConfiguration.donationAmount = donationAmount;
-	TournamentConfiguration.playerBuyIn = playerBuyIn;
+FTournamentConfiguration TournamentConfiguration = FTournamentConfiguration();
+TournamentConfiguration.GameMode = GameMode;
+TournamentConfiguration.MinTeams = TeamMin;
+TournamentConfiguration.MaxTeams = TeamMax;
+TournamentConfiguration.Region = Region;
+TournamentConfiguration.Title = TournamentTitle;
+TournamentConfiguration.donationAmount = donationAmount;
+TournamentConfiguration.playerBuyIn = playerBuyIn;
 
-	// Creating a local player where we can get the UserID from
-	ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
-	TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
+// Creating a local player where we can get the UserID from
+ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
+TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
 
-	// const FUniqueNetId& LocalUserId, const FOnlinePartyTypeId TournamentTypeId, const FTournamentConfiguration& TournamentConfig, const FOnCreateTournamentComplete& Delegate = FOnCreateTournamentComplete()
+// const FUniqueNetId& LocalUserId, const FOnlinePartyTypeId TournamentTypeId, const FTournamentConfiguration& TournamentConfig, const FOnCreateTournamentComplete& Delegate = FOnCreateTournamentComplete()
 
-	OnlineSub->GetTournamentInterface()->CreateTournament(*UserId, PartyTypeId, TournamentConfiguration, OnCreateTournamentCompleteDelegate);
-		//OnlineSub->GetPartyInterface()->CreateParty(*UserId, PartyTypeId, PartyConfiguration, OnCreatePartyCompleteDelegate);
+OnlineSub->GetTournamentInterface()->CreateTournament(*UserId, PartyTypeId, TournamentConfiguration, OnCreateTournamentCompleteDelegate);
+//OnlineSub->GetPartyInterface()->CreateParty(*UserId, PartyTypeId, PartyConfiguration, OnCreatePartyCompleteDelegate);
 }
 
 void AMyPlayerController::OnTournamentListDataChanged(const FUniqueNetId& LocalUserId)
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnTournamentListDataChanged"));
-	const auto OnlineSub = IOnlineSubsystem::Get();
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnTournamentListDataChanged"));
+const auto OnlineSub = IOnlineSubsystem::Get();
 
 
-	TArray< TSharedRef<FOnlineTournament> > TournamentListCache;
+TArray< TSharedRef<FOnlineTournament> > TournamentListCache;
 
-	if (OnlineSub->GetTournamentInterface()->GetTournamentList(0, TournamentListCache))
-	{
-		//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers(%s) returned %d friends"), UserId.ToString(), RecentPlayers.Num());
+if (OnlineSub->GetTournamentInterface()->GetTournamentList(0, TournamentListCache))
+{
+//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers(%s) returned %d friends"), UserId.ToString(), RecentPlayers.Num());
 
-		// Clear old entries
-		MyCachedTournaments.Empty();
+// Clear old entries
+MyCachedTournaments.Empty();
 
-		// Log each friend's data out
-		for (int32 Index = 0; Index < TournamentListCache.Num(); Index++)
-		{
-			const FOnlineTournament& ThisTournament = *TournamentListCache[Index];
+// Log each friend's data out
+for (int32 Index = 0; Index < TournamentListCache.Num(); Index++)
+{
+const FOnlineTournament& ThisTournament = *TournamentListCache[Index];
 
-			UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *ThisTournament.GetTitle(), *ThisTournament.GetTournamentId()->ToString());
+UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *ThisTournament.GetTitle(), *ThisTournament.GetTournamentId()->ToString());
 
 
-			FMyTournament ThisMyTournamentStruct;
-			ThisMyTournamentStruct.tournamentKeyId = ThisTournament.GetTournamentId()->ToString();
-			ThisMyTournamentStruct.tournamentTitle = ThisTournament.GetTitle();
+FMyTournament ThisMyTournamentStruct;
+ThisMyTournamentStruct.tournamentKeyId = ThisTournament.GetTournamentId()->ToString();
+ThisMyTournamentStruct.tournamentTitle = ThisTournament.GetTitle();
 
-			MyCachedTournaments.Add(ThisMyTournamentStruct);
+MyCachedTournaments.Add(ThisMyTournamentStruct);
 
-		}
+}
 
-	}
-	else
-	{
-		//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers failed"));
+}
+else
+{
+//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers failed"));
 
-	}
+}
 
-	OnTournamentListChangedUETopiaDisplayUIDelegate.Broadcast();
-	return;
+OnTournamentListChangedUETopiaDisplayUIDelegate.Broadcast();
+return;
 
 }
 
 void AMyPlayerController::ReadTournamentDetails(const FString& TournamentKeyId)
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ReadTournamentDetails"));
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ReadTournamentDetails"));
 
-	// Dump our cached tournament data
-	MyCachedTournament.tournamentTitle = "loading...";
-	MyCachedTournament.tournamentKeyId = "0";
-	MyCachedTournament.RoundList.Empty();
-	MyCachedTournament.TeamList.Empty();
+// Dump our cached tournament data
+MyCachedTournament.tournamentTitle = "loading...";
+MyCachedTournament.tournamentKeyId = "0";
+MyCachedTournament.RoundList.Empty();
+MyCachedTournament.TeamList.Empty();
 
-	const auto OnlineSub = IOnlineSubsystem::Get();
+const auto OnlineSub = IOnlineSubsystem::Get();
 
-	FOnlinePartyIdUEtopiaDup TournamentId = FOnlinePartyIdUEtopiaDup(TournamentKeyId);
+FOnlinePartyIdUEtopiaDup TournamentId = FOnlinePartyIdUEtopiaDup(TournamentKeyId);
 
-	OnlineSub->GetTournamentInterface()->ReadTournamentDetails(0, TournamentId);
+OnlineSub->GetTournamentInterface()->ReadTournamentDetails(0, TournamentId);
 }
 
 void AMyPlayerController::OnTournamentDetailsReadComplete()
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete"));
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete"));
 
-	const auto OnlineSub = IOnlineSubsystem::Get();
+const auto OnlineSub = IOnlineSubsystem::Get();
 
-	// this is just junk
-	TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
+// this is just junk
+TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
 
-	TSharedPtr<FTournament> TournamentDetailsFromOSS = OnlineSub->GetTournamentInterface()->GetTournament(0, *UserId);
+TSharedPtr<FTournament> TournamentDetailsFromOSS = OnlineSub->GetTournamentInterface()->GetTournament(0, *UserId);
 
-	// Empty out local struct arrays
-	MyCachedTournament.RoundList.Empty();
-	MyCachedTournament.TeamList.Empty();
+// Empty out local struct arrays
+MyCachedTournament.RoundList.Empty();
+MyCachedTournament.TeamList.Empty();
 
-	// Copy over the OSS data into our local struct
-	MyCachedTournament.tournamentKeyId = TournamentDetailsFromOSS->TournamentKeyId;
-	MyCachedTournament.tournamentTitle = TournamentDetailsFromOSS->Configuration.Title;
-	MyCachedTournament.region = TournamentDetailsFromOSS->Configuration.Region;
-	MyCachedTournament.donationAmount = TournamentDetailsFromOSS->Configuration.donationAmount;
-	MyCachedTournament.playerBuyIn = TournamentDetailsFromOSS->Configuration.playerBuyIn;
-	MyCachedTournament.GameMode = TournamentDetailsFromOSS->Configuration.GameMode;
-	MyCachedTournament.PrizeDistributionType = TournamentDetailsFromOSS->Configuration.PrizeDistributionType;
+// Copy over the OSS data into our local struct
+MyCachedTournament.tournamentKeyId = TournamentDetailsFromOSS->TournamentKeyId;
+MyCachedTournament.tournamentTitle = TournamentDetailsFromOSS->Configuration.Title;
+MyCachedTournament.region = TournamentDetailsFromOSS->Configuration.Region;
+MyCachedTournament.donationAmount = TournamentDetailsFromOSS->Configuration.donationAmount;
+MyCachedTournament.playerBuyIn = TournamentDetailsFromOSS->Configuration.playerBuyIn;
+MyCachedTournament.GameMode = TournamentDetailsFromOSS->Configuration.GameMode;
+MyCachedTournament.PrizeDistributionType = TournamentDetailsFromOSS->Configuration.PrizeDistributionType;
 
-	for (int32 Index = 0; Index < TournamentDetailsFromOSS->TeamList.Num(); Index++)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Team"));
-		FMyTournamentTeam TempTeamData;
-		TempTeamData.KeyId = TournamentDetailsFromOSS->TeamList[Index].KeyId;
-		TempTeamData.title = TournamentDetailsFromOSS->TeamList[Index].Title;
+for (int32 Index = 0; Index < TournamentDetailsFromOSS->TeamList.Num(); Index++)
+{
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Team"));
+FMyTournamentTeam TempTeamData;
+TempTeamData.KeyId = TournamentDetailsFromOSS->TeamList[Index].KeyId;
+TempTeamData.title = TournamentDetailsFromOSS->TeamList[Index].Title;
 
-		MyCachedTournament.TeamList.Add(TempTeamData);
-	}
+MyCachedTournament.TeamList.Add(TempTeamData);
+}
 
-	for (int32 RoundIndex = 0; RoundIndex < TournamentDetailsFromOSS->RoundList.Num(); RoundIndex++)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round"));
-		FMyTournamentRound TempRoundData;
+for (int32 RoundIndex = 0; RoundIndex < TournamentDetailsFromOSS->RoundList.Num(); RoundIndex++)
+{
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round"));
+FMyTournamentRound TempRoundData;
 
-		TempRoundData.RoundIndex = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundIndex;
+TempRoundData.RoundIndex = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundIndex;
 
-		for (int32 RoundMatchIndex = 0; RoundMatchIndex < TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList.Num(); RoundMatchIndex++)
-		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round Match"));
-			FMyTournamentRoundMatch TempRoundMatchData;
-			TempRoundMatchData.Team1KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1KeyId;
-			TempRoundMatchData.Team1Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Title;
-			TempRoundMatchData.Team1Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Winner;
-			TempRoundMatchData.Team1Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Loser;
+for (int32 RoundMatchIndex = 0; RoundMatchIndex < TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList.Num(); RoundMatchIndex++)
+{
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round Match"));
+FMyTournamentRoundMatch TempRoundMatchData;
+TempRoundMatchData.Team1KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1KeyId;
+TempRoundMatchData.Team1Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Title;
+TempRoundMatchData.Team1Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Winner;
+TempRoundMatchData.Team1Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Loser;
 
-			TempRoundMatchData.Team2KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2KeyId;
-			TempRoundMatchData.Team2Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Title;
-			TempRoundMatchData.Team2Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Winner;
-			TempRoundMatchData.Team2Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Loser;
+TempRoundMatchData.Team2KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2KeyId;
+TempRoundMatchData.Team2Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Title;
+TempRoundMatchData.Team2Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Winner;
+TempRoundMatchData.Team2Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Loser;
 
-			TempRoundMatchData.Status = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Status;
+TempRoundMatchData.Status = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Status;
 
-			TempRoundData.RoundMatchList.Add(TempRoundMatchData);
-		}
+TempRoundData.RoundMatchList.Add(TempRoundMatchData);
+}
 
-		MyCachedTournament.RoundList.Add(TempRoundData);
+MyCachedTournament.RoundList.Add(TempRoundData);
 
-	}
+}
 
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete - triggering OnTournamentDataReadUETopiaDisplayUIDelegate"));
-	OnTournamentDataReadUETopiaDisplayUIDelegate.Broadcast();
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete - triggering OnTournamentDataReadUETopiaDisplayUIDelegate"));
+OnTournamentDataReadUETopiaDisplayUIDelegate.Broadcast();
 
-	return;
+return;
 }
 
 void AMyPlayerController::JoinTournament(const FString& TournamentKeyId)
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::JoinTournament"));
-	const auto OnlineSub = IOnlineSubsystem::Get();
+UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::JoinTournament"));
+const auto OnlineSub = IOnlineSubsystem::Get();
 
-	// Fabricate a new FUniqueNetId by the TournamentKeyId
-	const TSharedPtr<const FUniqueNetId> TournamentId = OnlineSub->GetIdentityInterface()->CreateUniquePlayerId(TournamentKeyId);
+// Fabricate a new FUniqueNetId by the TournamentKeyId
+const TSharedPtr<const FUniqueNetId> TournamentId = OnlineSub->GetIdentityInterface()->CreateUniquePlayerId(TournamentKeyId);
 
-	OnlineSub->GetTournamentInterface()->JoinTournament(0, *TournamentId);
+OnlineSub->GetTournamentInterface()->JoinTournament(0, *TournamentId);
 
 }
+*/
+
 
 
 // Inventory stuff

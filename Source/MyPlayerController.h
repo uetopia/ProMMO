@@ -11,7 +11,9 @@
 #include "math.h"
 //#include "Online.h"
 #include "OnlineFriendsInterface.h"
-#include "OnlineTournamentsInterface.h"
+// Requires the OSS additions and patched engine.
+// Install it for full functionality support.
+// #include "OnlineTournamentsInterface.h"
 #include "ILoginFlowManager.h"
 #include "MyBasePickup.h"
 #include "MyBaseVendor.h"
@@ -463,6 +465,13 @@ public:
 	// Friend Functions
 	///////////////////
 
+	// On Friends changed delegate does not exist in the stock OSS. 
+	// Use the enhanced OSS branch instead.
+	// As a workaround we can use a manual refresh of the frineds list, and trigger it when a user open the friends UI
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		void QueryFriends();
+
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void InviteUserToFriends(const FString& UserKeyId);
 
@@ -471,6 +480,17 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void AcceptFriendInvite(const FString& senderUserKeyId);
+
+	///////////////////
+	// Chat Functions
+	///////////////////
+
+	// On Chat channel changed delegate does not exist in the stock OSS. 
+	// Use the enhanced OSS branch instead.
+	// As a workaround we can use a delay poll
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		void QueryChatChannels();
 
 	//////////////////////////
 	// Party Related Functions
@@ -498,6 +518,11 @@ public:
 	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void RefreshChatChannelList(const FUniqueNetId& LocalUserId);
 
+	// This is only here because the OSS functions we need are not in the stock engine.
+	// Use the OSS enhanced branch to get rid of this nonsense.
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		void RefreshLocalChatChannelList();
+
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void CreateChatChannel(const FString& ChatChannelTitle);
 
@@ -514,17 +539,20 @@ public:
 	// TOURNAMENT related Functions
 	///////////////////////////////
 
-	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		void FetchJoinableTournaments();
+	// Requires the OSS additions and patched engine.
+	// Install it for full functionality support.
 
-	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		void CreateTournament(const FString& TournamentTitle, const FString& GameMode, const FString& Region, int32 TeamMin, int32 TeamMax, int32 donationAmount, int32 playerBuyIn);
+	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	//	void FetchJoinableTournaments();
 
-	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		void ReadTournamentDetails(const FString& TournamentKeyId);
+	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	//	void CreateTournament(const FString& TournamentTitle, const FString& GameMode, const FString& Region, int32 TeamMin, int32 TeamMax, int32 donationAmount, int32 playerBuyIn);
 
-	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		void JoinTournament(const FString& TournamentKeyId);
+	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	//	void ReadTournamentDetails(const FString& TournamentKeyId);
+
+	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	//	void JoinTournament(const FString& TournamentKeyId);
 
 	//////////////////////////////
 	// Inventory related functions
@@ -840,7 +868,9 @@ public:
 	//FOnPartyInviteResponseReceived OnPartyInviteResponseReceivedComplete;
 	//FOnChatRoomMessageReceivedDisplayUIDelegate OnChatRoomMessageReceivedDisplayUIDelegate;
 
-	FOnCreateTournamentComplete OnCreateTournamentCompleteDelegate;
+	// Requires the OSS additions and patched engine.
+	// Install it for full functionality support.
+	// FOnCreateTournamentComplete OnCreateTournamentCompleteDelegate;
 
 	// CACHED DATA FOR PASSING IN TO UI
 
@@ -861,6 +891,7 @@ public:
 	FMyChatChannels MyCachedChatChannels;
 
 	// tournament cache
+	// You need the OSS enhancements.  Install it for this to work.
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		TArray<FMyTournament> MyCachedTournaments;
 
@@ -1007,11 +1038,12 @@ private:
 	void OnChatPrivateMessageReceivedComplete(const FUniqueNetId& SenderUserId, const TSharedRef<FChatMessage>& ChatMessage);
 
 	// Tournament stuff
+	// You need the OSS enhancements - install it for this to work
 	//DECLARE_MULTICAST_DELEGATE_OneParam(F_PREFIX(OnTournamentListDataChanged), const FUniqueNetId& /*LocalUserId*/);
-	void OnTournamentListDataChanged(const FUniqueNetId& LocalUserId);
+	//void OnTournamentListDataChanged(const FUniqueNetId& LocalUserId);
 
 	// The subsystem has finished reading the tournament details.  Copy them into our local struct and trigger the delegate to update the UI
-	void OnTournamentDetailsReadComplete();
+	//void OnTournamentDetailsReadComplete();
 
 
 	TArray<TSharedRef<IOnlinePartyJoinInfo>> PendingInvitesArray;

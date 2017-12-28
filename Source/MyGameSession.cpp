@@ -27,7 +27,9 @@ AMyGameSession::AMyGameSession(const FObjectInitializer& ObjectInitializer)
 		OnDestroySessionCompleteDelegate = FOnDestroySessionCompleteDelegate::CreateUObject(this, &AMyGameSession::OnDestroySessionComplete);
 		OnFindSessionsCompleteDelegate = FOnFindSessionsCompleteDelegate::CreateUObject(this, &AMyGameSession::OnFindSessionsComplete);
 		OnJoinSessionCompleteDelegate = FOnJoinSessionCompleteDelegate::CreateUObject(this, &AMyGameSession::OnJoinSessionComplete);
-		OnMatchmakingStartedDelegate = FOnMatchmakingStartedDelegate::CreateUObject(this, &AMyGameSession::OnMatchmakingStartedComplete);
+		// Requires the OSS additions and patched engine.
+		// Install it for full functionality support.
+		// OnMatchmakingStartedDelegate = FOnMatchmakingStartedDelegate::CreateUObject(this, &AMyGameSession::OnMatchmakingStartedComplete);
 		OnMatchmakingCompleteDelegate = FOnMatchmakingCompleteDelegate::CreateUObject(this, &AMyGameSession::OnMatchmakingComplete);
 		if (IsRunningDedicatedServer()) {
 			//RegisterServer();
@@ -40,7 +42,9 @@ AMyGameSession::AMyGameSession(const FObjectInitializer& ObjectInitializer)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyGameSession::AMyGameSession Session valid"));
 			Sessions->AddOnMatchmakingCompleteDelegate_Handle(OnMatchmakingCompleteDelegate);
-			Sessions->AddOnMatchmakingStartedDelegate_Handle(OnMatchmakingStartedDelegate);
+			// Requires the OSS additions and patched engine.
+			// Install it for full functionality support.
+			//Sessions->AddOnMatchmakingStartedDelegate_Handle(OnMatchmakingStartedDelegate);
 		}
 	}
 }

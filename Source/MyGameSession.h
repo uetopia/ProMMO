@@ -81,7 +81,9 @@ protected:
 	FOnDestroySessionCompleteDelegate OnDestroySessionCompleteDelegate;
 
 	/** Delegate for MATCHMAKER STARTED */
-	FOnMatchmakingStartedDelegate OnMatchmakingStartedDelegate;
+	// Requires the OSS additions and patched engine.
+	// Install it for full functionality support.
+	// FOnMatchmakingStartedDelegate OnMatchmakingStartedDelegate;
 	/** Delegate for MATCHMAKER COMPLETED */
 	FOnMatchmakingCompleteDelegate OnMatchmakingCompleteDelegate;
 
