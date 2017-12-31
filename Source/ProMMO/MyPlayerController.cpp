@@ -160,12 +160,12 @@ void AMyPlayerController::BeginPlay()
 			{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
 			//OnlineSub->GetFriendsInterface()->TriggerOnFriendsChangeDelegates(0);
-			OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
+			//OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
 			
 
-			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
+			//TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
 			//OnlineSub->GetFriendsInterface()->TriggerOnQueryRecentPlayersCompleteDelegates(*pid,"default",true,"none");
-			OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
+			//OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
 			}
 			
 			
