@@ -150,28 +150,37 @@ void AMyPlayerController::BeginPlay()
 		else
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] BeginPlay on Regular Level"));
-	
+
 			const auto OnlineSub = IOnlineSubsystem::Get();
 			if (OnlineSub)
 			{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
-			//OnlineSub->GetFriendsInterface()->TriggerOnFriendsChangeDelegates(0);
-			OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
-			
-
-			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
-			//OnlineSub->GetFriendsInterface()->TriggerOnQueryRecentPlayersCompleteDelegates(*pid,"default",true,"none");
-			OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
+				const auto IdentityInterface = OnlineSub->GetIdentityInterface();
+				if (IdentityInterface.IsValid())
+				{
+					// Creating a local player where we can get the UserID from
+					ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
+					TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
+					if (UserId.IsValid())
+					{
+						const auto LoginStatus = IdentityInterface->GetLoginStatus(*UserId);
+						if (LoginStatus == ELoginStatus::LoggedIn)
+						{
+							OnlineSub->GetFriendsInterface()->ReadFriendsList(0, "default");
+							OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*UserId, "default");
+						}
+					}
+				}
 			}
-			
-			
+
+
 
 
 		}
 	}
-	
 
-	
+
+
 
 }
 
@@ -1170,8 +1179,8 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 			}
 		}
 	}
-	
-	
+
+
 	return false;
 }
 
@@ -1327,7 +1336,7 @@ void AMyPlayerController::ServerAttemptSplitStackToIndex_Implementation(int32 in
 				if (InventorySlots[indexFrom].quantity > quantity)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom amount is greater than split amount"));
-					
+
 					InventorySlots[indexTo] = InventorySlots[indexFrom];
 					InventorySlots[indexTo].quantity = quantity;
 					InventorySlots[indexFrom].quantity = InventorySlots[indexFrom].quantity - quantity;
@@ -1375,7 +1384,7 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 		FTransform const SpawnTransform(ShootDir.Rotation(), spawnlocation);
 
 		UWorld* World = GetWorld(); // get a reference to the world
-		if (World) 
+		if (World)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] got world "));
 			// if world exists, spawn the blueprint actor
@@ -1394,16 +1403,16 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 				UGameplayStatics::FinishSpawningActor(pActor, SpawnTransform);
 			}
 
-			
+
 		}
 
 		InventorySlots[index].quantity = 0;
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptSpawnActor_Implementation DoRep_InventoryChanged"));
 		//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-		
-		
-		
-		
+
+
+
+
 	}
 
 }
@@ -1448,13 +1457,13 @@ void AMyPlayerController::ServerAttemptUseItem_Implementation(int32 index)
 	{
 		myBasePickup->OnItemUsed(SpawnTransform, myPlayerState->playerKeyId, LoadedActorOwnerClass);
 	}
-	
+
 
 	InventorySlots[index].quantity = InventorySlots[index].quantity - 1;
 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptUseItem_Implementation DoRep_InventoryChanged"));
 	//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-	
+
 }
 
 bool AMyPlayerController::AddToIndex(int32 indexFrom, int32 indexTo)
@@ -1482,7 +1491,7 @@ bool AMyPlayerController::AddToIndex(int32 indexFrom, int32 indexTo)
 				return true;
 			}
 		}
-		
+
 	}
 	return false;
 }
@@ -1550,7 +1559,7 @@ void AMyPlayerController::InventoryItemSellStart(int32 index)
 	{
 		// TODO other checks like...  Is the vendor in range?
 		FOnInventoryItemSellStarted.Broadcast(index);
-		
+
 	}
 	return;
 }
@@ -1605,7 +1614,7 @@ bool AMyPlayerController::PerformJsonHttpRequest(void(AMyPlayerController::*dele
 
 	TSharedRef < IHttpRequest > Request = Http->CreateRequest();
 
-	
+
 	// Get the access token
 	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
 
@@ -1803,7 +1812,7 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 			JsonParsed->TryGetStringField("description", MyCurrentVendorDescription);
 			JsonParsed->TryGetBoolField("bMyVendor", MyCurrentVendorIsOwnedByMe);
 			JsonParsed->TryGetNumberField("vendorCurrency", MyCurrentVendorCurrency);
-			
+
 
 			const JsonValPtrArray *VendorItemsJson = nullptr;
 			JsonParsed->TryGetArrayField("items", VendorItemsJson);
@@ -1841,7 +1850,7 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 							//FString AttributeJsonRaw = savedAttributes;
 							TSharedPtr<FJsonObject> AttributesJsonParsed;
 							TSharedRef<TJsonReader<TCHAR>> AttributesJsonReader = TJsonReaderFactory<TCHAR>::Create(savedAttributes);
-							
+
 							//const JsonValPtrArray *AttributesJson;
 
 							if (FJsonSerializer::Deserialize(AttributesJsonReader, AttributesJsonParsed))
@@ -1885,17 +1894,17 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 									{
 										NewVendorItem.Attributes.Add(currObject->Value->AsNumber());
 									}
-									
+
 								}
 								*/
 
-								
-	
+
+
 								//AttributeParseSuccess = AttributesJsonParsed->TryGetArrayField("data", AttributesJson);
 								//TArray<TSharedPtr<FJsonValue> > JsonFriends = JsonObject->GetArrayField(TEXT("data"));
 							}
 
-		
+
 
 							/*
 							// parse user attributes
@@ -1967,11 +1976,11 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 						}
 					}
 				}
-				
+
 			}
 
 			FOnVendorInfoComplete.Broadcast();
-			
+
 		}
 	}
 }
@@ -2169,7 +2178,7 @@ bool AMyPlayerController::AddAbilityToBar(int32 index, FMyGrantedAbility Granted
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddAbilityToBar"));
 	// this is executing on the client, not server.
 
-	
+
 	ServerAttemptAddAbilityToBar(index, GrantedAbility);
 	return false;
 }
@@ -2222,7 +2231,7 @@ void AMyPlayerController::ServerAttemptAddAbilityToBar_Implementation(int32 inde
 
 	//DoRep_AbilityInterfaceChanged = !DoRep_AbilityInterfaceChanged;
 
-	
+
 	return;
 }
 
@@ -2323,6 +2332,6 @@ void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >
 	DOREPLIFETIME(AMyPlayerController, InteractingWithVendorKeyId);
 	DOREPLIFETIME(AMyPlayerController, Experience);
 	DOREPLIFETIME(AMyPlayerController, ExperienceThisLevel);
-	
+
 
 }
