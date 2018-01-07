@@ -14,7 +14,7 @@ https://www.youtube.com/watch?v=qVm1kcUoFBY
 https://forums.unrealengine.com/community/community-content-tools-and-tutorials/1404220-pro-mmo-foundation-free-open-source-multiplayer-tools-built-to-scale
 
 # Tutorial videos and walkthroughs
-coming soon
+https://www.youtube.com/watch?v=rLqGorlZ6hk
 
 # Known Issues
 none
