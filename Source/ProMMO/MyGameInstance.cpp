@@ -342,6 +342,12 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 			}
 		}
 	}
+
+	// pull down the list of game data objects if any - just testing
+	FString cursor = "";
+	QueryGameDataList(cursor);
+	QueryGameData("4898202331381760");
+
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] Done!"));
 }
 
@@ -3709,6 +3715,130 @@ void UMyGameInstance::RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpRe
 		}
 	}
 }
+
+
+bool UMyGameInstance::QueryGameDataList(FString cursor)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] QueryGameDataList"));
+
+	FString nonceString = "10951350917635";
+	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("nonce", "nonceString");
+	PlayerJsonObj->SetStringField("encryption", encryption);
+	if (cursor.Len() > 5)
+	{
+		PlayerJsonObj->SetStringField("cursor", cursor);
+	}
+	
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+	FString APIURI = "/api/v1/game/data/";
+
+	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::QueryGameDataListRequestComplete, APIURI, JsonOutputString);
+
+	return requestSuccess;
+}
+
+void UMyGameInstance::QueryGameDataListRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			bool Authorization = JsonParsed->GetBoolField("authorization");
+			UE_LOG(LogTemp, Log, TEXT("Authorization"));
+			if (Authorization)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+				bool Success = JsonParsed->GetBoolField("success");
+				if (Success) {
+					UE_LOG(LogTemp, Log, TEXT("Success True"));
+
+					// TODO - do something with the returned array of keys
+
+				}
+			}
+		}
+	}
+}
+
+
+bool UMyGameInstance::QueryGameData(FString gameDataKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] QueryGameData"));
+
+	FString nonceString = "10951350917635";
+	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("nonce", "nonceString");
+	PlayerJsonObj->SetStringField("encryption", encryption);
+	PlayerJsonObj->SetStringField("key_id", gameDataKeyId);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+	FString APIURI = "/api/v1/game/data/" + gameDataKeyId;
+
+	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::QueryGameDataRequestComplete, APIURI, JsonOutputString);
+
+	return requestSuccess;
+}
+
+void UMyGameInstance::QueryGameDataRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			bool Authorization = JsonParsed->GetBoolField("authorization");
+			UE_LOG(LogTemp, Log, TEXT("Authorization"));
+			if (Authorization)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+				bool Success = JsonParsed->GetBoolField("success");
+				if (Success) {
+					UE_LOG(LogTemp, Log, TEXT("Success True"));
+					FString game_data_json_string = JsonParsed->GetStringField("data");
+
+					// TODO - do something with the returned string
+
+				}
+			}
+		}
+	}
+}
+
 
 
 void UMyGameInstance::RequestBeginPlay()

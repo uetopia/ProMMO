@@ -489,6 +489,14 @@ public:
 	bool Reward(FString playerKeyId, FString itemName, FString description, int32 amount);
 	void RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
+	// Game data access
+	// set these up on the backend
+	bool QueryGameDataList(FString cursor);
+	void QueryGameDataListRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	bool QueryGameData(FString gameDataKeyId);
+	void QueryGameDataRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
 	void RequestBeginPlay();
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
