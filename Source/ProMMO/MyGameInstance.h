@@ -56,17 +56,23 @@ struct FMyActivePlayer {
 		int32 roundKills;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 roundDeaths;
-	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-	//	TArray<FString> killed;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		int32 Rank;
+		TArray<FString> killed;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FString> events;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 rank;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 experience;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 score;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 currencyCurrent;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString gamePlayerKeyId;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FUniqueNetIdRepl UniqueId;
-	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
+	//UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		AMyPlayerController* PlayerController;
 
 	FTimerHandle GetPlayerInfoDelayHandle;
@@ -80,6 +86,11 @@ struct FMyActivePlayers {
 	GENERATED_USTRUCT_BODY()
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		TArray<FMyActivePlayer> ActivePlayers;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString encryption;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString nonce;
+	
 };
 
 // Matchmaker specific structs.  These are used with uetopia matchmaker functionality.
@@ -142,6 +153,8 @@ struct FMyMatchInfo {
 		bool authorization;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString encryption;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString nonce;
 };
 
 USTRUCT(BlueprintType)
@@ -434,8 +447,8 @@ public:
 	bool OutgoingChat(int32 playerID, FText message);
 	void OutgoingChatComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
-	bool SubmitMatchResults();
-	void SubmitMatchResultsComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+	void SubmitReport();
+	void SubmitReportComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	bool SubmitMatchMakerResults();
 	void SubmitMatchMakerResultsComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
@@ -524,6 +537,9 @@ public:
 	// Record it.
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		bool RecordKill(int32 killerPlayerID, int32 victimPlayerID);
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool RecordEvent(int32 playerID, FString eventSummary);
 
 	// Get a serverLink our of our serverlinks array by targetServerKeyId
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")

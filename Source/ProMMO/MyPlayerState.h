@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Engine.h"
 #include "MyTravelApprovedActor.h"
+#include "MyTypes.h"
 #include "MyPlayerState.generated.h"
 
 /**
@@ -113,6 +114,10 @@ public:
 		FString savedAbilities;
 	UPROPERTY(BlueprintReadOnly)
 		FString savedInterface;
+
+	// Keep track of the abilities this player has available.
+	// We need to be able to give them to the character again on respawn
+	TArray< FMyGrantedAbility > GrantedAbilities;
 
 	// Authorizations for servers go in here.  These are server Key Ids.
 	// This is deprecated...  Keeping a copy of the entire server link now to facilitate instances.

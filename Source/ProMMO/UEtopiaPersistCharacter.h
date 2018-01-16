@@ -7,6 +7,7 @@
 #include "MyBaseVendor.h"
 #include "AbilitySystemInterface.h" 
 #include "GameplayAbility.h"
+#include "MyAttributeSet.h"
 #include "UEtopiaPersistCharacter.generated.h"
 
 
@@ -150,10 +151,26 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void RemapAbilities();
 
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		float GetCooldownTimeRemaining(FGameplayAbilitySpecHandle CallingAbilityHandle, float& TotalDuration);
+
 	// Current health of the Pawn
+	// TODO Deprecate - this is an attribute now!
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UETOPIA")
 		float Health;
 
+	UPROPERTY()
+		UMyAttributeSet*	AttributeSet;
+
+	//UFUNCTION(Server, Reliable, WithValidation)
+	void Die(AController* Killer, AActor* DamageCauser, const FGameplayEffectSpec& KillingEffectSpec, float KillingDamageMagnitude, FVector KillingDamageNormal);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void PlayDying();
+
+	bool bIsDying;
+
+	FTimerHandle PlayDyingTimerHandle;
 
 
 private:
