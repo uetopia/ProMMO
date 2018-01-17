@@ -37,6 +37,18 @@ struct FMySessionSearchResult {
 };
 
 USTRUCT(BlueprintType)
+struct FUserEvent {
+
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString EventIcon;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString EventType;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString EventSummary;
+};
+
+USTRUCT(BlueprintType)
 struct FMyActivePlayer {
 
 	GENERATED_USTRUCT_BODY()
@@ -59,7 +71,7 @@ struct FMyActivePlayer {
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		TArray<FString> killed;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		TArray<FString> events;
+		TArray<FUserEvent> events;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 rank;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
@@ -539,7 +551,7 @@ public:
 		bool RecordKill(int32 killerPlayerID, int32 victimPlayerID);
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		bool RecordEvent(int32 playerID, FString eventSummary);
+		bool RecordEvent(int32 playerID, FString eventSummary, FString eventIcon, FString eventType);
 
 	// Get a serverLink our of our serverlinks array by targetServerKeyId
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")

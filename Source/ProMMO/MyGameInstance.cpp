@@ -5249,7 +5249,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 			
 			// create an event also
 			FString eventSummary = "killed " + PlayerRecord.ActivePlayers[victimPlayerIndex].playerTitle;
-			RecordEvent(killerPlayerID, eventSummary);
+			RecordEvent(killerPlayerID, eventSummary, "location_searching", "Kill");  // look at https://material.io/icons/ for other icons
 
 			// Increase the killer's kill count
 			PlayerRecord.ActivePlayers[killerPlayerIndex].roundKills = PlayerRecord.ActivePlayers[killerPlayerIndex].roundKills + 1;
@@ -5348,7 +5348,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 	return true;
 }
 
-bool UMyGameInstance::RecordEvent(int32 playerID, FString eventSummary)
+bool UMyGameInstance::RecordEvent(int32 playerID, FString eventSummary, FString eventIcon, FString eventType)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] "));
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] killerPlayerID: %s"), *eventSummary);
@@ -5361,7 +5361,7 @@ bool UMyGameInstance::RecordEvent(int32 playerID, FString eventSummary)
 	{
 		for (int32 b = 0; b < CurrentActivePlayer->events.Num(); b++)
 		{
-			if (CurrentActivePlayer->events[b] == eventSummary)
+			if (CurrentActivePlayer->events[b].EventSummary == eventSummary)
 			{
 				eventAlreadyExists = true;
 				break;
@@ -5371,7 +5371,11 @@ bool UMyGameInstance::RecordEvent(int32 playerID, FString eventSummary)
 
 	if (!eventAlreadyExists)
 	{
-		CurrentActivePlayer->events.Add(eventSummary);
+		FUserEvent tempEvent;
+		tempEvent.EventSummary = eventSummary;
+		tempEvent.EventIcon = eventIcon;
+		tempEvent.EventType = eventType;
+		CurrentActivePlayer->events.Add(tempEvent);
 	}
 	return true;
 }
