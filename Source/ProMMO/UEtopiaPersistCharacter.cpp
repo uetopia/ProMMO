@@ -99,6 +99,9 @@ void AUEtopiaPersistCharacter::PossessedBy(AController* NewController)
 		AbilitySystem->InitAbilityActorInfo(this, this);
 		InitAbilitySystemClient();
 	}
+
+	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
+	playerC->GrantCachedAbilities();
 	RemapAbilities();
 }
 

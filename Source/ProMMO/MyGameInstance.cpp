@@ -1215,6 +1215,9 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 				FString playerKeyId = JsonParsed->GetStringField("userKeyId");
 
 				FMyActivePlayer* activePlayer = getPlayerByPlayerKey(JsonParsed->GetStringField("userKeyId"));
+
+				// TODO - refactor this to use get by key.
+
 				for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 				{
 					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - Looking for player Controller"));
@@ -1319,9 +1322,14 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 										{
 											UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
 
-											AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+											// There is a problem with giving the ability here.
+											// It works fine for initial play.
+											// but after a death/respawn abilities are missing.
+											// moved the give ability call into the refresh call
 
-											grantedAbility.AbilityHandle = AbilityHandle;
+											//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+
+											//grantedAbility.AbilityHandle = AbilityHandle;
 											grantedAbility.classPath = grantedAbilityObj->GetStringField(FString("AbilityClass"));
 											grantedAbility.Icon = LoadedObjectClass->Icon;
 											grantedAbility.title = LoadedObjectClass->Title.ToString();
@@ -1335,8 +1343,15 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									}
 
 									// trigger the delegate
-									playerC->MyGrantedAbilities = LocalGrantedAbilities;
-									playerS->GrantedAbilities = LocalGrantedAbilities;
+									// We don't want to do this anymore.
+									// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
+									//playerC->MyGrantedAbilities = LocalGrantedAbilities;
+									playerS->CachedAbilities = LocalGrantedAbilities;
+
+									// tell player controller to convert cached to granted
+									playerC->GrantCachedAbilities();
+
+									//playerS->GrantedAbilities = LocalGrantedAbilities;
 									//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
 								}
 							}
@@ -1370,9 +1385,9 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 								{
 									UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
 
-									AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+									//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
 
-									grantedAbility.AbilityHandle = AbilityHandle;
+									//grantedAbility.AbilityHandle = AbilityHandle;
 									grantedAbility.classPath = AbilityClassPaths[AbilityIndex];
 									grantedAbility.Icon = LoadedObjectClass->Icon;
 									grantedAbility.title = LoadedObjectClass->Title.ToString();
@@ -1385,8 +1400,15 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							}
 
 							// trigger the delegate
-							playerC->MyGrantedAbilities = LocalGrantedAbilities;
+							// We don't want to do this anymore.
+							// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
+							// playerC->MyGrantedAbilities = LocalGrantedAbilities;
 							//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
+
+							playerS->CachedAbilities = LocalGrantedAbilities;
+
+							// tell player controller to convert cached to granted
+							playerC->GrantCachedAbilities();
 
 						}
 

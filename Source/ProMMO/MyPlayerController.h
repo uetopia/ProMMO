@@ -625,12 +625,17 @@ public:
 	UPROPERTY(BlueprintReadOnly, Replicated, Category = "UETOPIA")
 		int32 AbilitySlotsPerRow;
 
-	// TODO delete MyGrantedAbilities + move OnRep_OnAbilitiesChange
-	// THis is how I had it originally set up, but it needed to exist in player state
-	// this is not needed anymore.
+	// THis is confusing, but neccesary.
+	// This array of granted abilities exists for the client to set up the UI
+	// Server side the cached and granted abilities lists live inside playerState
+	// The reason is that we need to re-grant the abilities on respawn, which happens server side.
+	// After abilities have been granted, this array is updated, which triggers the UI refresh client side.
 
 	UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_OnAbilitiesChange, Category = "UETOPIA")
 		TArray<FMyGrantedAbility> MyGrantedAbilities;
+
+	UFUNCTION(Server, Reliable, WithValidation)
+		void GrantCachedAbilities();
 
 	// Rep notify to tell the client to load the new inventory
 	//UPROPERTY(ReplicatedUsing = OnRep_OnAbilitiesChange)

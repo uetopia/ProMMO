@@ -3,6 +3,7 @@
 #include "MyPlayerController.h"
 #include "ProMMO.h"
 #include "MyGameInstance.h"
+#include "MyBaseGameplayAbility.h"
 #include "OnlineSubsystemUtils.h"
 #include "ILoginFlowModule.h"
 //#include "OnlinePartyUEtopia.h"
@@ -2275,9 +2276,84 @@ void AMyPlayerController::ServerAttemptSwapAbilityBarLocations_Implementation(in
 	return;
 }
 
+bool AMyPlayerController::GrantCachedAbilities_Validate()
+{
+	return true;
+}
+void AMyPlayerController::GrantCachedAbilities_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::GrantCachedAbilities_Implementation"));
+
+	AMyPlayerState* playerS = Cast<AMyPlayerState>(this->PlayerState);
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	FGameplayAbilitySpecHandle AbilityHandle;
+	UClass* LoadedActorOwnerClass;
+	UMyBaseGameplayAbility* LoadedObjectClass;
+
+	// empty the granted abilities array in player state and here
+	MyGrantedAbilities.Empty();
+	playerS->GrantedAbilities.Empty();
+
+	// Create a local copy of the array
+	TArray<FMyGrantedAbility> LocalGrantedAbilities;
+	FMyGrantedAbility grantedAbility;
+
+	for (int32 Index = 0; Index < playerS->CachedAbilities.Num(); Index++)
+	{
+		
+		LoadedActorOwnerClass = LoadClassFromPath(playerS->CachedAbilities[Index].classPath);
+
+		if (LoadedActorOwnerClass)
+		{
+			LoadedObjectClass = Cast<UMyBaseGameplayAbility>(LoadedActorOwnerClass->GetDefaultObject());
+			AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+
+			grantedAbility.AbilityHandle = AbilityHandle;
+			grantedAbility.classPath = playerS->CachedAbilities[Index].classPath;
+			grantedAbility.Icon = LoadedObjectClass->Icon;
+			grantedAbility.title = LoadedObjectClass->Title.ToString();
+			grantedAbility.description = LoadedObjectClass->Description.ToString();
+			//UGameplayAbility* AbilityClassRef = Cast<UGameplayAbility>(LoadedObjectClass);
+			grantedAbility.Ability = LoadedObjectClass->GetClass();
+
+			LocalGrantedAbilities.Add(grantedAbility);
+		}
+
+		
+	}
+	playerS->GrantedAbilities = LocalGrantedAbilities;
+	MyGrantedAbilities = LocalGrantedAbilities;
+
+	// WE need to update MyAbilitySlots as well with the new ability
+	for (int32 Index = 0; Index < MyAbilitySlots.Num(); Index++)
+	{
+		int32 matchingGrantedAbilityIndex = -1;
+		// go though granted abilities and find by Class
+		for (int32 grantedAIndex = 0; grantedAIndex < MyGrantedAbilities.Num(); grantedAIndex++)
+		{
+			if (MyAbilitySlots[Index].classPath == MyGrantedAbilities[grantedAIndex].classPath)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Found matching granted ability"));
+				matchingGrantedAbilityIndex = grantedAIndex;
+				break;
+			}
+		}
+		// If a match was found, replace the link to the granted ability.
+		if (matchingGrantedAbilityIndex >= 0)
+		{
+			UE_LOG(LogTemp, Log, TEXT("Adding found ability to ability slots"));
+			MyAbilitySlots[Index].GrantedAbility = MyGrantedAbilities[matchingGrantedAbilityIndex];
+		}
+
+	}
+	return;
+}
+
 void AMyPlayerController::OnRep_OnAbilitiesChange_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilitiesChange"));
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	playerChar->RemapAbilities();
 	OnAbilitiesChanged.Broadcast();
 }
 
@@ -2286,8 +2362,8 @@ void AMyPlayerController::OnRep_OnAbilityInterfaceChange_Implementation()
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilityInterfaceChange"));
 	OnAbilityInterfaceChanged.Broadcast();
 
-	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
-	playerChar->RemapAbilities();
+	
+	
 }
 
 /*
@@ -2307,7 +2383,7 @@ return true;
 
 void AMyPlayerController::UnFreeze()
 {
-	
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::UnFreeze"));
 	ServerRestartPlayer();
 
 	// Tell the UI to refresh
