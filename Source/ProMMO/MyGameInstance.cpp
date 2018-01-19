@@ -2044,10 +2044,10 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 				PlayerJsonObj->SetStringField("equipment", "hardcoded test");
 				PlayerJsonObj->SetStringField("abilities", AbilitiesOutputString);
 				PlayerJsonObj->SetStringField("interface", InterfaceOutputString);
-				PlayerJsonObj->SetNumberField("rank", 1600);
-				PlayerJsonObj->SetNumberField("score", 1);
-				PlayerJsonObj->SetNumberField("level", 1);
-				PlayerJsonObj->SetNumberField("experience", 1);
+				PlayerJsonObj->SetNumberField("rank", activePlayer->rank);
+				PlayerJsonObj->SetNumberField("score", activePlayer->score);
+				PlayerJsonObj->SetNumberField("level", 1);  // TODO set this up in the struct
+				PlayerJsonObj->SetNumberField("experience", activePlayer->experience);
 				PlayerJsonObj->SetNumberField("experienceThisLevel", 1);
 				PlayerJsonObj->SetNumberField("coordLocationX", 1);
 				PlayerJsonObj->SetNumberField("coordLocationY", 1);
@@ -5278,6 +5278,13 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 			// And increase the victim's deaths
 			PlayerRecord.ActivePlayers[victimPlayerIndex].roundDeaths = PlayerRecord.ActivePlayers[victimPlayerIndex].roundDeaths + 1;
 
+			// Give the killer some xp and score
+			PlayerRecord.ActivePlayers[killerPlayerIndex].score = PlayerRecord.ActivePlayers[killerPlayerIndex].score + 100;
+			PlayerRecord.ActivePlayers[killerPlayerIndex].experience = PlayerRecord.ActivePlayers[killerPlayerIndex].experience + 10;
+
+			//Change rank
+			CalculateNewRankContinuous(killerPlayerIndex, victimPlayerIndex, true);
+
 			// Optionally, you can also have a CRED cost associated with killing/dying.
 			// Leaving it muted here, since it's not a standard MMO feature.
 
@@ -5635,6 +5642,35 @@ void UMyGameInstance::CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlaye
 
 	MatchInfo.players[WinnerPlayerIndex].rank = newWinnerRank;
 	MatchInfo.players[LoserPlayerIndex].rank = newLoserRank;
+}
+
+void UMyGameInstance::CalculateNewRankContinuous(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser) {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] "));
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] WinnerRank %d"), PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] LoserRank %d"), PlayerRecord.ActivePlayers[LoserPlayerIndex].rank);
+	// redoing this according to:
+	// https://metinmediamath.wordpress.com/2013/11/27/how-to-calculate-the-elo-rating-including-example/
+	float winnerTransformedRankExp = PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank / 400.0f;
+	float winnerTransformedRank = pow(10.0f, winnerTransformedRankExp);
+	float loserTransformedRankExp = PlayerRecord.ActivePlayers[LoserPlayerIndex].rank / 400.0f;
+	float loserTransformedRank = pow(10.0f, loserTransformedRankExp);
+
+	float winnerExpected = winnerTransformedRank / (winnerTransformedRank + loserTransformedRank);
+	float loserExpected = loserTransformedRank / (winnerTransformedRank + loserTransformedRank);
+
+	float k = 32.0f;
+
+	int32 newWinnerRank = round(PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank + k * (1.0f - winnerExpected));
+	int32 newLoserRank = round(PlayerRecord.ActivePlayers[LoserPlayerIndex].rank + k * (0.0f - loserExpected));
+
+
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] newWinnerRank %d"), newWinnerRank);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] NewLoserRank %d"), newLoserRank);
+
+	PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank = newWinnerRank;
+	PlayerRecord.ActivePlayers[LoserPlayerIndex].rank = newLoserRank;
 }
 
 bool UMyGameInstance::NotifyDownReady()

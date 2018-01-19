@@ -684,7 +684,10 @@ protected:
 	*/
 	virtual void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
 
-	void CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser);
+	// WE probably don't need two of these, but they operate on different structs, so I'm leaving them for now.
+	void CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser); // for competitive/matchmaker
+	void CalculateNewRankContinuous(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser); // for continuous
+	
 
 
 };
