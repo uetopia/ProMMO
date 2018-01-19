@@ -166,7 +166,7 @@ void UMyGameInstance::Init()
 
 	// Set up a timer to submit kills and stats to the backend 
 	// This should be anywhere from a minute to 15 minutes, depending on game load.
-	GetWorld()->GetTimerManager().SetTimer(ServerLinksTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
+	GetWorld()->GetTimerManager().SetTimer(SubmitReportTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
 	
 
 	MatchStarted = false;

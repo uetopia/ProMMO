@@ -325,6 +325,7 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	FTimerHandle ServerLinksTimerHandle;
 	FTimerHandle RewardSpawnTimerHandle;
 	FTimerHandle AttemptStartMatchTimerHandle;
+	FTimerHandle SubmitReportTimerHandle;
 
 	//*************************
 	//TEMPLATE Load Obj From Path (thanks Rama!)
