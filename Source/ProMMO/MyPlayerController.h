@@ -46,6 +46,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnVendorInfoCompleteDelegate);
 //DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnVendorInteractChangedDelegate, FString, VendorKeyId, bool, bIsInteracting);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAbilitiesChangedDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAbilityInterfaceChangedDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGetCharacterListCompleteDelegate);
 
 
 /**
@@ -412,6 +413,28 @@ public:
 	bool GetVendorInfo(FString vendorKeyId);
 	void GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
+
+	/////////////////////////////////////////
+	// Character list, create, delete, and select are performed on the client before connecting to the server
+	/////////////////////////////////////////
+
+	
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	bool GetCharacterList();
+	void GetCharacterListComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+	
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	bool CreateCharacter(FString title, FString description, FString characterType, FString characterState);
+	void CreateCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+	
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	bool DeleteCharacter(FString characterKeyId);
+	void DeleteCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	bool SelectCharacter(FString characterKeyId);
+	void SelectCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
 	
 	// DELEGATES
 
@@ -507,7 +530,10 @@ public:
 	//UPROPERTY(ReplicatedUsing = OnRep_OnAbilityInterfaceChange)
 	//	bool DoRep_AbilityInterfaceChanged;
 
-	
+	// This is the delegate to grab on to in the UI
+	// When it fires, it signals that you should refresh the character list
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+	FOnGetCharacterListCompleteDelegate OnGetCharacterListCompleteDelegate;
 
 	// Delegate which is triggered whenever a vendor interaction starts or ends
 	//UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
@@ -644,6 +670,11 @@ public:
 	// this function activates after replication
 	UFUNCTION(Client, Reliable)
 		void OnRep_OnAbilitiesChange();
+
+	// Characters
+	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FMyCharacterRecord> MyCachedCharacters;
+	
 
 	ILoginFlowManager::FOnPopupDismissed OnPopupDismissedUEtopiaDelegate;
 

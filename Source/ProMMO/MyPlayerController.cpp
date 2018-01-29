@@ -1896,48 +1896,6 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 								//TArray<TSharedPtr<FJsonValue> > JsonFriends = JsonObject->GetArrayField(TEXT("data"));
 							}
 
-		
-
-							/*
-							// parse user attributes
-							if (It->Value.IsValid() && It->Value->Type == EJson::String)
-							{
-							FString ValueStr = It->Value->AsString();
-							if (It->Key == TEXT("key_id"))
-							{
-							UserIdStr = ValueStr;
-							}
-							Attributes.Add(It->Key, ValueStr);
-							}
-							// setup presence booleans
-							if (It->Value.IsValid() && It->Value->Type == EJson::Boolean)
-							{
-							bool ValueBool = It->Value->AsBool();
-							if (It->Key == TEXT("bIsPlayingThisGame"))
-							{
-							UserIsPlayingThisGame = ValueBool;
-							}
-							if (It->Key == TEXT("bIsOnline"))
-							{
-							UserIsOnline = ValueBool;
-							}
-
-							}
-							}
-							// only add if valid id
-							if (!UserIdStr.IsEmpty())
-							{
-							TSharedRef<FOnlineFriendUEtopia> FriendEntry(new FOnlineFriendUEtopia(UserIdStr));
-							FriendEntry->AccountData = Attributes;
-							// set up presence
-							FriendEntry->Presence.bIsPlayingThisGame = UserIsPlayingThisGame;
-							FriendEntry->Presence.bIsOnline = UserIsOnline;
-							// Add new friend entry to list
-							FriendsList.Friends.Add(FriendEntry);
-							}
-							*/
-
-
 							if (!NewVendorItem.itemClassPath.IsEmpty())
 							{
 								UE_LOG(LogTemp, Log, TEXT("!NewVendorItem.itemClassPath.IsEmpty()"));
@@ -1961,8 +1919,6 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 							{
 								NewVendorItem.Icon = nullptr;
 							}
-
-
 
 							MyCurrentVendorInventory.Add(NewVendorItem);
 						}
@@ -2131,6 +2087,223 @@ void AMyPlayerController::ServerClaimItemFromVendor_Implementation(const FString
 	TheGameInstance->VendorItemClaim(this, vendorKeyId, vendorItemKeyId);
 	return;
 }
+
+/////////////
+// CHARACTERS
+/////////////
+
+
+bool AMyPlayerController::GetCharacterList()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] GetCharacterList"));
+
+	// clear out the struct
+	MyCachedCharacters.Empty();
+
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/collectionGetPage";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::GetCharacterListComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+
+}
+
+void AMyPlayerController::GetCharacterListComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+
+			const JsonValPtrArray *CharactersJson = nullptr;
+			JsonParsed->TryGetArrayField("characters", CharactersJson);
+			if (CharactersJson != nullptr)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Found Characters in JSON "));
+				// sometimes crashing here...  adding an extra check
+				if (CharactersJson->Num() > 0)
+				{
+					for (auto characterJson : *CharactersJson) {
+						UE_LOG(LogTemp, Log, TEXT("Found Vendor Item "));
+						auto CharacterObj = characterJson->AsObject();
+						if (CharacterObj.IsValid())
+						{
+							UE_LOG(LogTemp, Log, TEXT("Found Character - it is valid "));
+							FMyCharacterRecord NewCharacter;
+
+							CharacterObj->TryGetStringField("key_id", NewCharacter.key_id);
+							CharacterObj->TryGetStringField("title", NewCharacter.title);
+							CharacterObj->TryGetStringField("description", NewCharacter.description);
+							CharacterObj->TryGetStringField("characterType", NewCharacter.characterType);
+							CharacterObj->TryGetStringField("characterState", NewCharacter.characterState);
+							CharacterObj->TryGetBoolField("characterAlive", NewCharacter.characterAlive);
+							CharacterObj->TryGetBoolField("currentlySelectedActive", NewCharacter.currentlySelectedActive);
+
+							// TODO - run some logic to assign an icon 
+							NewCharacter.Icon = nullptr;
+	
+							MyCachedCharacters.Add(NewCharacter);
+						}
+					}
+				}
+
+			}
+
+			OnGetCharacterListCompleteDelegate.Broadcast();
+
+		}
+	}
+}
+
+bool AMyPlayerController::CreateCharacter(FString title, FString description, FString characterType, FString characterState)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] CreateCharacter"));
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+
+	PlayerJsonObj->SetStringField("title", title);
+	PlayerJsonObj->SetStringField("description", description);
+	PlayerJsonObj->SetStringField("characterType", characterType);
+	PlayerJsonObj->SetStringField("characterState", characterState);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/create";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::CreateCharacterComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+
+}
+
+void AMyPlayerController::CreateCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
+		}
+	}
+}
+
+bool AMyPlayerController::DeleteCharacter(FString characterKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] DeleteCharacter"));
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("key_id", characterKeyId);
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/delete";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::DeleteCharacterComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+}
+
+void AMyPlayerController::DeleteCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
+		}
+	}
+}
+
+
+bool AMyPlayerController::SelectCharacter(FString characterKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] SelectCharacter"));
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("key_id", characterKeyId);
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/select";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::SelectCharacterComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+}
+
+void AMyPlayerController::SelectCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
+		}
+	}
+}
+
 
 ////////////
 // ABILITIES
