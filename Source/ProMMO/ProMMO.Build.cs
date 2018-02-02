@@ -18,10 +18,13 @@ public class ProMMO : ModuleRules
                 "Slate",
                 "SlateCore",
                 "GameplayAbilities",
-"RamaSaveSystem"
- });
-        PrivateDependencyModuleNames.AddRange(new string[] { "LoginFlow", "RamaSaveSystem", "Slate", "SlateCore" });
-        PrivateIncludePathModuleNames.AddRange(new string[] { "RamaSaveSystem" });
+	            "GameplayTags"
+                //,"RamaSaveSystem"
+         });
+
+        PrivateDependencyModuleNames.AddRange(new string[] { "LoginFlow", "Slate", "SlateCore" });
+        //PrivateDependencyModuleNames.AddRange(new string[] { "LoginFlow", "RamaSaveSystem", "Slate", "SlateCore" });
+        //PrivateIncludePathModuleNames.AddRange(new string[] { "RamaSaveSystem" });
 
     }
 }

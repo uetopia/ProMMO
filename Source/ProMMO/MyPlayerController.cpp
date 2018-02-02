@@ -3,6 +3,7 @@
 #include "MyPlayerController.h"
 #include "ProMMO.h"
 #include "MyGameInstance.h"
+#include "MyBaseGameplayAbility.h"
 #include "OnlineSubsystemUtils.h"
 #include "ILoginFlowModule.h"
 //#include "OnlinePartyUEtopia.h"
@@ -75,9 +76,10 @@ AMyPlayerController::AMyPlayerController()
 
 	// Requires the OSS additions and patched engine.
 	// Install it for full functionality support.
-	//ChatInterface->AddOnChatRoomListReadCompleteDelegate_Handle(FOnChatRoomListReadCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnChatRoomListReadComplete));
-	//TournamentInterface->AddOnTournamentListDataChangedDelegate_Handle(FOnTournamentListDataChangedDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentListDataChanged));
-	//TournamentInterface->AddOnTournamentDetailsReadDelegate_Handle(FOnTournamentDetailsReadDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentDetailsReadComplete));
+	// ChatInterface->AddOnChatRoomListReadCompleteDelegate_Handle(FOnChatRoomListReadCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnChatRoomListReadComplete));
+
+	// TournamentInterface->AddOnTournamentListDataChangedDelegate_Handle(FOnTournamentListDataChangedDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentListDataChanged));
+	// TournamentInterface->AddOnTournamentDetailsReadDelegate_Handle(FOnTournamentDetailsReadDelegate::CreateUObject(this, &AMyPlayerController::OnTournamentDetailsReadComplete));
 
 	// Bind delegates into the OSS
 	OnReadFriendsListCompleteDelegate = FOnReadFriendsListComplete::CreateUObject(this, &AMyPlayerController::OnReadFriendsComplete);
@@ -160,12 +162,12 @@ void AMyPlayerController::BeginPlay()
 			{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
 			//OnlineSub->GetFriendsInterface()->TriggerOnFriendsChangeDelegates(0);
-			//OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
+			OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
 			
 
-			//TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
+			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
 			//OnlineSub->GetFriendsInterface()->TriggerOnQueryRecentPlayersCompleteDelegates(*pid,"default",true,"none");
-			//OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
+			OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
 			}
 			
 			
@@ -208,7 +210,6 @@ bool AMyPlayerController::RequestBeginPlay_Validate()
 {
 	return true;
 }
-
 
 // only here because oss functionality is missing.
 // USE the enhaced OSS for serious projects.
@@ -279,7 +280,7 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 				TEXT("GetFriendsList(%d) failed"), LocalPlayer);
 		}
 	}
-	// this is causing duplicates?
+	// this is causing duplicates
 	OnFriendsChanged.Broadcast();
 
 	// Can't have this in here.
@@ -412,7 +413,6 @@ void AMyPlayerController::AcceptFriendInvite(const FString& senderUserKeyId)
 	OnlineSub->GetFriendsInterface()->AcceptInvite(0, *SenderUserId, "default");
 }
 
-
 // This is only here because we need functionality that does not exist in the stock OSS.
 // Why is there no Query Friends list or OnFriendsListChanged?
 // Hacky workaround is to use a room exit delegate instead
@@ -427,9 +427,9 @@ void AMyPlayerController::QueryChatChannels() {
 		{
 			OnlineSub->GetChatInterface()->TriggerOnChatRoomExitDelegates(*UserId, FChatRoomId("unused"), true, "unused");
 		}
-		
+
 	}
-	
+
 }
 
 void AMyPlayerController::CreateParty(const FString& PartyTitle, const FString& TournamentKeyId, bool TournamentParty)
@@ -852,188 +852,185 @@ void AMyPlayerController::OnChatPrivateMessageReceivedComplete(const FUniqueNetI
 	OnChatPrivateMessageReceivedDisplayUIDelegate.Broadcast(SenderUserKeyId, ChatMessageCombined);
 }
 
-
 // Requires the OSS additions and patched engine.
 // Install it for full functionality support.
 /*
-
 void AMyPlayerController::FetchJoinableTournaments()
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::FetchJoinableTournaments"));
-const auto OnlineSub = IOnlineSubsystem::Get();
-OnlineSub->GetTournamentInterface()->FetchJoinableTournaments();
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::FetchJoinableTournaments"));
+	const auto OnlineSub = IOnlineSubsystem::Get();
+	OnlineSub->GetTournamentInterface()->FetchJoinableTournaments();
 }
+
 
 void AMyPlayerController::CreateTournament(const FString& TournamentTitle, const FString& GameMode, const FString& Region, int32 TeamMin, int32 TeamMax, int32 donationAmount, int32 playerBuyIn)
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::CreateTournament"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::CreateTournament"));
 
-const auto OnlineSub = IOnlineSubsystem::Get();
-FOnlinePartyTypeId PartyTypeId;
+	const auto OnlineSub = IOnlineSubsystem::Get();
+	FOnlinePartyTypeId PartyTypeId;
 
-FTournamentConfiguration TournamentConfiguration = FTournamentConfiguration();
-TournamentConfiguration.GameMode = GameMode;
-TournamentConfiguration.MinTeams = TeamMin;
-TournamentConfiguration.MaxTeams = TeamMax;
-TournamentConfiguration.Region = Region;
-TournamentConfiguration.Title = TournamentTitle;
-TournamentConfiguration.donationAmount = donationAmount;
-TournamentConfiguration.playerBuyIn = playerBuyIn;
+	FTournamentConfiguration TournamentConfiguration = FTournamentConfiguration();
+	TournamentConfiguration.GameMode = GameMode;
+	TournamentConfiguration.MinTeams = TeamMin;
+	TournamentConfiguration.MaxTeams = TeamMax;
+	TournamentConfiguration.Region = Region;
+	TournamentConfiguration.Title = TournamentTitle;
+	TournamentConfiguration.donationAmount = donationAmount;
+	TournamentConfiguration.playerBuyIn = playerBuyIn;
 
-// Creating a local player where we can get the UserID from
-ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
-TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
+	// Creating a local player where we can get the UserID from
+	ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
+	TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
 
-// const FUniqueNetId& LocalUserId, const FOnlinePartyTypeId TournamentTypeId, const FTournamentConfiguration& TournamentConfig, const FOnCreateTournamentComplete& Delegate = FOnCreateTournamentComplete()
+	// const FUniqueNetId& LocalUserId, const FOnlinePartyTypeId TournamentTypeId, const FTournamentConfiguration& TournamentConfig, const FOnCreateTournamentComplete& Delegate = FOnCreateTournamentComplete()
 
-OnlineSub->GetTournamentInterface()->CreateTournament(*UserId, PartyTypeId, TournamentConfiguration, OnCreateTournamentCompleteDelegate);
-//OnlineSub->GetPartyInterface()->CreateParty(*UserId, PartyTypeId, PartyConfiguration, OnCreatePartyCompleteDelegate);
+	OnlineSub->GetTournamentInterface()->CreateTournament(*UserId, PartyTypeId, TournamentConfiguration, OnCreateTournamentCompleteDelegate);
+		//OnlineSub->GetPartyInterface()->CreateParty(*UserId, PartyTypeId, PartyConfiguration, OnCreatePartyCompleteDelegate);
 }
 
 void AMyPlayerController::OnTournamentListDataChanged(const FUniqueNetId& LocalUserId)
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnTournamentListDataChanged"));
-const auto OnlineSub = IOnlineSubsystem::Get();
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnTournamentListDataChanged"));
+	const auto OnlineSub = IOnlineSubsystem::Get();
 
 
-TArray< TSharedRef<FOnlineTournament> > TournamentListCache;
+	TArray< TSharedRef<FOnlineTournament> > TournamentListCache;
 
-if (OnlineSub->GetTournamentInterface()->GetTournamentList(0, TournamentListCache))
-{
-//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers(%s) returned %d friends"), UserId.ToString(), RecentPlayers.Num());
+	if (OnlineSub->GetTournamentInterface()->GetTournamentList(0, TournamentListCache))
+	{
+		//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers(%s) returned %d friends"), UserId.ToString(), RecentPlayers.Num());
 
-// Clear old entries
-MyCachedTournaments.Empty();
+		// Clear old entries
+		MyCachedTournaments.Empty();
 
-// Log each friend's data out
-for (int32 Index = 0; Index < TournamentListCache.Num(); Index++)
-{
-const FOnlineTournament& ThisTournament = *TournamentListCache[Index];
+		// Log each friend's data out
+		for (int32 Index = 0; Index < TournamentListCache.Num(); Index++)
+		{
+			const FOnlineTournament& ThisTournament = *TournamentListCache[Index];
 
-UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *ThisTournament.GetTitle(), *ThisTournament.GetTournamentId()->ToString());
+			UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *ThisTournament.GetTitle(), *ThisTournament.GetTournamentId()->ToString());
 
 
-FMyTournament ThisMyTournamentStruct;
-ThisMyTournamentStruct.tournamentKeyId = ThisTournament.GetTournamentId()->ToString();
-ThisMyTournamentStruct.tournamentTitle = ThisTournament.GetTitle();
+			FMyTournament ThisMyTournamentStruct;
+			ThisMyTournamentStruct.tournamentKeyId = ThisTournament.GetTournamentId()->ToString();
+			ThisMyTournamentStruct.tournamentTitle = ThisTournament.GetTitle();
 
-MyCachedTournaments.Add(ThisMyTournamentStruct);
+			MyCachedTournaments.Add(ThisMyTournamentStruct);
 
-}
+		}
 
-}
-else
-{
-//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers failed"));
+	}
+	else
+	{
+		//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers failed"));
 
-}
+	}
 
-OnTournamentListChangedUETopiaDisplayUIDelegate.Broadcast();
-return;
+	OnTournamentListChangedUETopiaDisplayUIDelegate.Broadcast();
+	return;
 
 }
 
 void AMyPlayerController::ReadTournamentDetails(const FString& TournamentKeyId)
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ReadTournamentDetails"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ReadTournamentDetails"));
 
-// Dump our cached tournament data
-MyCachedTournament.tournamentTitle = "loading...";
-MyCachedTournament.tournamentKeyId = "0";
-MyCachedTournament.RoundList.Empty();
-MyCachedTournament.TeamList.Empty();
+	// Dump our cached tournament data
+	MyCachedTournament.tournamentTitle = "loading...";
+	MyCachedTournament.tournamentKeyId = "0";
+	MyCachedTournament.RoundList.Empty();
+	MyCachedTournament.TeamList.Empty();
 
-const auto OnlineSub = IOnlineSubsystem::Get();
+	const auto OnlineSub = IOnlineSubsystem::Get();
 
-FOnlinePartyIdUEtopiaDup TournamentId = FOnlinePartyIdUEtopiaDup(TournamentKeyId);
+	FOnlinePartyIdUEtopiaDup TournamentId = FOnlinePartyIdUEtopiaDup(TournamentKeyId);
 
-OnlineSub->GetTournamentInterface()->ReadTournamentDetails(0, TournamentId);
+	OnlineSub->GetTournamentInterface()->ReadTournamentDetails(0, TournamentId);
 }
 
 void AMyPlayerController::OnTournamentDetailsReadComplete()
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete"));
 
-const auto OnlineSub = IOnlineSubsystem::Get();
+	const auto OnlineSub = IOnlineSubsystem::Get();
 
-// this is just junk
-TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
+	// this is just junk
+	TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
 
-TSharedPtr<FTournament> TournamentDetailsFromOSS = OnlineSub->GetTournamentInterface()->GetTournament(0, *UserId);
+	TSharedPtr<FTournament> TournamentDetailsFromOSS = OnlineSub->GetTournamentInterface()->GetTournament(0, *UserId);
 
-// Empty out local struct arrays
-MyCachedTournament.RoundList.Empty();
-MyCachedTournament.TeamList.Empty();
+	// Empty out local struct arrays
+	MyCachedTournament.RoundList.Empty();
+	MyCachedTournament.TeamList.Empty();
 
-// Copy over the OSS data into our local struct
-MyCachedTournament.tournamentKeyId = TournamentDetailsFromOSS->TournamentKeyId;
-MyCachedTournament.tournamentTitle = TournamentDetailsFromOSS->Configuration.Title;
-MyCachedTournament.region = TournamentDetailsFromOSS->Configuration.Region;
-MyCachedTournament.donationAmount = TournamentDetailsFromOSS->Configuration.donationAmount;
-MyCachedTournament.playerBuyIn = TournamentDetailsFromOSS->Configuration.playerBuyIn;
-MyCachedTournament.GameMode = TournamentDetailsFromOSS->Configuration.GameMode;
-MyCachedTournament.PrizeDistributionType = TournamentDetailsFromOSS->Configuration.PrizeDistributionType;
+	// Copy over the OSS data into our local struct
+	MyCachedTournament.tournamentKeyId = TournamentDetailsFromOSS->TournamentKeyId;
+	MyCachedTournament.tournamentTitle = TournamentDetailsFromOSS->Configuration.Title;
+	MyCachedTournament.region = TournamentDetailsFromOSS->Configuration.Region;
+	MyCachedTournament.donationAmount = TournamentDetailsFromOSS->Configuration.donationAmount;
+	MyCachedTournament.playerBuyIn = TournamentDetailsFromOSS->Configuration.playerBuyIn;
+	MyCachedTournament.GameMode = TournamentDetailsFromOSS->Configuration.GameMode;
+	MyCachedTournament.PrizeDistributionType = TournamentDetailsFromOSS->Configuration.PrizeDistributionType;
 
-for (int32 Index = 0; Index < TournamentDetailsFromOSS->TeamList.Num(); Index++)
-{
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Team"));
-FMyTournamentTeam TempTeamData;
-TempTeamData.KeyId = TournamentDetailsFromOSS->TeamList[Index].KeyId;
-TempTeamData.title = TournamentDetailsFromOSS->TeamList[Index].Title;
+	for (int32 Index = 0; Index < TournamentDetailsFromOSS->TeamList.Num(); Index++)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Team"));
+		FMyTournamentTeam TempTeamData;
+		TempTeamData.KeyId = TournamentDetailsFromOSS->TeamList[Index].KeyId;
+		TempTeamData.title = TournamentDetailsFromOSS->TeamList[Index].Title;
 
-MyCachedTournament.TeamList.Add(TempTeamData);
-}
+		MyCachedTournament.TeamList.Add(TempTeamData);
+	}
 
-for (int32 RoundIndex = 0; RoundIndex < TournamentDetailsFromOSS->RoundList.Num(); RoundIndex++)
-{
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round"));
-FMyTournamentRound TempRoundData;
+	for (int32 RoundIndex = 0; RoundIndex < TournamentDetailsFromOSS->RoundList.Num(); RoundIndex++)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round"));
+		FMyTournamentRound TempRoundData;
 
-TempRoundData.RoundIndex = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundIndex;
+		TempRoundData.RoundIndex = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundIndex;
 
-for (int32 RoundMatchIndex = 0; RoundMatchIndex < TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList.Num(); RoundMatchIndex++)
-{
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round Match"));
-FMyTournamentRoundMatch TempRoundMatchData;
-TempRoundMatchData.Team1KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1KeyId;
-TempRoundMatchData.Team1Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Title;
-TempRoundMatchData.Team1Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Winner;
-TempRoundMatchData.Team1Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Loser;
+		for (int32 RoundMatchIndex = 0; RoundMatchIndex < TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList.Num(); RoundMatchIndex++)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] Found Round Match"));
+			FMyTournamentRoundMatch TempRoundMatchData;
+			TempRoundMatchData.Team1KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1KeyId;
+			TempRoundMatchData.Team1Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Title;
+			TempRoundMatchData.Team1Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Winner;
+			TempRoundMatchData.Team1Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team1Loser;
 
-TempRoundMatchData.Team2KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2KeyId;
-TempRoundMatchData.Team2Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Title;
-TempRoundMatchData.Team2Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Winner;
-TempRoundMatchData.Team2Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Loser;
+			TempRoundMatchData.Team2KeyId = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2KeyId;
+			TempRoundMatchData.Team2Title = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Title;
+			TempRoundMatchData.Team2Winner = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Winner;
+			TempRoundMatchData.Team2Loser = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Team2Loser;
 
-TempRoundMatchData.Status = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Status;
+			TempRoundMatchData.Status = TournamentDetailsFromOSS->RoundList[RoundIndex].RoundMatchList[RoundMatchIndex].Status;
 
-TempRoundData.RoundMatchList.Add(TempRoundMatchData);
-}
+			TempRoundData.RoundMatchList.Add(TempRoundMatchData);
+		}
 
-MyCachedTournament.RoundList.Add(TempRoundData);
+		MyCachedTournament.RoundList.Add(TempRoundData);
 
-}
+	}
 
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete - triggering OnTournamentDataReadUETopiaDisplayUIDelegate"));
-OnTournamentDataReadUETopiaDisplayUIDelegate.Broadcast();
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnTournamentDetailsReadComplete - triggering OnTournamentDataReadUETopiaDisplayUIDelegate"));
+	OnTournamentDataReadUETopiaDisplayUIDelegate.Broadcast();
 
-return;
+	return;
 }
 
 void AMyPlayerController::JoinTournament(const FString& TournamentKeyId)
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::JoinTournament"));
-const auto OnlineSub = IOnlineSubsystem::Get();
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::JoinTournament"));
+	const auto OnlineSub = IOnlineSubsystem::Get();
 
-// Fabricate a new FUniqueNetId by the TournamentKeyId
-const TSharedPtr<const FUniqueNetId> TournamentId = OnlineSub->GetIdentityInterface()->CreateUniquePlayerId(TournamentKeyId);
+	// Fabricate a new FUniqueNetId by the TournamentKeyId
+	const TSharedPtr<const FUniqueNetId> TournamentId = OnlineSub->GetIdentityInterface()->CreateUniquePlayerId(TournamentKeyId);
 
-OnlineSub->GetTournamentInterface()->JoinTournament(0, *TournamentId);
+	OnlineSub->GetTournamentInterface()->JoinTournament(0, *TournamentId);
 
 }
 */
-
-
 
 // Inventory stuff
 
@@ -1951,48 +1948,6 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 								//TArray<TSharedPtr<FJsonValue> > JsonFriends = JsonObject->GetArrayField(TEXT("data"));
 							}
 
-		
-
-							/*
-							// parse user attributes
-							if (It->Value.IsValid() && It->Value->Type == EJson::String)
-							{
-							FString ValueStr = It->Value->AsString();
-							if (It->Key == TEXT("key_id"))
-							{
-							UserIdStr = ValueStr;
-							}
-							Attributes.Add(It->Key, ValueStr);
-							}
-							// setup presence booleans
-							if (It->Value.IsValid() && It->Value->Type == EJson::Boolean)
-							{
-							bool ValueBool = It->Value->AsBool();
-							if (It->Key == TEXT("bIsPlayingThisGame"))
-							{
-							UserIsPlayingThisGame = ValueBool;
-							}
-							if (It->Key == TEXT("bIsOnline"))
-							{
-							UserIsOnline = ValueBool;
-							}
-
-							}
-							}
-							// only add if valid id
-							if (!UserIdStr.IsEmpty())
-							{
-							TSharedRef<FOnlineFriendUEtopia> FriendEntry(new FOnlineFriendUEtopia(UserIdStr));
-							FriendEntry->AccountData = Attributes;
-							// set up presence
-							FriendEntry->Presence.bIsPlayingThisGame = UserIsPlayingThisGame;
-							FriendEntry->Presence.bIsOnline = UserIsOnline;
-							// Add new friend entry to list
-							FriendsList.Friends.Add(FriendEntry);
-							}
-							*/
-
-
 							if (!NewVendorItem.itemClassPath.IsEmpty())
 							{
 								UE_LOG(LogTemp, Log, TEXT("!NewVendorItem.itemClassPath.IsEmpty()"));
@@ -2016,8 +1971,6 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 							{
 								NewVendorItem.Icon = nullptr;
 							}
-
-
 
 							MyCurrentVendorInventory.Add(NewVendorItem);
 						}
@@ -2187,6 +2140,223 @@ void AMyPlayerController::ServerClaimItemFromVendor_Implementation(const FString
 	return;
 }
 
+/////////////
+// CHARACTERS
+/////////////
+
+
+bool AMyPlayerController::GetCharacterList()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] GetCharacterList"));
+
+	// clear out the struct
+	MyCachedCharacters.Empty();
+
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/collectionGetPage";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::GetCharacterListComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+
+}
+
+void AMyPlayerController::GetCharacterListComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+
+			const JsonValPtrArray *CharactersJson = nullptr;
+			JsonParsed->TryGetArrayField("characters", CharactersJson);
+			if (CharactersJson != nullptr)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Found Characters in JSON "));
+				// sometimes crashing here...  adding an extra check
+				if (CharactersJson->Num() > 0)
+				{
+					for (auto characterJson : *CharactersJson) {
+						UE_LOG(LogTemp, Log, TEXT("Found Vendor Item "));
+						auto CharacterObj = characterJson->AsObject();
+						if (CharacterObj.IsValid())
+						{
+							UE_LOG(LogTemp, Log, TEXT("Found Character - it is valid "));
+							FMyCharacterRecord NewCharacter;
+
+							CharacterObj->TryGetStringField("key_id", NewCharacter.key_id);
+							CharacterObj->TryGetStringField("title", NewCharacter.title);
+							CharacterObj->TryGetStringField("description", NewCharacter.description);
+							CharacterObj->TryGetStringField("characterType", NewCharacter.characterType);
+							CharacterObj->TryGetStringField("characterState", NewCharacter.characterState);
+							CharacterObj->TryGetBoolField("characterAlive", NewCharacter.characterAlive);
+							CharacterObj->TryGetBoolField("currentlySelectedActive", NewCharacter.currentlySelectedActive);
+
+							// TODO - run some logic to assign an icon 
+							NewCharacter.Icon = nullptr;
+	
+							MyCachedCharacters.Add(NewCharacter);
+						}
+					}
+				}
+
+			}
+
+			OnGetCharacterListCompleteDelegate.Broadcast();
+
+		}
+	}
+}
+
+bool AMyPlayerController::CreateCharacter(FString title, FString description, FString characterType, FString characterState)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] CreateCharacter"));
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+
+	PlayerJsonObj->SetStringField("title", title);
+	PlayerJsonObj->SetStringField("description", description);
+	PlayerJsonObj->SetStringField("characterType", characterType);
+	PlayerJsonObj->SetStringField("characterState", characterState);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/create";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::CreateCharacterComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+
+}
+
+void AMyPlayerController::CreateCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
+		}
+	}
+}
+
+bool AMyPlayerController::DeleteCharacter(FString characterKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] DeleteCharacter"));
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("key_id", characterKeyId);
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/delete";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::DeleteCharacterComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+}
+
+void AMyPlayerController::DeleteCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
+		}
+	}
+}
+
+
+bool AMyPlayerController::SelectCharacter(FString characterKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] SelectCharacter"));
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("key_id", characterKeyId);
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+	FString APIURI = "/_ah/api/characters/v1/select";
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::SelectCharacterComplete, APIURI, JsonOutputString);
+	return requestSuccess;
+}
+
+void AMyPlayerController::SelectCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			UE_LOG(LogTemp, Log, TEXT("Parsed JSON response successfully."));
+			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
+		}
+	}
+}
+
+
 ////////////
 // ABILITIES
 ////////////
@@ -2331,9 +2501,84 @@ void AMyPlayerController::ServerAttemptSwapAbilityBarLocations_Implementation(in
 	return;
 }
 
+bool AMyPlayerController::GrantCachedAbilities_Validate()
+{
+	return true;
+}
+void AMyPlayerController::GrantCachedAbilities_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::GrantCachedAbilities_Implementation"));
+
+	AMyPlayerState* playerS = Cast<AMyPlayerState>(this->PlayerState);
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	FGameplayAbilitySpecHandle AbilityHandle;
+	UClass* LoadedActorOwnerClass;
+	UMyBaseGameplayAbility* LoadedObjectClass;
+
+	// empty the granted abilities array in player state and here
+	MyGrantedAbilities.Empty();
+	playerS->GrantedAbilities.Empty();
+
+	// Create a local copy of the array
+	TArray<FMyGrantedAbility> LocalGrantedAbilities;
+	FMyGrantedAbility grantedAbility;
+
+	for (int32 Index = 0; Index < playerS->CachedAbilities.Num(); Index++)
+	{
+		
+		LoadedActorOwnerClass = LoadClassFromPath(playerS->CachedAbilities[Index].classPath);
+
+		if (LoadedActorOwnerClass)
+		{
+			LoadedObjectClass = Cast<UMyBaseGameplayAbility>(LoadedActorOwnerClass->GetDefaultObject());
+			AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+
+			grantedAbility.AbilityHandle = AbilityHandle;
+			grantedAbility.classPath = playerS->CachedAbilities[Index].classPath;
+			grantedAbility.Icon = LoadedObjectClass->Icon;
+			grantedAbility.title = LoadedObjectClass->Title.ToString();
+			grantedAbility.description = LoadedObjectClass->Description.ToString();
+			//UGameplayAbility* AbilityClassRef = Cast<UGameplayAbility>(LoadedObjectClass);
+			grantedAbility.Ability = LoadedObjectClass->GetClass();
+
+			LocalGrantedAbilities.Add(grantedAbility);
+		}
+
+		
+	}
+	playerS->GrantedAbilities = LocalGrantedAbilities;
+	MyGrantedAbilities = LocalGrantedAbilities;
+
+	// WE need to update MyAbilitySlots as well with the new ability
+	for (int32 Index = 0; Index < MyAbilitySlots.Num(); Index++)
+	{
+		int32 matchingGrantedAbilityIndex = -1;
+		// go though granted abilities and find by Class
+		for (int32 grantedAIndex = 0; grantedAIndex < MyGrantedAbilities.Num(); grantedAIndex++)
+		{
+			if (MyAbilitySlots[Index].classPath == MyGrantedAbilities[grantedAIndex].classPath)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Found matching granted ability"));
+				matchingGrantedAbilityIndex = grantedAIndex;
+				break;
+			}
+		}
+		// If a match was found, replace the link to the granted ability.
+		if (matchingGrantedAbilityIndex >= 0)
+		{
+			UE_LOG(LogTemp, Log, TEXT("Adding found ability to ability slots"));
+			MyAbilitySlots[Index].GrantedAbility = MyGrantedAbilities[matchingGrantedAbilityIndex];
+		}
+
+	}
+	return;
+}
+
 void AMyPlayerController::OnRep_OnAbilitiesChange_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilitiesChange"));
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	playerChar->RemapAbilities();
 	OnAbilitiesChanged.Broadcast();
 }
 
@@ -2342,8 +2587,8 @@ void AMyPlayerController::OnRep_OnAbilityInterfaceChange_Implementation()
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilityInterfaceChange"));
 	OnAbilityInterfaceChanged.Broadcast();
 
-	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
-	playerChar->RemapAbilities();
+	
+	
 }
 
 /*
@@ -2361,6 +2606,44 @@ return true;
 }
 */
 
+void AMyPlayerController::UnFreeze()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::UnFreeze"));
+	ServerRestartPlayer();
+
+	// Tell the UI to refresh
+	OnAbilitiesChanged.Broadcast();
+	OnAbilityInterfaceChanged.Broadcast();
+	OnChatChannelsChangedUETopia.Broadcast();
+	OnFriendsChanged.Broadcast();
+	OnInventoryChanged.Broadcast();
+	OnPartyDataReceivedUETopiaDisplayUI.Broadcast();
+	OnRecentPlayersChanged.Broadcast();
+	
+	//AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	//playerChar->RemapAbilities();
+
+	//RemapAbilities()
+}
+
+void AMyPlayerController::ClearHUDWidgets_Implementation()
+{
+	/* Object Iterator for All User Widgets! */
+	for (TObjectIterator<UUserWidget> Itr; Itr; ++Itr)
+	{
+		UUserWidget* LiveWidget = *Itr;
+
+		/* If the Widget has no World, Ignore it (It's probably in the Content Browser!) */
+		if (!LiveWidget->GetWorld())
+		{
+			continue;
+		}
+		else
+		{
+			LiveWidget->RemoveFromParent();
+		}
+	}
+}
 
 void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
 {

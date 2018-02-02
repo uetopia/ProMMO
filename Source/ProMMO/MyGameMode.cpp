@@ -188,3 +188,17 @@ void AMyGameMode::Logout(AController* Exiting)
 	TheGameInstance->DeActivatePlayer(ExitingPlayerId);
 
 }
+
+void AMyGameMode::RestartPlayer(class AController* NewPlayer)
+{
+	Super::RestartPlayer(NewPlayer);
+}
+
+void AMyGameMode::KilledBy(AController* Killer, AActor* DamageCauser, AController* KilledController, AActor* KilledActor, const struct FGameplayEffectSpec& KillingEffectSpec)
+{
+	if (KilledController)
+	{
+		KilledController->ChangeState(NAME_Spectating);
+		RestartPlayer(KilledController);
+	}
+}

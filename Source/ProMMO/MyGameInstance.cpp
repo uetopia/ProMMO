@@ -163,6 +163,12 @@ void UMyGameInstance::Init()
 	GetWorld()->GetTimerManager().SetTimer(ServerLinksTimerHandle, this, &UMyGameInstance::GetServerLinks, 20.0f, true);
 	//GetWorld()->GetTimerManager().SetTimer(RewardSpawnTimerHandle, this, &UMyGameInstance::AttemptSpawnReward, SpawnRewardTimerSeconds, true);
 
+
+	// Set up a timer to submit kills and stats to the backend 
+	// This should be anywhere from a minute to 15 minutes, depending on game load.
+	GetWorld()->GetTimerManager().SetTimer(SubmitReportTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
+	
+
 	MatchStarted = false;
 
 }
@@ -342,6 +348,12 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 			}
 		}
 	}
+
+	// pull down the list of game data objects if any - just testing
+	FString cursor = "";
+	QueryGameDataList(cursor);
+	QueryGameData("4898202331381760");
+
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] Done!"));
 }
 
@@ -651,7 +663,9 @@ bool UMyGameInstance::ActivatePlayer(class AMyPlayerController* NewPlayerControl
 			activeplayer.roundDeaths = 0;
 			activeplayer.roundKills = 0;
 			//activeplayer.killed = nullptr;
-			activeplayer.Rank = 1600;
+			activeplayer.rank = 1600;
+			activeplayer.experience = 0;
+			activeplayer.score = 0;
 			activeplayer.currencyCurrent = 10;
 			activeplayer.gamePlayerKeyId = nullptr;
 			activeplayer.UniqueId = UniqueId;
@@ -768,7 +782,7 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 							PlayerRecord.ActivePlayers[b].playerTitle = JsonParsed->GetStringField("player_name");
 							PlayerRecord.ActivePlayers[b].playerKeyId = JsonParsed->GetStringField("user_key_id");
 							PlayerRecord.ActivePlayers[b].currencyCurrent = JsonParsed->GetIntegerField("player_currency");
-							PlayerRecord.ActivePlayers[b].Rank = JsonParsed->GetIntegerField("player_rank");
+							PlayerRecord.ActivePlayers[b].rank = JsonParsed->GetIntegerField("player_rank");
 							PlayerRecord.ActivePlayers[b].gamePlayerKeyId = JsonParsed->GetStringField("game_player_key_id");
 
 							// We need to go through the playercontrollerIterator to hunt for the playerKeyId
@@ -1201,6 +1215,9 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 				FString playerKeyId = JsonParsed->GetStringField("userKeyId");
 
 				FMyActivePlayer* activePlayer = getPlayerByPlayerKey(JsonParsed->GetStringField("userKeyId"));
+
+				// TODO - refactor this to use get by key.
+
 				for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 				{
 					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - Looking for player Controller"));
@@ -1235,6 +1252,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						JsonParsed->TryGetNumberField("level", playerS->Level);
 						JsonParsed->TryGetNumberField("experience", playerC->Experience);
 						JsonParsed->TryGetNumberField("experienceThisLevel", playerC->ExperienceThisLevel);
+						JsonParsed->TryGetNumberField("rank", activePlayer->rank);
 
 						playerS->playerTitle = titleTemp;
 						playerS->serverTitle = ServerTitle;
@@ -1243,6 +1261,11 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 
 						// TODO move player to the indicated position.
 
+						// Set up Active player variables
+						activePlayer->experience = playerC->Experience;
+						activePlayer->score = scoreTemp;
+
+						
 						
 						////////////////////////////////////////////////////////////////////
 						// Abilities
@@ -1299,9 +1322,14 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 										{
 											UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
 
-											AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+											// There is a problem with giving the ability here.
+											// It works fine for initial play.
+											// but after a death/respawn abilities are missing.
+											// moved the give ability call into the refresh call
 
-											grantedAbility.AbilityHandle = AbilityHandle;
+											//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+
+											//grantedAbility.AbilityHandle = AbilityHandle;
 											grantedAbility.classPath = grantedAbilityObj->GetStringField(FString("AbilityClass"));
 											grantedAbility.Icon = LoadedObjectClass->Icon;
 											grantedAbility.title = LoadedObjectClass->Title.ToString();
@@ -1315,7 +1343,15 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									}
 
 									// trigger the delegate
-									playerC->MyGrantedAbilities = LocalGrantedAbilities;
+									// We don't want to do this anymore.
+									// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
+									//playerC->MyGrantedAbilities = LocalGrantedAbilities;
+									playerS->CachedAbilities = LocalGrantedAbilities;
+
+									// tell player controller to convert cached to granted
+									playerC->GrantCachedAbilities();
+
+									//playerS->GrantedAbilities = LocalGrantedAbilities;
 									//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
 								}
 							}
@@ -1349,9 +1385,9 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 								{
 									UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
 
-									AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
+									//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
 
-									grantedAbility.AbilityHandle = AbilityHandle;
+									//grantedAbility.AbilityHandle = AbilityHandle;
 									grantedAbility.classPath = AbilityClassPaths[AbilityIndex];
 									grantedAbility.Icon = LoadedObjectClass->Icon;
 									grantedAbility.title = LoadedObjectClass->Title.ToString();
@@ -1364,8 +1400,15 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							}
 
 							// trigger the delegate
-							playerC->MyGrantedAbilities = LocalGrantedAbilities;
+							// We don't want to do this anymore.
+							// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
+							// playerC->MyGrantedAbilities = LocalGrantedAbilities;
 							//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
+
+							playerS->CachedAbilities = LocalGrantedAbilities;
+
+							// tell player controller to convert cached to granted
+							playerC->GrantCachedAbilities();
 
 						}
 
@@ -2001,10 +2044,10 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 				PlayerJsonObj->SetStringField("equipment", "hardcoded test");
 				PlayerJsonObj->SetStringField("abilities", AbilitiesOutputString);
 				PlayerJsonObj->SetStringField("interface", InterfaceOutputString);
-				PlayerJsonObj->SetNumberField("rank", 1600);
-				PlayerJsonObj->SetNumberField("score", 1);
-				PlayerJsonObj->SetNumberField("level", 1);
-				PlayerJsonObj->SetNumberField("experience", 1);
+				PlayerJsonObj->SetNumberField("rank", activePlayer->rank);
+				PlayerJsonObj->SetNumberField("score", activePlayer->score);
+				PlayerJsonObj->SetNumberField("level", 1);  // TODO set this up in the struct
+				PlayerJsonObj->SetNumberField("experience", activePlayer->experience);
 				PlayerJsonObj->SetNumberField("experienceThisLevel", 1);
 				PlayerJsonObj->SetNumberField("coordLocationX", 1);
 				PlayerJsonObj->SetNumberField("coordLocationY", 1);
@@ -2199,6 +2242,9 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - No Authorized players found - moving to save."));
 
 				
+				// Uncomment this if you want to use Rama Save System
+				// Or implement your own save system here.
+				/*
 				bool FileIOSuccess;
 				bool allComponentsSaved;
 				FString FileName = "serversavedata.dat";
@@ -2209,6 +2255,8 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 				else {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO FAIL."));
 				}
+				*/
+				
 				
 
 
@@ -2226,6 +2274,9 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 
 				// Reset the ServerPortal Actor Array
 				//ServerPortalActorReference.Empty();
+
+				// Try to submit match results one last time
+				SubmitReport();
 
 				// Tell the backend that it's safe to bring this server down.
 				NotifyDownReady();
@@ -3711,6 +3762,130 @@ void UMyGameInstance::RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpRe
 }
 
 
+bool UMyGameInstance::QueryGameDataList(FString cursor)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] QueryGameDataList"));
+
+	FString nonceString = "10951350917635";
+	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("nonce", "nonceString");
+	PlayerJsonObj->SetStringField("encryption", encryption);
+	if (cursor.Len() > 5)
+	{
+		PlayerJsonObj->SetStringField("cursor", cursor);
+	}
+	
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+	FString APIURI = "/api/v1/game/data/";
+
+	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::QueryGameDataListRequestComplete, APIURI, JsonOutputString);
+
+	return requestSuccess;
+}
+
+void UMyGameInstance::QueryGameDataListRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			bool Authorization = JsonParsed->GetBoolField("authorization");
+			UE_LOG(LogTemp, Log, TEXT("Authorization"));
+			if (Authorization)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+				bool Success = JsonParsed->GetBoolField("success");
+				if (Success) {
+					UE_LOG(LogTemp, Log, TEXT("Success True"));
+
+					// TODO - do something with the returned array of keys
+
+				}
+			}
+		}
+	}
+}
+
+
+bool UMyGameInstance::QueryGameData(FString gameDataKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] QueryGameData"));
+
+	FString nonceString = "10951350917635";
+	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("nonce", "nonceString");
+	PlayerJsonObj->SetStringField("encryption", encryption);
+	PlayerJsonObj->SetStringField("key_id", gameDataKeyId);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+	FString APIURI = "/api/v1/game/data/" + gameDataKeyId;
+
+	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::QueryGameDataRequestComplete, APIURI, JsonOutputString);
+
+	return requestSuccess;
+}
+
+void UMyGameInstance::QueryGameDataRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			bool Authorization = JsonParsed->GetBoolField("authorization");
+			UE_LOG(LogTemp, Log, TEXT("Authorization"));
+			if (Authorization)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+				bool Success = JsonParsed->GetBoolField("success");
+				if (Success) {
+					UE_LOG(LogTemp, Log, TEXT("Success True"));
+					FString game_data_json_string = JsonParsed->GetStringField("data");
+
+					// TODO - do something with the returned string
+
+				}
+			}
+		}
+	}
+}
+
+
+
 void UMyGameInstance::RequestBeginPlay()
 {
 	// This is not used here because we're skipping the lobby and going straight into the world.
@@ -3823,6 +3998,7 @@ bool UMyGameInstance::SubmitMatchMakerResults()
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitMatchMakerResults"));
 
 	MatchInfo.encryption = "off";
+	MatchInfo.nonce = "10951350917635";
 	FString json_string;
 	FJsonObjectConverter::UStructToJsonObjectString(MatchInfo.StaticStruct(), &MatchInfo, json_string, 0, 0);
 	UE_LOG(LogTemp, Log, TEXT("json_string: %s"), *json_string);
@@ -3868,93 +4044,78 @@ void UMyGameInstance::SubmitMatchMakerResultsComplete(FHttpRequestPtr HttpReques
 			}
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SubmitMatchResults] Done!"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SubmitMatchMakerResultsComplete] Done!"));
 }
 
 
-bool UMyGameInstance::SubmitMatchResults()
+void UMyGameInstance::SubmitReport()
 {
-
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitMatchResults"));
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DEBUG TEST"));
-
-	FString player_dict_list = "%5B";  //TODO build this string urlencoded from json properly
-	bool FoundKills = false;
-	// get the data ready
-
-	for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+	if (IsRunningDedicatedServer())
 	{
-		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
-		if (PlayerRecord.ActivePlayers[b].roundKills > 0) {
-			FoundKills = true;
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitReport"));
+
+		bool FoundKills = false;
+		bool FoundEvents = false;
+
+		for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+		{
+			if (PlayerRecord.ActivePlayers[b].roundKills > 0)
+			{
+				FoundKills = true;
+				break;
+			}
+			if (PlayerRecord.ActivePlayers[b].events.Num() > 0)
+			{
+				FoundEvents = true;
+				break;
+			}
 		}
-		player_dict_list = player_dict_list + "%7B%22deaths%22%3A" + FString::FromInt(PlayerRecord.ActivePlayers[b].roundDeaths) + "%2C";  // deaths
 
-																																		   /*
-																																		   player_dict_list = player_dict_list + "%22killed%22%3A+%5B"; // killed -list, go through em.
-																																		   for (int32 pkilledi = 0; pkilledi < PlayerRecord.ActivePlayers[b].killed.Num(); pkilledi++)
-																																		   {
-																																		   player_dict_list = player_dict_list + "%22" + PlayerRecord.ActivePlayers[b].killed[pkilledi] + "%22";
-																																		   if (pkilledi < PlayerRecord.ActivePlayers[b].killed.Num() - 1) {
-																																		   // If it's not the last one add a comma.  I know this is dumb and should just be json
-																																		   player_dict_list = player_dict_list + "%2C+";
-																																		   }
-																																		   }
-																																		   player_dict_list = player_dict_list + "%5D%2C";
-																																		   */
-		player_dict_list = player_dict_list + "%22playerKeyId%22%3A%22" + PlayerRecord.ActivePlayers[b].playerKeyId + "%22%2C";
-		player_dict_list = player_dict_list + "%22kills%22%3A+" + FString::FromInt(PlayerRecord.ActivePlayers[b].roundKills) + "%2C";
-		player_dict_list = player_dict_list + "%22experience%22%3A+" + FString::FromInt(PlayerRecord.ActivePlayers[b].roundKills) + "%2C";
-		player_dict_list = player_dict_list + "%22weapon%22%3A%22Bomb%22";
-		player_dict_list = player_dict_list + "%7D";
-		if (b < PlayerRecord.ActivePlayers.Num() - 1) {
-			// If it's not the last one add a comma.  I know this is dumb and should just be json
-			player_dict_list = player_dict_list + "%2C+";
+		PlayerRecord.encryption = "off";
+		PlayerRecord.nonce = "10951350917635";
+
+		FString json_string;
+
+		FJsonObjectConverter::UStructToJsonObjectString(FMyActivePlayers::StaticStruct(), &PlayerRecord, json_string, 0, 0);
+
+		//UE_LOG(LogTemp, Log, TEXT("json_string: %s"), *json_string);
+
+		if (FoundKills || FoundEvents) {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitReport - found kills or events"));
+
+			FHttpModule* Http = &FHttpModule::Get();
+			if (!Http) { return; }
+			if (!Http->IsHttpEnabled()) { return; }
+
+			UE_LOG(LogTemp, Log, TEXT("Object is: %s"), *GetName());
+
+			FString APIURI = "/api/v1/server/report";;
+
+			bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::SubmitReportComplete, APIURI, json_string);
+
+			// Clean out the active players list
+
+			for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+			{
+				PlayerRecord.ActivePlayers[b].killed.Empty();
+				PlayerRecord.ActivePlayers[b].roundDeaths = 0;
+				PlayerRecord.ActivePlayers[b].roundKills = 0;
+				PlayerRecord.ActivePlayers[b].events.Empty();
+			}
+
+
+			return;
+
+		}
+		else {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitReport - No kills or events - Ignoring"));
 		}
 	}
-	player_dict_list = player_dict_list + "%5D";
-
-	// DOing this in pure json for comparison
-	FString json_string;
-
-	FJsonObjectConverter::UStructToJsonObjectString(FMyActivePlayers::StaticStruct(), &PlayerRecord, json_string, 0, 0);
-
-	UE_LOG(LogTemp, Log, TEXT("player_dict_list: %s"), *player_dict_list);
-	UE_LOG(LogTemp, Log, TEXT("json_string: %s"), *json_string);
-
-	if (FoundKills == true) {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitMatchResults - found kills"));
-
-		FHttpModule* Http = &FHttpModule::Get();
-		if (!Http) { return false; }
-		if (!Http->IsHttpEnabled()) { return false; }
-
-		UE_LOG(LogTemp, Log, TEXT("Object is: %s"), *GetName());
-
-		FString nonceString = "10951350917635";
-		FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-
-
-		FString OutputString;
-
-		// Build Params as text string
-		OutputString = "nonce=" + nonceString + "&encryption=" + encryption + "&map_title=Demo&player_dict_list=" + player_dict_list;
-
-		FString APIURI = "/api/v1/match/results";;
-
-		bool requestSuccess = PerformHttpRequest(&UMyGameInstance::SubmitMatchResultsComplete, APIURI, OutputString);
-
-		return requestSuccess;
-
-	}
-	else {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitMatchResults - No Kills - Ignoring"));
-	}
-	return true;
+	return;
 
 }
 
-void UMyGameInstance::SubmitMatchResultsComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+void UMyGameInstance::SubmitReportComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
 {
 	if (!HttpResponse.IsValid())
 	{
@@ -3986,7 +4147,7 @@ void UMyGameInstance::SubmitMatchResultsComplete(FHttpRequestPtr HttpRequest, FH
 			}
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SubmitMatchResults] Done!"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SubmitReport] Done!"));
 }
 
 
@@ -4838,7 +4999,11 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] killerPlayerID: %i"), killerPlayerID);
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] victimPlayerID: %i "), victimPlayerID);
 	if (UEtopiaMode == "competitive") {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Mode set to competitive"));
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordKill - Mode set to competitive"));
+		/*
+		// If we are here, this server is running in competitive/matchmaker mode.
+		// 
+		*/
 		// get attacker activeplayer
 		bool attackerPlayerIDFound = false;
 		int32 killerPlayerIndex = 0;
@@ -4928,7 +5093,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 		int32 stillAliveTeamId = 0;
 		for (int32 b = 0; b <= teamCount; b++) // b is the team ID we're checking
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] Checking team %d"), b);
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] Checking team %d"), b);
 			bool thisTeamAlive = false;
 
 			for (int32 ip = 0; ip < MatchInfo.players.Num(); ip++) // ip is player index
@@ -5048,7 +5213,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 
 	}
 	else {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Mode set to continuous"));
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordKill - Mode set to continuous"));
 		// get attacker activeplayer
 		bool attackerPlayerIDFound = false;
 		int32 killerPlayerIndex = 0;
@@ -5087,39 +5252,57 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - FOUND MATCHING victim playerID"));
 					victimPlayerIDFound = true;
 					victimPlayerIndex = b;
+					break;
 				}
 			}
 
 			// check to see if this victim is already in the kill list
-			/*
+			
 			bool victimIDFoundInKillList = false;
 
 			for (int32 b = 0; b < PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Num(); b++)
 			{
-			if (PlayerRecord.ActivePlayers[killerPlayerIndex].killed[b] == PlayerRecord.ActivePlayers[victimPlayerIndex].playerKey)
-			{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Victim already in kill list"));
-			victimIDFoundInKillList = true;
-			}
+				if (PlayerRecord.ActivePlayers[killerPlayerIndex].killed[b] == PlayerRecord.ActivePlayers[victimPlayerIndex].playerKeyId)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Victim already in kill list"));
+					victimIDFoundInKillList = true;
+				}
 			}
 
 			if (victimIDFoundInKillList == false) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Adding victim to kill list"));
-			PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Add(PlayerRecord.ActivePlayers[victimPlayerIndex].playerKey);
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Adding victim to kill list"));
+				PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Add(PlayerRecord.ActivePlayers[victimPlayerIndex].playerKeyId);
 			}
-			*/
+			
+			// create an event also
+			FString eventSummary = "killed " + PlayerRecord.ActivePlayers[victimPlayerIndex].playerTitle;
+			RecordEvent(killerPlayerID, eventSummary, "location_searching", "Kill");  // look at https://material.io/icons/ for other icons
 
 			// Increase the killer's kill count
 			PlayerRecord.ActivePlayers[killerPlayerIndex].roundKills = PlayerRecord.ActivePlayers[killerPlayerIndex].roundKills + 1;
-			// Increase the killer's balance
-			//PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent + killRewardBTC;
 			// And increase the victim's deaths
 			PlayerRecord.ActivePlayers[victimPlayerIndex].roundDeaths = PlayerRecord.ActivePlayers[victimPlayerIndex].roundDeaths + 1;
+
+			// Give the killer some xp and score
+			PlayerRecord.ActivePlayers[killerPlayerIndex].score = PlayerRecord.ActivePlayers[killerPlayerIndex].score + 100;
+			PlayerRecord.ActivePlayers[killerPlayerIndex].experience = PlayerRecord.ActivePlayers[killerPlayerIndex].experience + 10;
+
+			//Change rank
+			CalculateNewRankContinuous(killerPlayerIndex, victimPlayerIndex, true);
+
+			// Optionally, you can also have a CRED cost associated with killing/dying.
+			// Leaving it muted here, since it's not a standard MMO feature.
+
+			// Increase the killer's balance
+			//PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent + killRewardBTC;
+			
 			// Decrease the victim's balance
 			//PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent - incrementCurrency;
 
 			// TODO kick the victim if it falls below the minimum?
 
+
+			/*
 			APlayerController* pc = NULL;
 			// Send out a chat message to all players
 			FText chatSender = NSLOCTEXT("UETOPIA", "chatSender", "SYSTEM");
@@ -5133,7 +5316,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				AMyPlayerState* thisMyPlayerState = Cast<AMyPlayerState>(thisPlayerState);
 				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
 
-				/*
+				
 				// old way
 				TSubclassOf<APlayerController> thisPlayerController = pc;
 				AMyPlayerController* thisPlayerController = Cast<AMyPlayerController>(pc);
@@ -5147,13 +5330,16 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
 				}
 				}
-				*/
+				
 			}
+			*/
 
 
 		}
 
-		// TODO deal with this
+		// Normally on MMOs, there are no rounds.
+		// If your game has specific rounds, and you don't want to use matchmaker
+		// You can use some logic like this example to detect a round finish, and reset.
 		/*
 		//Check to see if the game is over
 		if (roundKillsTotal >= MinimumKillsBeforeResultsSubmit) {
@@ -5196,6 +5382,37 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 	return true;
 }
 
+bool UMyGameInstance::RecordEvent(int32 playerID, FString eventSummary, FString eventIcon, FString eventType)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] "));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] killerPlayerID: %s"), *eventSummary);
+
+	FMyActivePlayer* CurrentActivePlayer = getPlayerByPlayerId(playerID);
+
+	bool eventAlreadyExists = false;
+
+	if (CurrentActivePlayer)
+	{
+		for (int32 b = 0; b < CurrentActivePlayer->events.Num(); b++)
+		{
+			if (CurrentActivePlayer->events[b].EventSummary == eventSummary)
+			{
+				eventAlreadyExists = true;
+				break;
+			}
+		}
+	}
+
+	if (!eventAlreadyExists)
+	{
+		FUserEvent tempEvent;
+		tempEvent.EventSummary = eventSummary;
+		tempEvent.EventIcon = eventIcon;
+		tempEvent.EventType = eventType;
+		CurrentActivePlayer->events.Add(tempEvent);
+	}
+	return true;
+}
 
 
 void UMyGameInstance::SpawnServerPortals()
@@ -5430,6 +5647,35 @@ void UMyGameInstance::CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlaye
 
 	MatchInfo.players[WinnerPlayerIndex].rank = newWinnerRank;
 	MatchInfo.players[LoserPlayerIndex].rank = newLoserRank;
+}
+
+void UMyGameInstance::CalculateNewRankContinuous(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser) {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] "));
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] WinnerRank %d"), PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] LoserRank %d"), PlayerRecord.ActivePlayers[LoserPlayerIndex].rank);
+	// redoing this according to:
+	// https://metinmediamath.wordpress.com/2013/11/27/how-to-calculate-the-elo-rating-including-example/
+	float winnerTransformedRankExp = PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank / 400.0f;
+	float winnerTransformedRank = pow(10.0f, winnerTransformedRankExp);
+	float loserTransformedRankExp = PlayerRecord.ActivePlayers[LoserPlayerIndex].rank / 400.0f;
+	float loserTransformedRank = pow(10.0f, loserTransformedRankExp);
+
+	float winnerExpected = winnerTransformedRank / (winnerTransformedRank + loserTransformedRank);
+	float loserExpected = loserTransformedRank / (winnerTransformedRank + loserTransformedRank);
+
+	float k = 32.0f;
+
+	int32 newWinnerRank = round(PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank + k * (1.0f - winnerExpected));
+	int32 newLoserRank = round(PlayerRecord.ActivePlayers[LoserPlayerIndex].rank + k * (0.0f - loserExpected));
+
+
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] newWinnerRank %d"), newWinnerRank);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRankContinuous] NewLoserRank %d"), newLoserRank);
+
+	PlayerRecord.ActivePlayers[WinnerPlayerIndex].rank = newWinnerRank;
+	PlayerRecord.ActivePlayers[LoserPlayerIndex].rank = newLoserRank;
 }
 
 bool UMyGameInstance::NotifyDownReady()

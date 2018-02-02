@@ -76,7 +76,10 @@ void AMyGameState::LoadLevel()
 	if (IsRunningDedicatedServer()) {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel - Dedicated server found."));
 
+		// Uncomment this if you want to use Rama Save System
+		// Or implement your own save functionality here.
 		// Load our old data
+		/*
 		bool FileIOSuccess;
 		TArray<FString> StreamingLevelsStates;
 		FString FileName = "serversavedata.dat";
@@ -86,11 +89,13 @@ void AMyGameState::LoadLevel()
 		//URamaSaveLibrary::RamaSave_LoadFromFile(GetWorld(), FileIOSuccess, FileName, true, true, true, "PersistentLevel");
 		//URamaSaveLibrary::RamaSave_LoadStreamingStateFromFile(GetWorld(), FileIOSuccess, FileName, StreamingLevelsStates);
 		if (FileIOSuccess) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO Success."));
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO Success."));
 		}
 		else {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO FAIL."));
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO FAIL."));
 		}
+		*/
+		
 
 		// This breaks the current session - don't do this.
 		//if (IsRunningDedicatedServer()) {

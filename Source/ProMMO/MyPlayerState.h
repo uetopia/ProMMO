@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Engine.h"
 #include "MyTravelApprovedActor.h"
+#include "MyTypes.h"
 #include "MyPlayerState.generated.h"
 
 /**
@@ -113,6 +114,19 @@ public:
 		FString savedAbilities;
 	UPROPERTY(BlueprintReadOnly)
 		FString savedInterface;
+
+	// Keep track of the abilities this player has available.
+	// We need to be able to give them to the character again on respawn
+	// This is confusing so I'm going to add another array to hopefully make it more clear
+
+	// cached abilities get created on login gameInstance->GetGamePlayerComplete
+	// They then get processed, and granted using playerChar->AttemptGiveAbility
+	
+	TArray< FMyGrantedAbility > CachedAbilities;
+
+	// Once they are granted, they are stored here.
+	// Additionally, they are copied over to the playerController so that the UI/HUD can be updated.
+	TArray< FMyGrantedAbility > GrantedAbilities;
 
 	// Authorizations for servers go in here.  These are server Key Ids.
 	// This is deprecated...  Keeping a copy of the entire server link now to facilitate instances.

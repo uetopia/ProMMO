@@ -44,7 +44,7 @@ AMyGameSession::AMyGameSession(const FObjectInitializer& ObjectInitializer)
 			Sessions->AddOnMatchmakingCompleteDelegate_Handle(OnMatchmakingCompleteDelegate);
 			// Requires the OSS additions and patched engine.
 			// Install it for full functionality support.
-			//Sessions->AddOnMatchmakingStartedDelegate_Handle(OnMatchmakingStartedDelegate);
+			// Sessions->AddOnMatchmakingStartedDelegate_Handle(OnMatchmakingStartedDelegate);
 		}
 	}
 }

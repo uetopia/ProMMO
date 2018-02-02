@@ -46,5 +46,13 @@ public:
 
 	virtual void BeginPlay() override;
 
+	virtual void RestartPlayer(class AController* NewPlayer) override;
+
+	// -------------------------------------------------------------------------------------------
+	//			GameplayAbility System Sample
+	// -------------------------------------------------------------------------------------------
+
+	void KilledBy(AController* Killer, AActor* DamageCauser, AController* KilledContoller, AActor* KilledActor, const struct FGameplayEffectSpec& KillingEffectSpec);
+
 
 };

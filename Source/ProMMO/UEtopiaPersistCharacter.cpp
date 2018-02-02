@@ -9,6 +9,7 @@
 #include "MyPlayerController.h"
 #include "UnrealNetwork.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "MyGameInstance.h"
 
 
@@ -50,6 +51,7 @@ AUEtopiaPersistCharacter::AUEtopiaPersistCharacter(const FObjectInitializer& Obj
 
 	// Our ability system component.
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
+	AttributeSet = CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
 
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character)
@@ -97,6 +99,10 @@ void AUEtopiaPersistCharacter::PossessedBy(AController* NewController)
 		AbilitySystem->InitAbilityActorInfo(this, this);
 		InitAbilitySystemClient();
 	}
+
+	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
+	playerC->GrantCachedAbilities();
+	RemapAbilities();
 }
 
 void AUEtopiaPersistCharacter::InitAbilitySystemClient_Implementation()
@@ -172,6 +178,9 @@ void AUEtopiaPersistCharacter::SetupPlayerInputComponent(class UInputComponent* 
 
 	// Map the "InputIDs" to the ability system
 	AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbiliyInputBinds("ConfirmInput", "CancelInput", "AbilityInput"));
+
+	//AttributeSet->CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
+	//AttributeSet = CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
 }
 
 
@@ -837,15 +846,16 @@ void AUEtopiaPersistCharacter::RemapAbilities_Implementation()
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] - Client "));
 	}
 	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
+	AMyPlayerState* playerS = Cast<AMyPlayerState>(playerC->PlayerState);
 
 	FGameplayAbilitySpec* Spec;
 
-	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerC->MyAbilitySlots.Num(); abilitySlotIndex++)
+	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerS->GrantedAbilities.Num(); abilitySlotIndex++)
 	{
-		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.AbilityHandle);
+		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerS->GrantedAbilities[abilitySlotIndex].AbilityHandle);
 		if (Spec)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.classPath);
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerS->GrantedAbilities[abilitySlotIndex].classPath);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] Spec->InputID: %d "), Spec->InputID);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] abilitySlotIndex: %d "), abilitySlotIndex);
 			Spec->InputID = abilitySlotIndex;
@@ -856,4 +866,139 @@ void AUEtopiaPersistCharacter::RemapAbilities_Implementation()
 	// testing - no effect
 	//AbilitySystem->InitAbilityActorInfo(this, this);
 
+}
+
+/*
+bool AUEtopiaPersistCharacter::Die_Validate(AController* Killer, AActor* DamageCauser, const FGameplayEffectSpec& KillingEffectSpec, float KillingDamageMagnitude, FVector KillingDamageNormal)
+{
+//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
+return true;
+}
+*/
+
+
+float AUEtopiaPersistCharacter::GetCooldownTimeRemaining(FGameplayAbilitySpecHandle CallingAbilityHandle, float& TotalDuration)
+{
+	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining]"));
+	FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(CallingAbilityHandle);
+	if (Spec)
+	{
+		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining] found spec"));
+		UGameplayAbility* AbilityToCheck = Spec->Ability;
+		UAbilitySystemComponent* AbilityComp = Cast<IAbilitySystemInterface>(this) ? Cast<IAbilitySystemInterface>(this)->GetAbilitySystemComponent() : nullptr;
+
+		if (AbilityToCheck && AbilityComp)
+		{
+			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining] AbilityToCheck && AbilityComp"));
+			float CurrentDuration;
+			AbilityToCheck->GetCooldownTimeRemainingAndDuration(CallingAbilityHandle, AbilityComp->AbilityActorInfo.Get(), CurrentDuration, TotalDuration);
+			return CurrentDuration;
+		}
+	}
+	return 0.f;
+
+}
+
+//void AUEtopiaPersistCharacter::Die_Implementation(AController* Killer, AActor* DamageCauser, const FGameplayEffectSpec& KillingEffectSpec, float KillingDamageMagnitude, FVector KillingDamageNormal)
+void AUEtopiaPersistCharacter::Die(AController* Killer, AActor* DamageCauser, const FGameplayEffectSpec& KillingEffectSpec, float KillingDamageMagnitude, FVector KillingDamageNormal)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [Die]  "));
+	// start the ragdoll and cancel abilities after a very brief delay.
+	GetWorldTimerManager().SetTimer(PlayDyingTimerHandle, this, &AUEtopiaPersistCharacter::PlayDying, 0.1f, false);
+
+	AController* const DyingController = (Controller != NULL) ? Controller : Cast<AController>(GetOwner());
+
+	bTearOff = true;
+	bIsDying = true;
+	
+	// clear all widgets 
+	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
+	playerC->ClearHUDWidgets();
+
+	UWorld* const World = GetWorld();
+	if (World) {
+		UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
+		if (gameInstance)
+		{
+			// report the kill
+			AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->PlayerState);
+			AMyPlayerState* KillerPlayerS = Cast<AMyPlayerState>(Killer->PlayerState);
+
+			gameInstance->RecordKill(KillerPlayerS->PlayerId, PlayerS->PlayerId);
+		}
+	}
+
+	DetachFromControllerPendingDestroy();
+
+	// set it up to remove this body
+	SetLifeSpan(5.0f);
+}
+
+
+
+
+void AUEtopiaPersistCharacter::PlayDying_Implementation()
+{
+	if (bIsDying)
+	{
+		return;
+	}
+
+	// CleanUpAbilitySystem();
+	// UAbilitySystemGlobals::Get().GetGameplayCueManager()->EndGameplayCuesFor(this);
+
+
+	bIsDying = true;
+	bTearOff = true;
+	bReplicateMovement = false;
+
+	SetLifeSpan(5.0f);
+
+	//DetachFromControllerPendingDestroy();
+
+	// set it up to remove this body
+	//SetLifeSpan(5.0f);
+
+	// disable collision on the collision capsule
+	if (GetCapsuleComponent())
+	{
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		GetCapsuleComponent()->SetCollisionResponseToAllChannels(ECR_Ignore);
+	}
+
+	// Disable character movement
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+		GetCharacterMovement()->DisableMovement();
+		GetCharacterMovement()->SetComponentTickEnabled(false);
+	}
+
+	// just go full ragdoll for now
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		//static FName CollisionProfileName(TEXT("Ragdoll"));
+		//PrimaryMesh->SetCollisionProfileName(CollisionProfileName);
+		SkelMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		SkelMesh->SetSimulatePhysics(true);
+
+		SkelMesh->SetAllBodiesSimulatePhysics(true);
+		SkelMesh->bBlendPhysics = true;
+		SkelMesh->SetAnimInstanceClass(nullptr);
+
+		// give it the impulse
+		/*
+		FDamageEvent& DamageEvent = LastTakeHitInfo.GetDamageEvent();
+		FVector ImpulseDir;
+		FHitResult Hit;
+		DamageEvent.GetBestHitInfo(this, LastTakeHitInfo.PawnInstigator.Get(), Hit, ImpulseDir);
+		if (DamageEvent.DamageTypeClass)
+		{
+		FVector const Impulse = ImpulseDir * DamageEvent.DamageTypeClass->GetDefaultObject<UDamageType>()->DamageImpulse;
+		PrimaryMesh->AddImpulseAtLocation(Impulse, Hit.ImpactPoint);
+		}
+		// Ignore projectiles
+		PrimaryMesh->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
+		*/
+	}
 }
