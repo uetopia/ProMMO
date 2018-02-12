@@ -156,28 +156,28 @@ void AMyPlayerController::BeginPlay()
 		else
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] BeginPlay on Regular Level"));
-	
+
 			const auto OnlineSub = IOnlineSubsystem::Get();
 			if (OnlineSub)
 			{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
 			//OnlineSub->GetFriendsInterface()->TriggerOnFriendsChangeDelegates(0);
 			OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
-			
+
 
 			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
 			//OnlineSub->GetFriendsInterface()->TriggerOnQueryRecentPlayersCompleteDelegates(*pid,"default",true,"none");
 			OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
 			}
-			
-			
+
+
 
 
 		}
 	}
-	
 
-	
+
+
 
 }
 
@@ -1223,8 +1223,8 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 			}
 		}
 	}
-	
-	
+
+
 	return false;
 }
 
@@ -1380,7 +1380,7 @@ void AMyPlayerController::ServerAttemptSplitStackToIndex_Implementation(int32 in
 				if (InventorySlots[indexFrom].quantity > quantity)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom amount is greater than split amount"));
-					
+
 					InventorySlots[indexTo] = InventorySlots[indexFrom];
 					InventorySlots[indexTo].quantity = quantity;
 					InventorySlots[indexFrom].quantity = InventorySlots[indexFrom].quantity - quantity;
@@ -1428,7 +1428,7 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 		FTransform const SpawnTransform(ShootDir.Rotation(), spawnlocation);
 
 		UWorld* World = GetWorld(); // get a reference to the world
-		if (World) 
+		if (World)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] got world "));
 			// if world exists, spawn the blueprint actor
@@ -1444,19 +1444,21 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 			if (pActor)
 			{
 				pActor->Attributes = InventorySlots[index].Attributes;
+				pActor->bCanBeStacked = InventorySlots[index].bCanBeStacked;
++				pActor->Quantity = InventorySlots[index].quantity;
 				UGameplayStatics::FinishSpawningActor(pActor, SpawnTransform);
 			}
 
-			
+
 		}
 
 		InventorySlots[index].quantity = 0;
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptSpawnActor_Implementation DoRep_InventoryChanged"));
 		//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-		
-		
-		
-		
+
+
+
+
 	}
 
 }
@@ -1501,13 +1503,13 @@ void AMyPlayerController::ServerAttemptUseItem_Implementation(int32 index)
 	{
 		myBasePickup->OnItemUsed(SpawnTransform, myPlayerState->playerKeyId, LoadedActorOwnerClass);
 	}
-	
+
 
 	InventorySlots[index].quantity = InventorySlots[index].quantity - 1;
 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptUseItem_Implementation DoRep_InventoryChanged"));
 	//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-	
+
 }
 
 bool AMyPlayerController::AddToIndex(int32 indexFrom, int32 indexTo)
@@ -1535,7 +1537,7 @@ bool AMyPlayerController::AddToIndex(int32 indexFrom, int32 indexTo)
 				return true;
 			}
 		}
-		
+
 	}
 	return false;
 }
@@ -1603,7 +1605,7 @@ void AMyPlayerController::InventoryItemSellStart(int32 index)
 	{
 		// TODO other checks like...  Is the vendor in range?
 		FOnInventoryItemSellStarted.Broadcast(index);
-		
+
 	}
 	return;
 }
@@ -1658,7 +1660,7 @@ bool AMyPlayerController::PerformJsonHttpRequest(void(AMyPlayerController::*dele
 
 	TSharedRef < IHttpRequest > Request = Http->CreateRequest();
 
-	
+
 	// Get the access token
 	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
 
@@ -1856,7 +1858,7 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 			JsonParsed->TryGetStringField("description", MyCurrentVendorDescription);
 			JsonParsed->TryGetBoolField("bMyVendor", MyCurrentVendorIsOwnedByMe);
 			JsonParsed->TryGetNumberField("vendorCurrency", MyCurrentVendorCurrency);
-			
+
 
 			const JsonValPtrArray *VendorItemsJson = nullptr;
 			JsonParsed->TryGetArrayField("items", VendorItemsJson);
@@ -1894,7 +1896,7 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 							//FString AttributeJsonRaw = savedAttributes;
 							TSharedPtr<FJsonObject> AttributesJsonParsed;
 							TSharedRef<TJsonReader<TCHAR>> AttributesJsonReader = TJsonReaderFactory<TCHAR>::Create(savedAttributes);
-							
+
 							//const JsonValPtrArray *AttributesJson;
 
 							if (FJsonSerializer::Deserialize(AttributesJsonReader, AttributesJsonParsed))
@@ -1938,12 +1940,12 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 									{
 										NewVendorItem.Attributes.Add(currObject->Value->AsNumber());
 									}
-									
+
 								}
 								*/
 
-								
-	
+
+
 								//AttributeParseSuccess = AttributesJsonParsed->TryGetArrayField("data", AttributesJson);
 								//TArray<TSharedPtr<FJsonValue> > JsonFriends = JsonObject->GetArrayField(TEXT("data"));
 							}
@@ -1976,11 +1978,11 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 						}
 					}
 				}
-				
+
 			}
 
 			FOnVendorInfoComplete.Broadcast();
-			
+
 		}
 	}
 }
@@ -2156,7 +2158,7 @@ bool AMyPlayerController::GetCharacterList()
 	FString GameKey = TheGameInstance->GameKey;
 
 	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
-	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("gameKeyIdStr", GameKey);
 
 	FString JsonOutputString;
 	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -2211,9 +2213,9 @@ void AMyPlayerController::GetCharacterListComplete(FHttpRequestPtr HttpRequest, 
 							CharacterObj->TryGetBoolField("characterAlive", NewCharacter.characterAlive);
 							CharacterObj->TryGetBoolField("currentlySelectedActive", NewCharacter.currentlySelectedActive);
 
-							// TODO - run some logic to assign an icon 
+							// TODO - run some logic to assign an icon
 							NewCharacter.Icon = nullptr;
-	
+
 							MyCachedCharacters.Add(NewCharacter);
 						}
 					}
@@ -2235,7 +2237,7 @@ bool AMyPlayerController::CreateCharacter(FString title, FString description, FS
 
 	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
 	FString GameKey = TheGameInstance->GameKey;
-	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("gameKeyIdStr", GameKey);
 
 	PlayerJsonObj->SetStringField("title", title);
 	PlayerJsonObj->SetStringField("description", description);
@@ -2395,7 +2397,7 @@ bool AMyPlayerController::AddAbilityToBar(int32 index, FMyGrantedAbility Granted
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddAbilityToBar"));
 	// this is executing on the client, not server.
 
-	
+
 	ServerAttemptAddAbilityToBar(index, GrantedAbility);
 	return false;
 }
@@ -2448,7 +2450,7 @@ void AMyPlayerController::ServerAttemptAddAbilityToBar_Implementation(int32 inde
 
 	//DoRep_AbilityInterfaceChanged = !DoRep_AbilityInterfaceChanged;
 
-	
+
 	return;
 }
 
@@ -2525,7 +2527,7 @@ void AMyPlayerController::GrantCachedAbilities_Implementation()
 
 	for (int32 Index = 0; Index < playerS->CachedAbilities.Num(); Index++)
 	{
-		
+
 		LoadedActorOwnerClass = LoadClassFromPath(playerS->CachedAbilities[Index].classPath);
 
 		if (LoadedActorOwnerClass)
@@ -2544,7 +2546,7 @@ void AMyPlayerController::GrantCachedAbilities_Implementation()
 			LocalGrantedAbilities.Add(grantedAbility);
 		}
 
-		
+
 	}
 	playerS->GrantedAbilities = LocalGrantedAbilities;
 	MyGrantedAbilities = LocalGrantedAbilities;
@@ -2577,18 +2579,20 @@ void AMyPlayerController::GrantCachedAbilities_Implementation()
 void AMyPlayerController::OnRep_OnAbilitiesChange_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilitiesChange"));
-	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
-	playerChar->RemapAbilities();
+	//AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	//playerChar->RemapAbilities();
 	OnAbilitiesChanged.Broadcast();
 }
 
 void AMyPlayerController::OnRep_OnAbilityInterfaceChange_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilityInterfaceChange"));
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	playerChar->RemapAbilities();
 	OnAbilityInterfaceChanged.Broadcast();
 
-	
-	
+
+
 }
 
 /*
@@ -2619,7 +2623,7 @@ void AMyPlayerController::UnFreeze()
 	OnInventoryChanged.Broadcast();
 	OnPartyDataReceivedUETopiaDisplayUI.Broadcast();
 	OnRecentPlayersChanged.Broadcast();
-	
+
 	//AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
 	//playerChar->RemapAbilities();
 
@@ -2662,6 +2666,6 @@ void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >
 	DOREPLIFETIME(AMyPlayerController, InteractingWithVendorKeyId);
 	DOREPLIFETIME(AMyPlayerController, Experience);
 	DOREPLIFETIME(AMyPlayerController, ExperienceThisLevel);
-	
+
 
 }
