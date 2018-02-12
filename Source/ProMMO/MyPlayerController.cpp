@@ -1392,6 +1392,8 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 			if (pActor)
 			{
 				pActor->Attributes = InventorySlots[index].Attributes;
+				pActor->bCanBeStacked = InventorySlots[index].bCanBeStacked;
+				pActor->Quantity = InventorySlots[index].quantity;
 				UGameplayStatics::FinishSpawningActor(pActor, SpawnTransform);
 			}
 
@@ -2104,7 +2106,7 @@ bool AMyPlayerController::GetCharacterList()
 	FString GameKey = TheGameInstance->GameKey;
 
 	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
-	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("gameKeyIdStr", GameKey);
 
 	FString JsonOutputString;
 	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -2183,7 +2185,7 @@ bool AMyPlayerController::CreateCharacter(FString title, FString description, FS
 
 	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
 	FString GameKey = TheGameInstance->GameKey;
-	PlayerJsonObj->SetStringField("gameKeyId", GameKey);
+	PlayerJsonObj->SetStringField("gameKeyIdStr", GameKey);
 
 	PlayerJsonObj->SetStringField("title", title);
 	PlayerJsonObj->SetStringField("description", description);
@@ -2420,6 +2422,8 @@ void AMyPlayerController::ServerAttemptSwapAbilityBarLocations_Implementation(in
 
 	// we can't just copy the entire struct becuase the key binding is in there too!
 
+	// We need to do something with the array in player state in order to get the keybindings to stick
+
 	FMyAbilitySlot TempSlotData = MyAbilitySlots[indexFrom];
 
 	MyAbilitySlots[indexFrom].bCanBeUsed = MyAbilitySlots[indexTo].bCanBeUsed;
@@ -2525,18 +2529,17 @@ void AMyPlayerController::GrantCachedAbilities_Implementation()
 void AMyPlayerController::OnRep_OnAbilitiesChange_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilitiesChange"));
-	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
-	playerChar->RemapAbilities();
+	//AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	//playerChar->RemapAbilities();
 	OnAbilitiesChanged.Broadcast();
 }
 
 void AMyPlayerController::OnRep_OnAbilityInterfaceChange_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnRep_OnAbilityInterfaceChange"));
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+	playerChar->RemapAbilities();
 	OnAbilityInterfaceChanged.Broadcast();
-
-	
-	
 }
 
 /*

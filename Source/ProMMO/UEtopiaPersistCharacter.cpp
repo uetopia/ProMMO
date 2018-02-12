@@ -850,12 +850,13 @@ void AUEtopiaPersistCharacter::RemapAbilities_Implementation()
 
 	FGameplayAbilitySpec* Spec;
 
-	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerS->GrantedAbilities.Num(); abilitySlotIndex++)
+
+	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerC->MyAbilitySlots.Num(); abilitySlotIndex++)
 	{
-		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerS->GrantedAbilities[abilitySlotIndex].AbilityHandle);
+		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.AbilityHandle);
 		if (Spec)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerS->GrantedAbilities[abilitySlotIndex].classPath);
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.classPath);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] Spec->InputID: %d "), Spec->InputID);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] abilitySlotIndex: %d "), abilitySlotIndex);
 			Spec->InputID = abilitySlotIndex;
