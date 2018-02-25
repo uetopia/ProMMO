@@ -48,6 +48,9 @@ AMyPlayerController::AMyPlayerController()
 	const auto OnlineSub = IOnlineSubsystem::Get();
 	check(OnlineSub);
 
+	const auto IdentityInterface = OnlineSub->GetIdentityInterface();
+	check(IdentityInterface.IsValid());
+
 	const auto FriendsInterface = OnlineSub->GetFriendsInterface();
 	check(FriendsInterface.IsValid());
 
@@ -59,6 +62,9 @@ AMyPlayerController::AMyPlayerController()
 
 	const auto TournamentInterface = OnlineSub->GetTournamentInterface();
 	check(TournamentInterface.IsValid());
+
+	IdentityInterface->AddOnLoginStatusChangedDelegate_Handle(0, FOnLoginStatusChangedDelegate::CreateUObject(this, &AMyPlayerController::OnLoginStatusChanged));
+	IdentityInterface->AddOnLoginCompleteDelegate_Handle(0, FOnLoginCompleteDelegate::CreateUObject(this, &AMyPlayerController::HandleUserLoginComplete));
 
 	FriendsInterface->AddOnFriendsChangeDelegate_Handle(0, FOnFriendsChangeDelegate::CreateUObject(this, &AMyPlayerController::OnFriendsChange));
 	FriendsInterface->AddOnInviteReceivedDelegate_Handle(FOnInviteReceivedDelegate::CreateUObject(this, &AMyPlayerController::OnFriendInviteReceivedComplete));
@@ -156,12 +162,14 @@ void AMyPlayerController::BeginPlay()
 			if (OnlineSub)
 			{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
-			//OnlineSub->GetFriendsInterface()->TriggerOnFriendsChangeDelegates(0);
+
+			// NOTE: If you want to PIE, you can comment these lines out - which cause crashes
 			OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
 			
 
 			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
-			//OnlineSub->GetFriendsInterface()->TriggerOnQueryRecentPlayersCompleteDelegates(*pid,"default",true,"none");
+
+			// NOTE: If you want to PIE, you can comment these lines out - which cause crashes
 			OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
 			}
 			
@@ -176,6 +184,43 @@ void AMyPlayerController::BeginPlay()
 
 }
 
+
+bool AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Validate(const FString& CurrentAccessTokenFromOSSIn)
+{
+	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
+	return true;
+}
+
+void AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Implementation(const FString& CurrentAccessTokenFromOSSIn)
+{
+	// Only run this on the server
+	if (IsRunningDedicatedServer())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Implementation"));
+
+		CurrentAccessTokenFromOSS = CurrentAccessTokenFromOSSIn;
+
+		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+		TheGameInstance->ActivatePlayer(this, playerKeyId, playerIDTemp, UniqueId);
+	}
+	return;
+}
+
+void AMyPlayerController::ClientGetCurrentAccessTokenFromOSS_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ClientGetCurrentAccessTokenFromOSS"));
+	// Get the access token
+	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
+
+	if (OnlineSub)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] PerformHttpRequest found OnlineSub"));
+		FString CurrentAccessTokenFromOSSCache = OnlineSub->GetIdentityInterface()->GetAuthToken(0);
+		ServerSetCurrentAccessTokenFromOSS(CurrentAccessTokenFromOSSCache);
+	}
+
+	return;
+}
 
 
 void AMyPlayerController::TravelPlayer(const FString& ServerUrl)
@@ -979,6 +1024,38 @@ void AMyPlayerController::JoinTournament(const FString& TournamentKeyId)
 
 }
 
+// Login status has changed.  We need up update the auth token
+void AMyPlayerController::OnLoginStatusChanged(int32 LocalUserNum, ELoginStatus::Type OldStatus, ELoginStatus::Type NewStatus, const FUniqueNetId& NewId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnLoginStatusChanged"));
+
+	// Get the access token
+	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
+
+	if (OnlineSub)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] PerformHttpRequest found OnlineSub"));
+		FString CurrentAccessTokenFromOSSCache = OnlineSub->GetIdentityInterface()->GetAuthToken(0);
+		ServerSetCurrentAccessTokenFromOSS(CurrentAccessTokenFromOSSCache);
+	}
+
+
+}
+
+void AMyPlayerController::HandleUserLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::HandleUserLoginComplete"));
+
+	// Get the access token
+	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
+
+	if (OnlineSub)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnlineSub"));
+		FString CurrentAccessTokenFromOSSCache = OnlineSub->GetIdentityInterface()->GetAuthToken(0);
+		ServerSetCurrentAccessTokenFromOSS(CurrentAccessTokenFromOSSCache);
+	}
+}
 
 // Inventory stuff
 

@@ -142,7 +142,13 @@ FString AMyGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		playerId = PlayerS->PlayerId; // NewPlayerController->PlayerState->PlayerId;
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] InitNewPlayer playerId: %d"), playerId);
 
-		TheGameInstance->ActivatePlayer(playerC, Name, playerId, UniqueId);
+		// WE need to move this...  We don't have the player access token yet.
+		// TheGameInstance->ActivatePlayer(playerC, Name, playerId, UniqueId);
+
+		// save the vars in the controller so we can run this later.
+		playerC->UniqueId = UniqueId;
+		playerC->playerKeyId = Name;
+		playerC->playerIDTemp = playerId;
 
 		// Init player's name
 		FString InName = UGameplayStatics::ParseOption(Options, TEXT("Name")).Left(20);

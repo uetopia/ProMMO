@@ -313,13 +313,16 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	FMyActivePlayers PlayerRecord;
 	FMyServerLinks ServerLinks;
 
+	// Keep track of which map is loaded 
+	FString CurrentLevelEngineString;
+
 	// Use this for matchmaker/competitive
 	FMyMatchInfo MatchInfo;
 	bool MatchStarted;
 	int32 RoundWinsNeededToWinMatch;
 
-	bool PerformHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString);
-	bool PerformJsonHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString);
+	bool PerformHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString, FString AccessToken);
+	bool PerformJsonHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString, FString AccessToken);
 
 	/* Handles to manage timers */
 	FTimerHandle ServerLinksTimerHandle;
