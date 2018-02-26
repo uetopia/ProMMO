@@ -103,6 +103,11 @@ class PROMMO_API AMyPlayerController : public APlayerController
 
 public:
 
+	// These are just temporary vars to hold data until we are ready to activate player.
+	FUniqueNetIdRepl UniqueId;
+	FString playerKeyId;
+	int32 playerIDTemp;
+
 	///////////////////////////////////////////////////////////
 	// This section from
 	// https://wiki.unrealengine.com/UMG,_Referencing_UMG_Widgets_in_Code
@@ -138,6 +143,20 @@ public:
 		void RequestBeginPlay();
 
 	FString PlayerUniqueNetId;
+
+	// We need to keep track of the Access token for each user.
+	// The server needs to be able to send this token along with certain requests for user validation
+	FString CurrentAccessTokenFromOSS;
+
+	// Set this player's access token on the server
+	UFUNCTION(Server, Reliable, WithValidation)
+		void ServerSetCurrentAccessTokenFromOSS(const FString& CurrentAccessTokenFromOSSIn);
+
+	// Tell the client to update the player access token
+	UFUNCTION(Client, Reliable)
+		void ClientGetCurrentAccessTokenFromOSS();
+
+	//////////////////////////////////
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void TravelPlayer(const FString& ServerUrl);
@@ -776,6 +795,12 @@ private:
 
 	// The subsystem has finished reading the tournament details.  Copy them into our local struct and trigger the delegate to update the UI
 	//void OnTournamentDetailsReadComplete();
+
+	// The subsystem login details have changed.  We need to update the cached token
+	// DECLARE_MULTICAST_DELEGATE_FourParams(FOnLoginStatusChanged, int32 /*LocalUserNum*/, ELoginStatus::Type /*OldStatus*/, ELoginStatus::Type /*NewStatus*/, const FUniqueNetId& /*NewId*/);
+	void OnLoginStatusChanged(int32 LocalUserNum, ELoginStatus::Type OldStatus, ELoginStatus::Type NewStatus, const FUniqueNetId& NewId);
+	void HandleUserLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
+
 
 
 	TArray<TSharedRef<IOnlinePartyJoinInfo>> PendingInvitesArray;

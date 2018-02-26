@@ -6,7 +6,7 @@
 #include "MyGameInstance.h"
 #include "MyPlayerState.h"
 #include "MyOnlineGameSettings.h"
-
+#include "MyPlayerController.h"
 
 namespace
 {
@@ -539,6 +539,11 @@ void AMyGameSession::RegisterServer() {
 void AMyGameSession::PostLogin(APlayerController* NewPlayer)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyGameSession::PostLogin"));
+
+	// Ask the client to provide the CurrentAccessTokenFromOSS
+	// This does not work?
+	AMyPlayerController* myPC = Cast<AMyPlayerController>(NewPlayer);
+	myPC->ClientGetCurrentAccessTokenFromOSS();
 }
 
 FString AMyGameSession::ApproveLogin(const FString& Options)
