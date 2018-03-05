@@ -1,7 +1,7 @@
 # PRO/MMO FOUNDATION
 Multiplayer tools for persistent worlds.
 
-4.18 Marketplace branch requires the 4.18 (or 4.18-Marketplace) branch of the UEtopia plugin, and the stock engine
+4.18 Marketplace branch requires the 4.18 (or 4.18-Marketplace) branch of the UEtopia plugin, and the stock 4.18 engine
 
 It is strongly recommended to use this branch for testing and evaluation only.  Use the OSS enhanced branch and the patched engine for serious projects as it contains important functionality for some otherwise missing push notifications.
 
