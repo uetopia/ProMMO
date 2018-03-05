@@ -5,7 +5,7 @@ Multiplayer tools for persistent worlds.
 https://github.com/uetopia/uetopia-online-subsystem/tree/4.18
 https://github.com/EpicGames/UnrealEngine/tree/4.18
 
-It is strongly recommended to use this branch for testing and evaluation only.  Use the OSS enhanced branch and the patched engine for serious projects as it contains important functionality for some otherwise missing push notifications.
+It is strongly recommended to use this branch for testing and evaluation only.  Use the OSS enhanced branch and the patched engine for serious projects.  These branches contain important functionality that is missing in the stock engine.
 
 # Live Demo
 https://www.youtube.com/watch?v=qVm1kcUoFBY
