@@ -1,11 +1,9 @@
 # PRO/MMO FOUNDATION
 Multiplayer tools for persistent worlds.
 
-4.18_OSS enhancements branch requires the 4.18 branch of the UEtopia plugin, and a patched version of the engine
-https://github.com/uetopia/uetopia-online-subsystem/tree/4.18
-https://github.com/uetopia/UnrealEngine/tree/4.18.0_UETOPIA_oss_changes
+4.18 Marketplace branch requires the 4.18 (or 4.18-Marketplace) branch of the UEtopia plugin, and the stock engine
 
-If you don't want to use the enhanced Online Subsystem, use the regular 4.18 branch.
+It is strongly recommended to use this branch for testing and evaluation only.  Use the OSS enhanced branch and the patched engine for serious projects as it contains important functionality for some otherwise missing push notifications.
 
 # Live Demo
 https://www.youtube.com/watch?v=qVm1kcUoFBY
