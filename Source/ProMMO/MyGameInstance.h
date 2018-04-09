@@ -15,38 +15,10 @@
 #include "MyServerPortalActorParallelPriv.h"
 #include "MyServerPortalActorParallelPart.h"
 #include "MyServerPortalActorParallelGrou.h"
+#include "MyTypes.h"
 #include "MyGameInstance.generated.h"
 
 
-
-USTRUCT(BlueprintType)
-struct FMySessionSearchResult {
-	GENERATED_USTRUCT_BODY()
-
-		UPROPERTY(BlueprintReadWrite)
-		FString OwningUserName;
-
-	UPROPERTY(BlueprintReadWrite)
-		FString ServerTitle;
-	// TODO - add more data that we care about
-	UPROPERTY(BlueprintReadWrite)
-		FString ServerKey;
-
-	UPROPERTY(BlueprintReadWrite)
-		int32 SearchIdx;
-};
-
-USTRUCT(BlueprintType)
-struct FUserEvent {
-
-	GENERATED_USTRUCT_BODY()
-		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString EventIcon;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString EventType;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString EventSummary;
-};
 
 USTRUCT(BlueprintType)
 struct FMyActivePlayer {
@@ -85,7 +57,7 @@ struct FMyActivePlayer {
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FUniqueNetIdRepl UniqueId;
 	//UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
-		AMyPlayerController* PlayerController;
+	AMyPlayerController* PlayerController;
 
 	FTimerHandle GetPlayerInfoDelayHandle;
 	FTimerDelegate GetPlayerInfoTimerDel;
@@ -102,7 +74,7 @@ struct FMyActivePlayers {
 		FString encryption;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString nonce;
-	
+
 };
 
 // Matchmaker specific structs.  These are used with uetopia matchmaker functionality.
@@ -190,69 +162,6 @@ struct FMyTeamList {
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		TArray<FMyTeamInfo> teams;
 };
-
-// KEY ID is actually an INT, but we'll keep it as a string for now.
-USTRUCT(BlueprintType)
-struct FMyServerLink {
-	GENERATED_USTRUCT_BODY()
-		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString targetServerTitle;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString targetServerKeyId;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetStatusIsContinuous;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetStatusCreating;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetStatusProvisioned;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetStatusOnline;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetStatusFull;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetStatusDead;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool permissionCanMount;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool permissionCanUserTravel;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool permissionCanDismount;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString resourcesUsedToTravel;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString resourceAmountsUsedToTravel;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		int32 currencyCostToTravel;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		float coordLocationX;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		float coordLocationY;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		float coordLocationZ;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString hostConnectionLink;
-	// Testing to see if this will work
-	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-	//	AMyServerPortalActor* ServerPortalActorReference;
-
-	// Additions to support parallel/instanced servers
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		bool targetInstanced;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString targetInstanceConfiguration;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		int32 targetInstancePartySizeMaximum;
-};
-
-USTRUCT(BlueprintType)
-struct FMyServerLinks {
-
-	GENERATED_USTRUCT_BODY()
-		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		TArray<FMyServerLink> links;
-};
-
-
 
 
 class AMyGameSession;
@@ -345,6 +254,9 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	{
 		return FStringClassReference(ClassPtr).ToString();
 	}
+
+	// sharded server?
+	bool bIsShardedServer;
 
 public:
 
@@ -477,7 +389,7 @@ public:
 		bool SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock);
 	void SaveGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
-	void TransferPlayer(const FString& ServerKey, int32 playerID, bool checkOnly);
+	void TransferPlayer(const FString& ServerKey, int32 playerID, bool checkOnly, bool toShard);
 	void TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	// VENDORS

@@ -476,8 +476,8 @@ void AUEtopiaPersistCharacter::OnTravel()
 					if (ObjectInFocus->state == readystate) {
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] State is Ready - travelling "));
 						ServerAttemptTravel(false);
-						traveledAndGone = true;
-						myPC->ClientTravel(ObjectInFocus->serverUrl, ETravelType::TRAVEL_Absolute);
+						//traveledAndGone = true;
+						//myPC->ClientTravel(ObjectInFocus->serverUrl, ETravelType::TRAVEL_Absolute);
 					}
 					else if (ObjectInFocus->state == instancedstate) {
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] State is Instanced "));
@@ -487,8 +487,8 @@ void AUEtopiaPersistCharacter::OnTravel()
 						{
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] Found a hostConnectionLink "));
 							ServerAttemptTravel(false);
-							traveledAndGone = true;
-							myPC->ClientTravel(playerS->ServerLinksAuthorized[b].hostConnectionLink, ETravelType::TRAVEL_Absolute);
+							//traveledAndGone = true;
+							//myPC->ClientTravel(playerS->ServerLinksAuthorized[b].hostConnectionLink, ETravelType::TRAVEL_Absolute);
 						}
 						
 					}
@@ -520,7 +520,7 @@ void AUEtopiaPersistCharacter::ServerAttemptTravel_Implementation(bool checkOnly
 			if (World) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] Requesting Transfer  "));
 				UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
-				gameInstance->TransferPlayer(ObjectInFocus->serverKeyId, PlayerState->PlayerId, checkOnly);
+				gameInstance->TransferPlayer(ObjectInFocus->serverKeyId, PlayerState->PlayerId, checkOnly, false);
 
 			}
 		}

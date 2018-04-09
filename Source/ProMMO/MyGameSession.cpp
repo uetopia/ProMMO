@@ -589,8 +589,9 @@ void AMyGameSession::RegisterPlayer(APlayerController* NewPlayer, const TSharedP
 		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameSession] RegisterPlayer UniqueId: %s"), *UniqueId->ToString()); //assertionFail
 		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameSession] RegisterPlayer playerUniqueId: %s"), *playerUniqueId);  // assertion fail
 
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameSession] RegisterPlayer NewPlayer->PlayerState->PlayerName: %s"), *NewPlayer->PlayerState->PlayerName);
-		//NewPlayer->PlayerState->
+		// Deprecated/Unused
+		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameSession] RegisterPlayer NewPlayer->PlayerState->PlayerName: %s"), *NewPlayer->PlayerState->PlayerName);
+
 
 
 

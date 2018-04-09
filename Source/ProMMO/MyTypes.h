@@ -5,6 +5,7 @@
 //#include "Engine.h"
 #include "GameplayEffect.h"
 #include "GameplayAbilitiesModule.h"
+#include "Online.h"
 #include "MyTypes.generated.h"
 
 UENUM()
@@ -419,3 +420,116 @@ struct FMyCharacterRecord {
 		UTexture2D* Icon;
 
 };
+
+
+USTRUCT(BlueprintType)
+struct FMySessionSearchResult {
+	GENERATED_USTRUCT_BODY()
+
+		UPROPERTY(BlueprintReadWrite)
+		FString OwningUserName;
+
+	UPROPERTY(BlueprintReadWrite)
+		FString ServerTitle;
+	// TODO - add more data that we care about
+	UPROPERTY(BlueprintReadWrite)
+		FString ServerKey;
+
+	UPROPERTY(BlueprintReadWrite)
+		int32 SearchIdx;
+};
+
+USTRUCT(BlueprintType)
+struct FUserEvent {
+
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString EventIcon;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString EventType;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString EventSummary;
+};
+
+// KEY ID is actually an INT, but we'll keep it as a string for now.
+USTRUCT(BlueprintType)
+struct FMyServerLink {
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString targetServerTitle;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString targetServerKeyId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetStatusIsContinuous;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetStatusCreating;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetStatusProvisioned;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetStatusOnline;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetStatusFull;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetStatusDead;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool permissionCanMount;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool permissionCanUserTravel;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool permissionCanDismount;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString resourcesUsedToTravel;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString resourceAmountsUsedToTravel;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 currencyCostToTravel;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float coordLocationX;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float coordLocationY;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float coordLocationZ;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString hostConnectionLink;
+	// Testing to see if this will work
+	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+	//	AMyServerPortalActor* ServerPortalActorReference;
+
+	// Additions to support parallel/instanced servers
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool targetInstanced;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString targetInstanceConfiguration;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 targetInstancePartySizeMaximum;
+};
+
+// KEY ID is actually an INT, but we'll keep it as a string for now.
+USTRUCT(BlueprintType)
+struct FMyServerShard {
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString targetServerKeyId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool online;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString hostConnectionLink;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 shardId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 playerCount;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 playerCapacityMaximum;
+};
+
+USTRUCT(BlueprintType)
+struct FMyServerLinks {
+
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FMyServerLink> links;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FMyServerShard> shards;
+};
+
+

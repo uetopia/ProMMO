@@ -12,6 +12,7 @@ AMyGameState::AMyGameState(const FObjectInitializer& ObjectInitializer) : Super(
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] CONSTRUCT"));
 
 	//GetWorld()->GetTimerManager().SetTimer(ServerPortalsTimerHandle, this, &AMyGameState::SpawnServerPortals, 20.0f, true);
+	ServerShards.Empty();
 
 
 }
@@ -23,6 +24,8 @@ void AMyGameState::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutL
 	DOREPLIFETIME(AMyGameState, serverTitle);
 	DOREPLIFETIME(AMyGameState, ServerLinks);
 	DOREPLIFETIME(AMyGameState, TeamList);
+	DOREPLIFETIME(AMyGameState, ServerShards);
+	//DOREPLIFETIME(AMyGameState, bIsShardedServer);
 
 }
 

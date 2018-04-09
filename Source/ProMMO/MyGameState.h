@@ -57,4 +57,11 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 		float sunAngleMultiplier = 1.0f;
+
+	// Server shards
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "UETOPIA")
+	TArray<FMyServerShard> ServerShards;
+
+
 };

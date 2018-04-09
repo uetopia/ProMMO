@@ -103,6 +103,8 @@ class AUEtopiaPersistCharacter : public ACharacter, public IAbilitySystemInterfa
 	bool bMouseShowing;
 	void OnToggleMouse();
 
+	// TODO - OnShardTransfer
+
 
 	/** spawnable blueprint object reference */
 	TSubclassOf<AMySpawnableObject> BlueprintVar; // the base class that the blueprint uses
