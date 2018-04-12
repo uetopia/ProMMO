@@ -352,6 +352,11 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 				uetopiaGameState->serverTitle = ServerTitle;
 				uetopiaGameState->sunAngle = sunRotation;
 
+				if (JsonParsed->GetBoolField("sharded")) {
+					UE_LOG(LogTemp, Log, TEXT("Found Sharded Server."));
+					bIsShardedServer = JsonParsed->GetBoolField("sharded");
+				}
+
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] ServerTitle: %s"), *ServerTitle);
 
 			}
@@ -551,6 +556,10 @@ void UMyGameInstance::GetServerLinksComplete(FHttpRequestPtr HttpRequest, FHttpR
 
 				}
 				*/
+
+				// update the game state with the shard list
+				AMyGameState* const MyGameState = GetWorld() != NULL ? GetWorld()->GetGameState<AMyGameState>() : NULL;
+				MyGameState->ServerShards = ServerLinks.shards;
 
 				// tell the game state to spawn them
 				//AMyGameState* const MyGameState = GetWorld() != NULL ? GetWorld()->GetGameState<AMyGameState>() : NULL;
@@ -805,7 +814,8 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 								pc = Iterator->Get();
 
 								
-
+								AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
+								AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
 								APlayerState* thisPlayerState = pc->PlayerState;
 								AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 								AMyPlayerController* playerC = Cast<AMyPlayerController>(pc);
@@ -817,6 +827,18 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 									PlayerRecord.ActivePlayers[b].playerID = thisPlayerState->PlayerId;
 									playerS->Currency = JsonParsed->GetIntegerField("player_currency");
 									playerC->CurrencyAvailable = JsonParsed->GetIntegerField("player_currency");
+
+									// Also set the server sharded state here.  We need it for ui display.
+									if (bIsShardedServer)
+									{
+										UE_LOG(LogTemp, Log, TEXT("bIsShardedServer"));
+										playerC->bIsShardedServer = true;
+									}
+									else
+									{
+										UE_LOG(LogTemp, Log, TEXT("bIsShardedServer = false"));
+										playerC->bIsShardedServer = false;
+									}
 
 									// Also set cubes to zero here.  We don't have the inventory yet.
 									//playerS->InventoryCubes = 0;
@@ -2315,8 +2337,7 @@ void UMyGameInstance::DeActivateRequestComplete(FHttpRequestPtr HttpRequest, FHt
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeActivateRequestComplete] Done!"));
 }
 
-
-void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, bool checkOnly)
+void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, bool checkOnly, bool toShard)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] TransferPlayer"));
 
@@ -2339,9 +2360,22 @@ void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, b
 	}
 
 	FString playerplayerKeyId = playerRecord->playerKeyId;
+	bool permissionCanUserTravel = false;
 
-	FMyServerLink* serverRecord = getServerByKey(ServerKey);
-	if (serverRecord->permissionCanUserTravel)
+	if (toShard)
+	{
+		permissionCanUserTravel = true;
+	}
+	else
+	{
+		FMyServerLink* serverRecord = getServerByKey(ServerKey);
+		if (serverRecord->permissionCanUserTravel)
+		{
+			permissionCanUserTravel = true;
+		}
+	}
+
+	if (permissionCanUserTravel)
 	{
 		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] TransferPlayer - Permission Granted"));
 		FString access_token = playerRecord->PlayerController->CurrentAccessTokenFromOSS;
@@ -2353,7 +2387,8 @@ void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, b
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] TransferPlayer - Checkonly is false - deactivating ASAP"));
 			// run final save - time is of the essence here.  We can't wait for them to log out and timeout.
-			DeActivatePlayer(playerID);
+			// Disabling this here.  Do it after we get the results back!
+			// DeActivatePlayer(playerID);
 		}
 		return;
 	}
@@ -2363,7 +2398,6 @@ void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, b
 	}
 
 }
-
 
 void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
 {
@@ -2412,6 +2446,14 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] allowedToTravel: FALSE"));
 				}
 
+				bool toShard = JsonParsed->GetBoolField("toShard");
+				if (toShard) {
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] toShard: TRUE"));
+				}
+				else {
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] toShard: FALSE"));
+				}
+
 				// Get the additional fields to support instanced servers
 				bool instanceServerTemplate = JsonParsed->GetBoolField("instanceServerTemplate");
 				FString instanceServerKeyId = JsonParsed->GetStringField("instanceServerKeyId");
@@ -2428,100 +2470,123 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found serverlink"));
 				}
 
-				if (checkOnly == "true") {
-					// get the player
-					FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
-
-					// we need our uetopiaplugcharacter to set the ServerPortalKeyIdsAuthorized
-					// just put it in the controller? No it should go in the state
-					// We need to go through the playercontrollerIterator to hunt for the playerKeyId
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - looking for a playerKeyId match"));
-					APlayerController* pc = NULL;
-					for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+				// Deal with shard to shard travel
+				if (toShard)
+				{
+					if (allowedToTravel)
 					{
-						pc = Iterator->Get();
+						// get the player
+						FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
+						AMyPlayerController* pc = ActivePlayer->PlayerController;
+
+						DeActivatePlayer(ActivePlayer->playerID);
+						pc->ExecuteClientTravel(instanceHostConnectionLink);
+					}
+
+				}
+				else
+				{
+					if (checkOnly == "true") {
+						// get the player
+						FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
+
+						// we need our uetopiaplugcharacter to set the ServerPortalKeyIdsAuthorized
+
+						// just get the controller from our active array.
+
+						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - looking for a playerKeyId match"));
+						AMyPlayerController* pc = ActivePlayer->PlayerController;
 
 						APlayerState* thisPlayerState = pc->PlayerState;
 						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-						if (playerS->playerKeyId == userKeyId)
-						{
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
-							UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
+						UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
 
-							// TODO - handle instanced server data
 
-							// Instanced servers have different keys and need to be handled differently.
-							// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
-							// We need to update all of the server link information after every transfer request like this one.
 
-							if (allowedToTravel) {
+						// Instanced servers have different keys and need to be handled differently.
+						// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
+						// We need to update all of the server link information after every transfer request like this one.
 
-								// check to see if this key is already in the array
-								bool foundServerLinkAuthorized = false;
-								for (int sla = 0; sla < playerS->ServerLinksAuthorized.Num(); sla++)
+						if (allowedToTravel) {
+
+							// check to see if this key is already in the array
+							bool foundServerLinkAuthorized = false;
+							for (int sla = 0; sla < playerS->ServerLinksAuthorized.Num(); sla++)
+							{
+								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found ServerLinkAuthorized"));
+								if (playerS->ServerLinksAuthorized[sla].targetServerKeyId == targetServerKeyId)
 								{
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found ServerLinkAuthorized"));
-									if (playerS->ServerLinksAuthorized[sla].targetServerKeyId == targetServerKeyId)
-									{
-										UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found Matching ServerLinkAuthorized"));
+									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found Matching ServerLinkAuthorized"));
 
-										// update the record
-										playerS->ServerLinksAuthorized[sla].hostConnectionLink = instanceHostConnectionLink;
-										foundServerLinkAuthorized = true;
-									}
+									// update the record
+									playerS->ServerLinksAuthorized[sla].hostConnectionLink = instanceHostConnectionLink;
+									foundServerLinkAuthorized = true;
 								}
+							}
 
-								if (!foundServerLinkAuthorized) 
-								{
-									FMyApprovedServerLink newApprovedLink;
-									newApprovedLink.hostConnectionLink = instanceHostConnectionLink;
-									newApprovedLink.targetServerKeyId = targetServerKeyId;
-									playerS->ServerLinksAuthorized.Add(newApprovedLink);
-								}
+							if (!foundServerLinkAuthorized)
+							{
+								FMyApprovedServerLink newApprovedLink;
+								newApprovedLink.hostConnectionLink = instanceHostConnectionLink;
+								newApprovedLink.targetServerKeyId = targetServerKeyId;
+								playerS->ServerLinksAuthorized.Add(newApprovedLink);
+							}
 
-								//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
+							//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
 
-								// Spawn and setup the travelapproved actor visible only to the owner
-								FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
+							// Spawn and setup the travelapproved actor visible only to the owner
+							FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
 
-								// check in case the server link is not found or does not exist.
-								if (thisServerLink.targetServerKeyId.IsEmpty()) {
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - thisServerLink.targetServerKeyId.IsEmpty - aborting TravelApproval"));
-									return;
-								}
-
-								
-								UWorld* const World = GetWorld(); // get a reference to the world
-								if (World) {
-									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
-									FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
-									FTransform SpawnTransform = FTransform(spawnlocation);
-									AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
-									TravelApprovedActor->setPlayerKeyId(userKeyId);
-									TravelApprovedActor->SetOwner(pc);
-									TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
-
-									// add the travel approved actor to our player state list.
-									// we need to keep track of it so we can delete it later.
-									playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
+							// check in case the server link is not found or does not exist.
+							if (thisServerLink.targetServerKeyId.IsEmpty()) {
+								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - thisServerLink.targetServerKeyId.IsEmpty - aborting TravelApproval"));
+								return;
+							}
 
 
+							UWorld* const World = GetWorld(); // get a reference to the world
+							if (World) {
+								//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
+								FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
+								FTransform SpawnTransform = FTransform(spawnlocation);
+								AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
+								TravelApprovedActor->setPlayerKeyId(userKeyId);
+								TravelApprovedActor->SetOwner(pc);
+								TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
+
+								// add the travel approved actor to our player state list.
+								// we need to keep track of it so we can delete it later.
+								playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
 
 
-								}
+
 
 							}
+
 						}
 					}
+					else
+					{
+						if (allowedToTravel) {
+							// get the player
+							FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
+							AMyPlayerController* pc = ActivePlayer->PlayerController;
 
+
+							pc->ExecuteClientTravel(instanceHostConnectionLink);
+							DeActivatePlayer(ActivePlayer->playerID);
+						}
+					}
 				}
 			}
 		}
 	}
 }
-
 
 
 

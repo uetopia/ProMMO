@@ -49,6 +49,7 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_OnSunAngleChange)
 		float sunAngle;
 
+	
 	// this function just calls the delegate.
 	UFUNCTION()
 		virtual void OnRep_OnSunAngleChange();
@@ -57,4 +58,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 		float sunAngleMultiplier = 1.0f;
+
+	// Server shards
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FMyServerShard> ServerShards;
+
 };

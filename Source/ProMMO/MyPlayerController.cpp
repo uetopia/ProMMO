@@ -231,6 +231,16 @@ void AMyPlayerController::TravelPlayer(const FString& ServerUrl)
 
 }
 
+void AMyPlayerController::ExecuteClientTravel_Implementation(const FString& ServerUrl)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ExecuteClientTravel_Implementation - Client Side"));
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ExecuteClientTravel_Implementation ServerUrl: %s"), *ServerUrl);
+
+	ClientTravel(ServerUrl, ETravelType::TRAVEL_Absolute);
+
+}
+
 void AMyPlayerController::RequestBeginPlay_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] RequestBeginPlay"));
@@ -2713,6 +2723,34 @@ void AMyPlayerController::ClearHUDWidgets_Implementation()
 	}
 }
 
+void AMyPlayerController::AttemptShardSwitch(const FString& ShardKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AttemptShardSwitch"));
+	ServerAttemptShardSwitch(ShardKeyId);
+}
+
+void AMyPlayerController::ServerAttemptShardSwitch_Implementation(const FString& ShardKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptShardSwitch_Implementation]  "));
+	UWorld* const World = GetWorld();
+	if (World) {
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptTravel_Implementation] Requesting Transfer  "));
+		UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
+		AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+		gameInstance->TransferPlayer(ShardKeyId, PlayerState->PlayerId, false, true);
+
+
+
+	}
+
+}
+
+bool AMyPlayerController::ServerAttemptShardSwitch_Validate(const FString& ShardKeyId)
+{
+	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Validate]  "));
+	return true;
+}
+
 void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -2730,6 +2768,6 @@ void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >
 	DOREPLIFETIME(AMyPlayerController, InteractingWithVendorKeyId);
 	DOREPLIFETIME(AMyPlayerController, Experience);
 	DOREPLIFETIME(AMyPlayerController, ExperienceThisLevel);
-	
+	DOREPLIFETIME(AMyPlayerController, bIsShardedServer);
 
 }

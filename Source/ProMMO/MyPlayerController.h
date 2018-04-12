@@ -161,6 +161,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void TravelPlayer(const FString& ServerUrl);
 
+	// Client function which the server calls when travel is approved and the client should ClientTravel
+	UFUNCTION(Client, Reliable)
+		void ExecuteClientTravel(const FString& serverUrl);
+
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		int32 Experience; // total experience all time
 
@@ -171,7 +175,18 @@ public:
 	// Prevent the case of a user disconnecting before the data has been populated and leading to a data wipe.
 	bool PlayerDataLoaded;
 
+	// Shard Related 
 
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "UETOPIA")
+		bool bIsShardedServer;
+
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		void AttemptShardSwitch(const FString& ShardKeyId);
+
+	// This is the function that gets called on the server
+	UFUNCTION(Server, Reliable, WithValidation)
+		void ServerAttemptShardSwitch(const FString& ShardKeyId);
 
 	///////////////////
 	// Friend Functions

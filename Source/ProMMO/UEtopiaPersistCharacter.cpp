@@ -83,7 +83,7 @@ void AUEtopiaPersistCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-
+	
 }
 
 void AUEtopiaPersistCharacter::PossessedBy(AController* NewController)
@@ -279,7 +279,7 @@ bool AUEtopiaPersistCharacter::CanFire()
 	return false;
 	*/
 	return false;
-
+	
 }
 
 void AUEtopiaPersistCharacter::OnStopFire()
@@ -311,7 +311,7 @@ void AUEtopiaPersistCharacter::ServerAttemptSpawnActor_Implementation()
 			//AMySpawnableObject* YC = World->SpawnActor<AMySpawnableObject>(BlueprintVar, SpawnTransform);
 
 			// get the controller
-
+			
 			AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
 
 			// doing it using the c++ class for now
@@ -364,11 +364,11 @@ bool AUEtopiaPersistCharacter::CanPickUp()
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] bOwnerCanPickUp "));
 				doPickup = true;
 			}
-
+			
 		}
-
+		
 		if (doPickup) {
-
+		
 			if (PlayerC->AddItem(ObjectInFocus, ObjectInFocus->Quantity, true)) // CHECK ONLY!
 			{
 				return true;
@@ -402,7 +402,7 @@ void AUEtopiaPersistCharacter::ServerAttemptPickUp_Implementation()
 		//GetItemFocus()->GetStaticMeshComponent()->DestroyComponent();
 		if (CanPickUp())
 		{
-
+			
 
 			AMyPlayerController* PlayerC = Cast<AMyPlayerController>(Controller);
 			APlayerState* thisPlayerState = PlayerC->PlayerState;
@@ -412,7 +412,7 @@ void AUEtopiaPersistCharacter::ServerAttemptPickUp_Implementation()
 			ObjectInFocus->OnItemPickedUp(playerS->playerKeyId);
 
 
-
+			
 
 			PlayerC->AddItem(ObjectInFocus, ObjectInFocus->Quantity, false);
 
@@ -476,8 +476,8 @@ void AUEtopiaPersistCharacter::OnTravel()
 					if (ObjectInFocus->state == readystate) {
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] State is Ready - travelling "));
 						ServerAttemptTravel(false);
-						traveledAndGone = true;
-						myPC->ClientTravel(ObjectInFocus->serverUrl, ETravelType::TRAVEL_Absolute);
+						//traveledAndGone = true;
+						//myPC->ClientTravel(ObjectInFocus->serverUrl, ETravelType::TRAVEL_Absolute);
 					}
 					else if (ObjectInFocus->state == instancedstate) {
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] State is Instanced "));
@@ -487,10 +487,10 @@ void AUEtopiaPersistCharacter::OnTravel()
 						{
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] Found a hostConnectionLink "));
 							ServerAttemptTravel(false);
-							traveledAndGone = true;
-							myPC->ClientTravel(playerS->ServerLinksAuthorized[b].hostConnectionLink, ETravelType::TRAVEL_Absolute);
+							//traveledAndGone = true;
+							//myPC->ClientTravel(playerS->ServerLinksAuthorized[b].hostConnectionLink, ETravelType::TRAVEL_Absolute);
 						}
-
+						
 					}
 				}
 			}
@@ -520,7 +520,7 @@ void AUEtopiaPersistCharacter::ServerAttemptTravel_Implementation(bool checkOnly
 			if (World) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] Requesting Transfer  "));
 				UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
-				gameInstance->TransferPlayer(ObjectInFocus->serverKeyId, PlayerState->PlayerId, checkOnly);
+				gameInstance->TransferPlayer(ObjectInFocus->serverKeyId, PlayerState->PlayerId, checkOnly, false);
 
 			}
 		}
@@ -568,7 +568,7 @@ void AUEtopiaPersistCharacter::OnInteractWithVendor()
 			myPC->ServerAttemptSetVendorInteract(VendorInFocus);
 		}
 	}
-
+	
 }
 
 void AUEtopiaPersistCharacter::OnToggleMouse()
@@ -590,17 +590,17 @@ void AUEtopiaPersistCharacter::OnToggleMouse()
 			PC->bShowMouseCursor = true;
 			PC->SetInputMode(FInputModeUIOnly());
 		}
-
+		
 	}
 
 	bMouseShowing = !bMouseShowing;
-
+	
 	*/
-
-
-
-
-
+	
+	
+	
+	
+	
 }
 
 void AUEtopiaPersistCharacter::ServerAttemptBuy_Implementation()
@@ -626,7 +626,7 @@ void AUEtopiaPersistCharacter::ServerAttemptBuy_Implementation()
 
 	}
 	*/
-
+	
 }
 
 bool AUEtopiaPersistCharacter::ServerAttemptBuy_Validate()
@@ -850,18 +850,18 @@ void AUEtopiaPersistCharacter::RemapAbilities_Implementation()
 
 	FGameplayAbilitySpec* Spec;
 
-	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerC->MyAbilitySlots.Num(); abilitySlotIndex++)
+	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerS->GrantedAbilities.Num(); abilitySlotIndex++)
 	{
-		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.AbilityHandle);
+		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerS->GrantedAbilities[abilitySlotIndex].AbilityHandle);
 		if (Spec)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.classPath);
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerS->GrantedAbilities[abilitySlotIndex].classPath);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] Spec->InputID: %d "), Spec->InputID);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] abilitySlotIndex: %d "), abilitySlotIndex);
 			Spec->InputID = abilitySlotIndex;
 			AbilitySystem->MarkAbilitySpecDirty(*Spec);
 		}
-
+		
 	}
 	// testing - no effect
 	//AbilitySystem->InitAbilityActorInfo(this, this);
@@ -910,8 +910,8 @@ void AUEtopiaPersistCharacter::Die(AController* Killer, AActor* DamageCauser, co
 
 	bTearOff = true;
 	bIsDying = true;
-
-	// clear all widgets
+	
+	// clear all widgets 
 	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
 	playerC->ClearHUDWidgets();
 
