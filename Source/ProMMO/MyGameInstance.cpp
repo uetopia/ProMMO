@@ -5581,10 +5581,15 @@ void UMyGameInstance::SpawnServerPortals()
 						UE_LOG(LogTemp, Log, TEXT("coordLocationX: %f"), ServerLinks.links[b].coordLocationX);
 						UE_LOG(LogTemp, Log, TEXT("coordLocationY: %f"), ServerLinks.links[b].coordLocationY);
 						UE_LOG(LogTemp, Log, TEXT("coordLocationZ: %f"), ServerLinks.links[b].coordLocationZ);
+						UE_LOG(LogTemp, Log, TEXT("rotationX: %f"), ServerLinks.links[b].rotationX);
+						UE_LOG(LogTemp, Log, TEXT("rotationY: %f"), ServerLinks.links[b].rotationY);
+						UE_LOG(LogTemp, Log, TEXT("rotationZ: %f"), ServerLinks.links[b].rotationZ);
 						UE_LOG(LogTemp, Log, TEXT("hostConnectionLink: %s"), *ServerLinks.links[b].hostConnectionLink);
 
-						FVector spawnlocation = FVector(ServerLinks.links[b].coordLocationX, ServerLinks.links[b].coordLocationY, ServerLinks.links[b].coordLocationZ);
-						FTransform SpawnTransform = FTransform(spawnlocation);
+						const FVector spawnlocation = FVector(ServerLinks.links[b].coordLocationX, ServerLinks.links[b].coordLocationY, ServerLinks.links[b].coordLocationZ);
+						const FRotator spawnRotation = FRotator(ServerLinks.links[b].rotationX, ServerLinks.links[b].rotationY, ServerLinks.links[b].rotationZ);
+						//const FVector spawnScale = FVector(1.0f, 1.0f, 1.0f);
+						//FTransform SpawnTransform = FTransform(spawnRotation, spawnlocation, spawnScale);
 
 						// Parallel/Instanced servers have a different class, with probably a different model.
 						// switch based on the instance type
@@ -5593,7 +5598,7 @@ void UMyGameInstance::SpawnServerPortals()
 							UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced"));
 							if (ServerLinks.links[b].targetInstanceConfiguration == "user") {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - user"));
-								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5602,7 +5607,7 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 							else if (ServerLinks.links[b].targetInstanceConfiguration == "party") {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - party"));
-								AMyServerPortalActorParallelPart* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPart>(AMyServerPortalActorParallelPart::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelPart* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPart>(AMyServerPortalActorParallelPart::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5611,7 +5616,7 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 							else if (ServerLinks.links[b].targetInstanceConfiguration == "group") {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - group"));
-								AMyServerPortalActorParallelGrou* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelGrou>(AMyServerPortalActorParallelGrou::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelGrou* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelGrou>(AMyServerPortalActorParallelGrou::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5620,7 +5625,7 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 							else {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - not found"));
-								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5629,7 +5634,8 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 						}
 						else {
-							AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), SpawnTransform);
+							//AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), SpawnTransform);
+							AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), spawnlocation, spawnRotation);
 							PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 							PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 							PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
