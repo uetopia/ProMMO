@@ -164,10 +164,10 @@ void UMyGameInstance::Init()
 	//GetWorld()->GetTimerManager().SetTimer(RewardSpawnTimerHandle, this, &UMyGameInstance::AttemptSpawnReward, SpawnRewardTimerSeconds, true);
 
 
-	// Set up a timer to submit kills and stats to the backend 
+	// Set up a timer to submit kills and stats to the backend
 	// This should be anywhere from a minute to 15 minutes, depending on game load.
 	GetWorld()->GetTimerManager().SetTimer(SubmitReportTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
-	
+
 
 	MatchStarted = false;
 
@@ -505,7 +505,7 @@ void  UMyGameInstance::GetServerLinks()
 			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
 			FString APIURI = "/api/v1/server/links";
 			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::GetServerLinksComplete, APIURI, OutputString, "" ); // No Access Token
-			
+
 		}
 
 	}
@@ -813,7 +813,7 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 							{
 								pc = Iterator->Get();
 
-								
+
 								AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
 								AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
 								APlayerState* thisPlayerState = pc->PlayerState;
@@ -1273,8 +1273,8 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						activePlayer->experience = playerC->Experience;
 						activePlayer->score = scoreTemp;
 
-						
-						
+
+
 						////////////////////////////////////////////////////////////////////
 						// Abilities
 						////////////////////////////////////////////////////////////////////
@@ -1376,7 +1376,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							// Blueprint'/Game/Abilities/TestAbility3.TestAbility3'
 							//Blueprint'/Game/Abilities/TestAbility4.TestAbility4'
 							TArray <FString> AbilityClassPaths = { "/Game/Abilities/TestAbility2.TestAbility2_C", "/Game/Abilities/TestAbility3.TestAbility3_C", "/Game/Abilities/TestAbility4.TestAbility4_C" };
-							
+
 							UClass* LoadedActorOwnerClass;
 							UMyBaseGameplayAbility* LoadedObjectClass;
 							FMyGrantedAbility grantedAbility;
@@ -1424,7 +1424,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						// Interface
 						////////////////////////////////////////////////////////////////////
 
-						
+
 
 						// First try to parse interface ability bar as json
 						// If it fails or does not make sense, set it to a default value
@@ -1608,7 +1608,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							else
 							{
 								UE_LOG(LogTemp, Log, TEXT("InterfaceParse FAIL"));
-								
+
 								// WE don't have Interface json to work with, so we're just going to build up a blank action bar that is empty.
 								FMyAbilitySlot BlankAbility;
 								BlankAbility.Icon = nullptr;
@@ -1625,7 +1625,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									BlankAbility.GrantedAbility = grantedAbility;
 									BlankAbility.bIsValid = false;
 									LocalAbilitySlots.Add(BlankAbility);
-								
+
 								}
 
 								// trigger the delegate so we can build the UI
@@ -1633,10 +1633,10 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 								playerC->AbilitySlotsPerRow = AbilitySlotsPerRow;
 								playerC->MyAbilitySlots = LocalAbilitySlots;
 								//playerC->DoRep_AbilityInterfaceChanged = !playerC->DoRep_AbilityInterfaceChanged;
-								
-								
 
-								
+
+
+
 
 							}
 						}
@@ -1674,7 +1674,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						{
 							UE_LOG(LogTemp, Log, TEXT("InventoryParseSuccess"));
 
-							
+
 
 							// TODO - set up player controller inventory.
 							playerC->InventoryCapacity = InventoryCapacity;
@@ -1737,9 +1737,9 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 												if (attributeObj.IsValid())
 												{
 													JsonIndexName = FString::FromInt(currentIndex);
-													
+
 													attributeObj->TryGetNumberField(JsonIndexName, JsonValue);
-						
+
 													itemSlot.Attributes.Add(JsonValue);
 												}
 												currentIndex++;
@@ -1775,7 +1775,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 											}
 											*/
 
-											
+
 
 											itemSlot.bCanBeUsed = basePickupBP->bCanBeUsed;
 											itemSlot.UseText = basePickupBP->UseText;
@@ -1825,7 +1825,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							}
 
 							emptySlot.itemId = 0;
-							
+
 							emptySlot.quantity = 0;
 
 							for (int32 inventoryIndex = 0; inventoryIndex < remainingSlotsToFill; inventoryIndex++)
@@ -1869,16 +1869,16 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									emptySlot.Icon = basePickupBP->Icon;
 									emptySlot.itemTitle = basePickupBP->Title.ToString();
 								}
-								
+
 							}
 							else {
 								UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
 								emptySlot.itemTitle = "Empty";
 							}
-							
+
 							emptySlot.itemId = 0;
 							emptySlot.quantity = 0;
-							
+
 
 							for (int32 inventoryIndex = 0; inventoryIndex < 16; inventoryIndex++)
 							{
@@ -1891,7 +1891,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							//playerC->DoRep_InventoryChanged = !playerC->DoRep_InventoryChanged;
 						}
 
-						// set loaded state 
+						// set loaded state
 						playerC->PlayerDataLoaded = true;
 					}
 				}
@@ -2099,7 +2099,7 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 		}
 	}
 
-	
+
 	return false;
 
 }
@@ -2234,7 +2234,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 						}
 						playerS->ServerLinksAuthorized.Empty();
 						playerS->ServerTravelApprovedActors.Empty();
-						
+
 					}
 				}
 
@@ -2253,7 +2253,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 			else {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - No Authorized players found - moving to save."));
 
-				
+
 				// Uncomment this if you want to use Rama Save System
 				// Or implement your own save system here.
 				/*
@@ -2268,8 +2268,8 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO FAIL."));
 				}
 				*/
-				
-				
+
+
 
 
 				// removing lobby level entirely. Leaving this here for reference
@@ -2292,7 +2292,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 
 				// Tell the backend that it's safe to bring this server down.
 				NotifyDownReady();
-				
+
 
 			}
 		}
@@ -2819,7 +2819,7 @@ void UMyGameInstance::VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, F
 						if (playerS->playerKeyId == createdByUserKeyId)
 						{
 
-							
+
 							// update player inventory
 							if (itemName == "Cube") {
 							UE_LOG(LogTemp, Log, TEXT("Purchase was a cube"));
@@ -2830,14 +2830,14 @@ void UMyGameInstance::VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, F
 							// update player currency balance
 							playerRecord->currencyCurrent = playerRecord->currencyCurrent - purchaseAmount;
 							playerS->Currency = playerS->Currency - purchaseAmount;
-							
 
-							
+
+
 						}
 					}
 					*/
 
-					
+
 
 				}
 
@@ -2929,9 +2929,9 @@ void UMyGameInstance::VendorUpdateRequestComplete(FHttpRequestPtr HttpRequest, F
 								UE_LOG(LogTemp, Log, TEXT("Found the vendor in the world.  Marking as bOwnerCanPickUp"));
 								Vendor->bOwnerCanPickUp = true;
 							}
-							
+
 						}
-						
+
 					}
 				}
 			}
@@ -3293,7 +3293,7 @@ void UMyGameInstance::VendorItemDeleteRequestComplete(FHttpRequestPtr HttpReques
 
 							playerC->InventorySlots.Add(itemSlot);
 							*/
-							
+
 						}
 					}
 				}
@@ -3518,7 +3518,7 @@ void UMyGameInstance::VendorWithdrawRequestComplete(FHttpRequestPtr HttpRequest,
 			{
 				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
 				bool Success = JsonParsed->GetBoolField("success");
-				if (Success) 
+				if (Success)
 				{
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
 					// TODO - add the currency to the player
@@ -3853,7 +3853,7 @@ void UMyGameInstance::RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpRe
 					}
 					*/
 
-					
+
 				}
 			}
 		}
@@ -3875,7 +3875,7 @@ bool UMyGameInstance::QueryGameDataList(FString cursor)
 	{
 		PlayerJsonObj->SetStringField("cursor", cursor);
 	}
-	
+
 
 	FString JsonOutputString;
 	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -4003,7 +4003,7 @@ void UMyGameInstance::LoadServerStateFromFile()
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] LoadServerStateFromFile"));
 
 	/*
-	DEPRECATED - THIS LIVES IN GAME STATE 
+	DEPRECATED - THIS LIVES IN GAME STATE
 	bool FileIOSuccess;
 	//bool allComponentsLoaded;
 	//bool destroyActorsBeforeLoad = false;
@@ -4024,7 +4024,7 @@ void UMyGameInstance::LoadServerStateFromFile()
 
 	*/
 
-	
+
 
 }
 
@@ -5103,7 +5103,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordKill - Mode set to competitive"));
 		/*
 		// If we are here, this server is running in competitive/matchmaker mode.
-		// 
+		//
 		*/
 		// get attacker activeplayer
 		bool attackerPlayerIDFound = false;
@@ -5358,7 +5358,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 			}
 
 			// check to see if this victim is already in the kill list
-			
+
 			bool victimIDFoundInKillList = false;
 
 			for (int32 b = 0; b < PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Num(); b++)
@@ -5374,7 +5374,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Adding victim to kill list"));
 				PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Add(PlayerRecord.ActivePlayers[victimPlayerIndex].playerKeyId);
 			}
-			
+
 			// create an event also
 			FString eventSummary = "killed " + PlayerRecord.ActivePlayers[victimPlayerIndex].playerTitle;
 			RecordEvent(killerPlayerID, eventSummary, "location_searching", "Kill");  // look at https://material.io/icons/ for other icons
@@ -5396,7 +5396,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 
 			// Increase the killer's balance
 			//PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent + killRewardBTC;
-			
+
 			// Decrease the victim's balance
 			//PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent - incrementCurrency;
 
@@ -5417,7 +5417,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				AMyPlayerState* thisMyPlayerState = Cast<AMyPlayerState>(thisPlayerState);
 				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
 
-				
+
 				// old way
 				TSubclassOf<APlayerController> thisPlayerController = pc;
 				AMyPlayerController* thisPlayerController = Cast<AMyPlayerController>(pc);
@@ -5431,7 +5431,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
 				}
 				}
-				
+
 			}
 			*/
 
@@ -5572,10 +5572,15 @@ void UMyGameInstance::SpawnServerPortals()
 						UE_LOG(LogTemp, Log, TEXT("coordLocationX: %f"), ServerLinks.links[b].coordLocationX);
 						UE_LOG(LogTemp, Log, TEXT("coordLocationY: %f"), ServerLinks.links[b].coordLocationY);
 						UE_LOG(LogTemp, Log, TEXT("coordLocationZ: %f"), ServerLinks.links[b].coordLocationZ);
+						UE_LOG(LogTemp, Log, TEXT("rotationX: %f"), ServerLinks.links[b].rotationX);
+						UE_LOG(LogTemp, Log, TEXT("rotationY: %f"), ServerLinks.links[b].rotationY);
+						UE_LOG(LogTemp, Log, TEXT("rotationZ: %f"), ServerLinks.links[b].rotationZ);
 						UE_LOG(LogTemp, Log, TEXT("hostConnectionLink: %s"), *ServerLinks.links[b].hostConnectionLink);
 
-						FVector spawnlocation = FVector(ServerLinks.links[b].coordLocationX, ServerLinks.links[b].coordLocationY, ServerLinks.links[b].coordLocationZ);
-						FTransform SpawnTransform = FTransform(spawnlocation);
+						const FVector spawnlocation = FVector(ServerLinks.links[b].coordLocationX, ServerLinks.links[b].coordLocationY, ServerLinks.links[b].coordLocationZ);
+						const FRotator spawnRotation = FRotator(ServerLinks.links[b].rotationX, ServerLinks.links[b].rotationY, ServerLinks.links[b].rotationZ);
+						//const FVector spawnScale = FVector(1.0f, 1.0f, 1.0f);
+						//FTransform SpawnTransform = FTransform(spawnRotation, spawnlocation, spawnScale);
 
 						// Parallel/Instanced servers have a different class, with probably a different model.
 						// switch based on the instance type
@@ -5584,7 +5589,7 @@ void UMyGameInstance::SpawnServerPortals()
 							UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced"));
 							if (ServerLinks.links[b].targetInstanceConfiguration == "user") {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - user"));
-								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5593,7 +5598,7 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 							else if (ServerLinks.links[b].targetInstanceConfiguration == "party") {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - party"));
-								AMyServerPortalActorParallelPart* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPart>(AMyServerPortalActorParallelPart::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelPart* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPart>(AMyServerPortalActorParallelPart::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5602,7 +5607,7 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 							else if (ServerLinks.links[b].targetInstanceConfiguration == "group") {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - group"));
-								AMyServerPortalActorParallelGrou* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelGrou>(AMyServerPortalActorParallelGrou::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelGrou* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelGrou>(AMyServerPortalActorParallelGrou::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5611,7 +5616,7 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 							else {
 								UE_LOG(LogTemp, Log, TEXT("Parallel/Instanced - not found"));
-								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), SpawnTransform);
+								AMyServerPortalActorParallelPriv* const PortalActor = World->SpawnActor<AMyServerPortalActorParallelPriv>(AMyServerPortalActorParallelPriv::StaticClass(), spawnlocation, spawnRotation);
 								PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 								PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 								PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
@@ -5620,11 +5625,11 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 						}
 						else {
-							AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), SpawnTransform);
+							AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), spawnlocation, spawnRotation);
 							PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 							PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 							PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
-			
+
 							// determine the portal state, and set it
 							if (ServerLinks.links[b].targetStatusOnline) {
 								PortalActor->setState("Ready");
@@ -5644,8 +5649,8 @@ void UMyGameInstance::SpawnServerPortals()
 
 						}
 
-						
-						
+
+
 					}
 
 				}
