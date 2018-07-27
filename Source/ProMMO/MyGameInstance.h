@@ -589,6 +589,9 @@ private:
 	/** Variables to control the purchase of cubes */
 	int32 CubeStoreCost;
 
+	// Custom texture url string.
+	FString customTexture;
+
 protected:
 	/** Delegate for creating a new session */
 	//FOnCreateSessionCompleteDelegate OnCreateSessionCompleteDelegate;

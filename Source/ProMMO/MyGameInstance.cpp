@@ -361,6 +361,13 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 					bIsShardedServer = JsonParsed->GetBoolField("sharded");
 				}
 
+				if (JsonParsed->HasField("custom_in_game_texture")) {
+					FString custom_in_game_texture = JsonParsed->GetStringField("custom_in_game_texture");
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] custom_in_game_texture: %s"), *custom_in_game_texture);
+					// set custom texture
+					customTexture = custom_in_game_texture;
+				}
+
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] ServerTitle: %s"), *ServerTitle);
 
 			}
@@ -614,6 +621,9 @@ bool UMyGameInstance::ActivatePlayer(class AMyPlayerController* NewPlayerControl
 
 	// Reset the currency back to zero, in case it's not.
 	playerS->Currency = 0;
+
+	// Start the custom texture loading asap.
+	NewPlayerController->customTexture = customTexture;
 
 	if (UEtopiaMode == "competitive") {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Mode set to competitive"));
