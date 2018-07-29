@@ -184,7 +184,13 @@ void UMyUserWidget::Login()
 	//{
 	//	UE_LOG(LogTemp, Warning, TEXT("No Google subsystem configured. It will be unavailable"));
 	//}
-	if (!LoginFlowManager->AddLoginFlow(UEtopiaIdentifier, ILoginFlowManager::FOnDisplayPopup::CreateUObject(this, &UMyUserWidget::OnDisplayLoginWidget), true))
+
+	// This changed in 4.20
+	// Now the 3rd argument is for On Account Create
+	// WHich we don't use.  FOR NOW
+	// Just returning the same delegate for now.
+	if (!LoginFlowManager->AddLoginFlow(UEtopiaIdentifier, ILoginFlowManager::FOnDisplayPopup::CreateUObject(this, &UMyUserWidget::OnDisplayLoginWidget), ILoginFlowManager::FOnDisplayPopup::CreateUObject(this, &UMyUserWidget::OnDisplayLoginWidget), true))
+
 	{
 		UE_LOG(LogTemp, Warning, TEXT("No UEtopia subsystem configured. It will be unavailable"));
 	}

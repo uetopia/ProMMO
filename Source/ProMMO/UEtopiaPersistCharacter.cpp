@@ -10,6 +10,7 @@
 #include "UnrealNetwork.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
+#include "GameplayAbilityTypes.h"
 #include "MyGameInstance.h"
 
 
@@ -177,7 +178,8 @@ void AUEtopiaPersistCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	InputComponent->BindTouch(IE_Released, this, &AUEtopiaPersistCharacter::TouchStopped);
 
 	// Map the "InputIDs" to the ability system
-	AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbiliyInputBinds("ConfirmInput", "CancelInput", "AbilityInput"));
+	AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds("ConfirmInput", "CancelInput", "AbilityInput"));
+
 
 	//AttributeSet->CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
 	//AttributeSet = CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
@@ -909,7 +911,8 @@ void AUEtopiaPersistCharacter::Die(AController* Killer, AActor* DamageCauser, co
 
 	AController* const DyingController = (Controller != NULL) ? Controller : Cast<AController>(GetOwner());
 
-	bTearOff = true;
+	TearOff();
+	//bTearOff = true;
 	bIsDying = true;
 	
 	// clear all widgets 
@@ -948,9 +951,9 @@ void AUEtopiaPersistCharacter::PlayDying_Implementation()
 	// CleanUpAbilitySystem();
 	// UAbilitySystemGlobals::Get().GetGameplayCueManager()->EndGameplayCuesFor(this);
 
-
+	TearOff();
 	bIsDying = true;
-	bTearOff = true;
+	//bTearOff = true;
 	bReplicateMovement = false;
 
 	SetLifeSpan(5.0f);

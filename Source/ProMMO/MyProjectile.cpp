@@ -23,7 +23,9 @@ AMyProjectile::AMyProjectile(const FObjectInitializer& ObjectInitializer)
 	MeshComponent->SetupAttachment(RootComponent);
 	MeshComponent->SetCanEverAffectNavigation(false);
 	MeshComponent->CastShadow = false;
-	MeshComponent->bGenerateOverlapEvents = false;
+
+	// moved to private in 4.20?
+	//MeshComponent->bGenerateOverlapEvents = false;
 
 	MovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileComp0"));
 	MovementComponent->UpdatedComponent = RootComponent;

@@ -11,6 +11,10 @@
 #include "Components/ScrollBox.h"
 #include "UEtopiaPersistCharacter.h"
 #include "Net/UnrealNetwork.h"
+#include "Runtime/ImageWrapper/Public/IImageWrapper.h"
+#include "Runtime/ImageWrapper/Public/IImageWrapperModule.h"
+#include "DDSLoader.h"
+#include "DynamicTextureStaticMeshActor.h"
 #include "MyPlayerState.h"
 
 
@@ -549,7 +553,9 @@ void AMyPlayerController::InviteUserToParty(const FString& PartyKeyId, const FSt
 	PartyData.SetAttribute("key_id", PartyKeyId);
 
 	// Tell the OSS to send the invite
-	OnlineSub->GetPartyInterface()->SendInvitation(*UserId, PartyId, PartyInviteRecipient, PartyData, OnSendPartyInvitationComplete);
+	// this changed in 4.20
+	//OnlineSub->GetPartyInterface()->SendInvitation(*UserId, PartyId, PartyInviteRecipient, PartyData, OnSendPartyInvitationComplete);
+	OnlineSub->GetPartyInterface()->SendInvitation(*UserId, PartyId, PartyInviteRecipient, OnSendPartyInvitationComplete);
 
 }
 
@@ -573,25 +579,32 @@ void AMyPlayerController::OnPartyInviteReceivedComplete(const FUniqueNetId& Loca
 		IOnlinePartyJoinInfo& PartyInfo = *PendingInvitesArray[Index];
 
 		FMyPartyInvitation ThisPartyInvitation;
-		FOnlinePartyData ThisPartyData;
-		ThisPartyData = PartyInfo.GetClientData();
+		//FOnlinePartyData ThisPartyData;
+		// This was removed in 4.20
+		//ThisPartyData = PartyInfo.GetClientData();
 
-		FVariantData partyKeyId;
-		FVariantData partyTitle ;
-		FVariantData senderUserKeyId;
-		FVariantData senderUserTitle;
-		FVariantData recipientUserKeyId;
+		//FVariantData partyKeyId;
+		//FVariantData partyTitle ;
+		//FVariantData senderUserKeyId;
+		//FVariantData senderUserTitle;
+		//FVariantData recipientUserKeyId;
 
 
-		ThisPartyData.GetAttribute("partyTitle", partyTitle);
-		ThisPartyData.GetAttribute("senderUserKeyId", senderUserKeyId);
-		ThisPartyData.GetAttribute("senderUserTitle", senderUserTitle);
-		ThisPartyData.GetAttribute("partyKeyId", partyKeyId);
+		//ThisPartyData.GetAttribute("partyTitle", partyTitle);
+		//ThisPartyData.GetAttribute("senderUserKeyId", senderUserKeyId);
+		//ThisPartyData.GetAttribute("senderUserTitle", senderUserTitle);
+		//ThisPartyData.GetAttribute("partyKeyId", partyKeyId);
 
-		partyTitle.GetValue(ThisPartyInvitation.partyTitle);
-		senderUserKeyId.GetValue(ThisPartyInvitation.senderUserKeyId);
-		senderUserTitle.GetValue(ThisPartyInvitation.senderUserTitle);
-		partyKeyId.GetValue(ThisPartyInvitation.partyKeyId);
+		//partyTitle.GetValue(ThisPartyInvitation.partyTitle);
+		//senderUserKeyId.GetValue(ThisPartyInvitation.senderUserKeyId);
+		//senderUserTitle.GetValue(ThisPartyInvitation.senderUserTitle);
+		//partyKeyId.GetValue(ThisPartyInvitation.partyKeyId);
+
+		ThisPartyInvitation.partyKeyId = PartyId.ToString();
+		// Is there some other way to get the party title now?
+		ThisPartyInvitation.partyTitle = PartyInfo.GetSourceDisplayName();
+		ThisPartyInvitation.senderUserKeyId = PartyInfo.GetSourceUserId()->ToString();
+		ThisPartyInvitation.senderUserTitle = PartyInfo.GetSourceDisplayName();
 
 		MyCachedPartyInvitations.Add(ThisPartyInvitation);
 
@@ -2718,6 +2731,251 @@ bool AMyPlayerController::ServerAttemptShardSwitch_Validate(const FString& Shard
 	return true;
 }
 
+
+void AMyPlayerController::SendLocalChatMessage_Implementation(const FString& ChatMessageIn)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SendLocalChatMessage"));
+	OnChatPrivateMessageReceivedDisplayUIDelegate.Broadcast("SYSTEM", ChatMessageIn);
+}
+
+
+void AMyPlayerController::OnRep_OnCustomTextureChange_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnRep_OnCustomTextureChange_Implementation."));
+
+	// Make sure valid filename was specified
+	if (customTexture.IsEmpty() || customTexture.Contains(TEXT(" ")))
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnRep_OnCustomTextureChange_Implementation.  INVALID FILENAME"));
+		customTexture = "https://apitest-dot-ue4topia.appspot.com/img/groups/M_Banners_BaseColor.png";
+	}
+
+	// Create the Http request and add to pending request list
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) { return; }
+	if (!Http->IsHttpEnabled()) { return; }
+
+	TSharedRef < IHttpRequest > Request = Http->CreateRequest();
+	Request->SetVerb("GET");
+	Request->SetURL(customTexture);
+	Request->SetHeader("User-Agent", "UETOPIA_UE4_API_CLIENT/1.0");
+	Request->SetHeader("Content-Type", "application/x-www-form-urlencoded");
+
+	//TSharedRef<class IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
+	//FileRequests.Add(&HttpRequest.Get(), FPendingFileRequest(FileName));
+
+	//Request->OnProcessRequestComplete().BindUObject(this, delegateCallback);
+
+	Request->OnProcessRequestComplete().BindUObject(this, &AMyPlayerController::ReadCustomTexture_HttpRequestComplete);
+	//HttpRequest->SetURL(customTexture);
+	//HttpRequest->SetVerb(TEXT("GET"));
+
+	Request->ProcessRequest();
+
+	return;
+}
+
+void AMyPlayerController::ReadCustomTexture_HttpRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete."));
+	if (!HttpRequest.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete REQUEST INVALID."));
+		return;
+	}
+
+	/*
+
+	const FPendingFileRequest* PendingRequest = FileRequests.Find(HttpRequest.Get());
+
+	if (PendingRequest == nullptr)
+	{
+	return;
+	}
+
+
+	*/
+	bool bResult = false;
+	FString ResponseStr, ErrorStr;
+
+	/*
+
+	// Cloud file being operated on
+	{
+	FCloudFile* CloudFile = GetCloudFile(PendingRequest->FileName, true);
+	CloudFile->AsyncState = EOnlineAsyncTaskState::Failed;
+	CloudFile->Data.Empty();
+	}
+	*/
+
+	if (bSucceeded &&
+		HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. bSucceeded and IsValid "));
+		if (EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
+		{
+			UE_LOG(LogTemp, Log, TEXT("ReadFile request complete. url=%s code=%d"),
+				*HttpRequest->GetURL(), HttpResponse->GetResponseCode());
+
+			// https://answers.unrealengine.com/questions/75929/is-it-possible-to-load-bitmap-or-jpg-files-at-runt.html
+
+			// update the memory copy of the file with data that was just downloaded
+			//FCloudFile* CloudFile = GetCloudFile(PendingRequest->FileName, true);
+
+			// only tracking a single file....
+			// const FString& InFileName
+			const FString& CloudFileTitle = "GroupTexture";
+			FCloudFile CloudFile = FCloudFile(CloudFileTitle);
+			CloudFile.FileName = CloudFileTitle;
+
+			CloudFile.AsyncState = EOnlineAsyncTaskState::Done;
+			CloudFile.Data = HttpResponse->GetContent();
+
+			// cache to disk on successful download
+			SaveCloudFileToDisk(CloudFile.FileName, CloudFile.Data);
+
+			IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+			// Note: PNG format.  Other formats are supported
+			TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+
+			//FString TexturePath = FPaths::GameContentDir() + TEXT("../Saved/Cloud/") + CloudFileTitle;
+			FString TexturePath = FPaths::CloudDir() + CloudFileTitle;
+			UE_LOG(LogTemp, Warning, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. TexturePath: %s"), *TexturePath);
+			TArray<uint8> FileData;
+
+			if (FFileHelper::LoadFileToArray(FileData, *TexturePath))
+			{
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. LoadFileToArray "));
+				if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(FileData.GetData(), FileData.Num()))
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. ImageWrapper->SetCompressed "));
+					const TArray<uint8>* UncompressedBGRA = NULL;
+					if (ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBGRA))
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. ImageWrapper->GetRaw "));
+						LoadedTexture = UTexture2D::CreateTransient(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), PF_B8G8R8A8);
+
+						/* Create transient texture */
+						//LoadedTexture = UTexture2D::CreateTransient(DDSLoadHelper.DDSHeader->dwWidth, DDSLoadHelper.DDSHeader->dwHeight, Format);
+
+						//LoadedTexture->MipGenSettings = TMGS_LeaveExistingMips; // apparently this is editor only functionality???
+						LoadedTexture->PlatformData->NumSlices = 1;
+						LoadedTexture->NeverStream = true;
+						LoadedTexture->Rename(*CloudFileTitle);
+
+						/* Get pointer to actual data */
+						//uint8* DataPtr = (uint8*)DDSLoadHelper.GetDDSDataPointer();
+
+						//uint32 CurrentWidth = DDSLoadHelper.DDSHeader->dwWidth;
+						//uint32 CurrentHeight = DDSLoadHelper.DDSHeader->dwHeight;
+
+						//Copy!
+						void* TextureData = LoadedTexture->PlatformData->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
+						FMemory::Memcpy(TextureData, UncompressedBGRA->GetData(), UncompressedBGRA->Num());
+						LoadedTexture->PlatformData->Mips[0].BulkData.Unlock();
+
+
+						LoadedTexture->UpdateResource();
+					}
+
+
+				}
+
+				// now assign this texture to all of the banners
+				TActorIterator< ADynamicTextureStaticMeshActor > AllActorsItr = TActorIterator< ADynamicTextureStaticMeshActor >(GetWorld());
+
+				//While not reached end (overloaded bool operator)
+				while (AllActorsItr)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. Found ADynamicTextureStaticMeshActor "));
+					// TODO do something with the texture/material
+
+
+
+					//AllActorsItr->GetStaticMeshComponent()->GetMaterial(0)->Get;
+					if (AllActorsItr->MaterialInstance->IsValidLowLevel())
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. Material Instance IsValid "));
+						//AllActorsItr->Material = LoadedTexture;
+						AllActorsItr->MaterialInstance->SetTextureParameterValue(FName("BaseColor"), LoadedTexture);
+					}
+
+
+
+					//next actor
+					++AllActorsItr;
+				}
+
+
+				/*
+				// HTTP response; image
+				TArray<uint8> imageDataArray = CloudFile.Data;
+
+				if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(imageDataArray.GetData(), imageDataArray.Num()))
+				{
+
+				const TArray<uint8>* uncompressedBGRA = NULL;
+				if (ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, uncompressedBGRA))
+				{
+				// TODO get actual image dimensions
+				LoadedTexture = UTexture2D::CreateTransient(DDSLoadHelper.DDSHeader->dwWidth, DDSLoadHelper.DDSHeader->dwHeight, Format);
+				LoadedTexture->MipGenSettings = TMGS_LeaveExistingMips;
+				LoadedTexture->PlatformData->NumSlices = 1;
+				LoadedTexture->NeverStream = true;
+				LoadedTexture->Rename(*CloudFileTitle);
+				}
+				}
+				*/
+			}
+
+			bResult = true;
+		}
+		else
+		{
+			ErrorStr = FString::Printf(TEXT("Invalid response. code=%d error=%s"),
+				HttpResponse->GetResponseCode(), *HttpResponse->GetContentAsString());
+
+			UE_LOG(LogTemp, Log, TEXT("Invalid response. code=%d error=%sd"),
+				HttpResponse->GetResponseCode(), *HttpRequest->GetURL());
+		}
+	}
+	else
+	{
+		ErrorStr = TEXT("No response");
+	}
+
+	if (!ErrorStr.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ReadFile request failed. %s"), *ErrorStr);
+	}
+
+	//TriggerOnReadFileCompleteDelegates(bResult, PendingRequest->FileName);
+
+	//FileRequests.Remove(HttpRequest.Get());
+}
+
+void AMyPlayerController::SaveCloudFileToDisk(const FString& Filename, const TArray<uint8>& Data)
+{
+	// save local disk copy as well
+	FString LocalFilePath = GetLocalFilePath(Filename);
+	bool bSavedLocal = FFileHelper::SaveArrayToFile(Data, *LocalFilePath);
+	if (bSavedLocal)
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("WriteUserFile request complete. Local file cache updated =%s"),
+			*LocalFilePath);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("WriteUserFile request complete. Local file cache failed to update =%s"),
+			*LocalFilePath);
+	}
+}
+
+FString AMyPlayerController::GetLocalFilePath(const FString& FileName)
+{
+	return FPaths::CloudDir() + FPaths::GetCleanFilename(FileName);
+}
+
 void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -2736,6 +2994,6 @@ void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >
 	DOREPLIFETIME(AMyPlayerController, Experience);
 	DOREPLIFETIME(AMyPlayerController, ExperienceThisLevel);
 	DOREPLIFETIME(AMyPlayerController, bIsShardedServer);
-
+	DOREPLIFETIME(AMyPlayerController, customTexture);
 
 }
