@@ -2870,7 +2870,7 @@ void UMyGameInstance::VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, F
 
 
 
-bool UMyGameInstance::VendorUpdate(FString userKeyId, FString VendorKeyId, FString Title, FString Description, bool bIsSelling, bool bIsBuying, bool bDisable)
+bool UMyGameInstance::VendorUpdate(FString userKeyId, FString VendorKeyId, FString Title, FString Description, FString DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisable)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] VendorUpdate"));
 
@@ -2885,6 +2885,7 @@ bool UMyGameInstance::VendorUpdate(FString userKeyId, FString VendorKeyId, FStri
 	//PlayerJsonObj->SetStringField("VendorTemporaryKeyId", VendorTemporaryKeyId);
 	PlayerJsonObj->SetStringField("title", Title);
 	PlayerJsonObj->SetStringField("description", Description);
+	PlayerJsonObj->SetStringField("discordWebhook", DiscordWebhook);
 	PlayerJsonObj->SetBoolField("selling", bIsSelling);
 	PlayerJsonObj->SetBoolField("buying", bIsBuying);
 	PlayerJsonObj->SetBoolField("disable", bDisable);

@@ -397,7 +397,7 @@ public:
 	bool VendorCreate(FString userKeyId, FString VendorTypeKeyId, float coordLocationX, float coordLocationY, float coordLocationZ, float forwardVecX, float forwardVecY, float forwardVecZ);
 	void VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
-	bool VendorUpdate(FString userKeyId, FString VendorKeyId, FString Title, FString Description, bool bIsSelling, bool bIsBuying, bool bDisable);
+	bool VendorUpdate(FString userKeyId, FString VendorKeyId, FString Title, FString Description, FString DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisable);
 	void VendorUpdateRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	bool VendorDelete(FString userKeyId, FString VendorKeyId);
@@ -588,6 +588,9 @@ private:
 
 	/** Variables to control the purchase of cubes */
 	int32 CubeStoreCost;
+
+	// Custom texture url string.
+	FString customTexture;
 
 protected:
 	/** Delegate for creating a new session */

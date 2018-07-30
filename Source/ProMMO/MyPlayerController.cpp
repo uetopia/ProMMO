@@ -1777,13 +1777,13 @@ void AMyPlayerController::AttemptVendorInteract(AMyBaseVendor* VendorRef)
 	//FOnVendorInteractChanged.Broadcast(VendorKeyId, true);
 }
 
-bool AMyPlayerController::ServerAttemptVendorUpdate_Validate(const FString& Title, const FString& Description, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
+bool AMyPlayerController::ServerAttemptVendorUpdate_Validate(const FString& Title, const FString& Description, const FString& DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
 {
 	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
 	return true;
 }
 
-void AMyPlayerController::ServerAttemptVendorUpdate_Implementation(const FString& Title, const FString& Description, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
+void AMyPlayerController::ServerAttemptVendorUpdate_Implementation(const FString& Title, const FString& Description, const FString& DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptVendorUpdate_Implementation"));
 
@@ -1797,15 +1797,15 @@ void AMyPlayerController::ServerAttemptVendorUpdate_Implementation(const FString
 	}
 	else
 	{
-		TheGameInstance->VendorUpdate(myPlayerState->playerKeyId, MyCurrentVendorRef->VendorKeyId, Title, Description, bIsSelling, bIsBuying, bDisableForPickup);
+		TheGameInstance->VendorUpdate(myPlayerState->playerKeyId, MyCurrentVendorRef->VendorKeyId, Title, Description, DiscordWebhook, bIsSelling, bIsBuying, bDisableForPickup);
 	}
 }
 
-void AMyPlayerController::AttemptVendorUpdate(const FString& Title, const FString& Description, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
+void AMyPlayerController::AttemptVendorUpdate(const FString& Title, const FString& Description, const FString& DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AttemptVendorUpdate"));
 
-	ServerAttemptVendorUpdate(Title, Description, bIsSelling, bIsBuying, bDisableForPickup);
+	ServerAttemptVendorUpdate(Title, Description, DiscordWebhook, bIsSelling, bIsBuying, bDisableForPickup);
 
 }
 
@@ -1911,6 +1911,8 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 
 			JsonParsed->TryGetStringField("title", MyCurrentVendorTitle);
 			JsonParsed->TryGetStringField("description", MyCurrentVendorDescription);
+			JsonParsed->TryGetStringField("discordWebhook", MyCurrentVendorDiscordWebhook);
+			
 			JsonParsed->TryGetBoolField("bMyVendor", MyCurrentVendorIsOwnedByMe);
 			JsonParsed->TryGetNumberField("vendorCurrency", MyCurrentVendorCurrency);
 

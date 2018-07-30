@@ -333,10 +333,10 @@ public:
 		void AttemptVendorInteract(AMyBaseVendor* VendorRef);
 
 	UFUNCTION(Server, Reliable, WithValidation)
-		void ServerAttemptVendorUpdate(const FString& Title, const FString& Description, bool bIsSelling, bool bIsBuying, bool bDisableForPickup);
+		void ServerAttemptVendorUpdate(const FString& Title, const FString& Description, const FString& DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisableForPickup);
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		void AttemptVendorUpdate(const FString& Title, const FString& Description, bool bIsSelling, bool bIsBuying, bool bDisableForPickup);
+		void AttemptVendorUpdate(const FString& Title, const FString& Description, const FString& DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisableForPickup);
 
 	UPROPERTY(BlueprintReadWrite, Replicated, Category = "UETOPIA")
 		bool bInteractingWithVendor;
@@ -666,6 +666,8 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		FString MyCurrentVendorDescription;
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
+		FString MyCurrentVendorDiscordWebhook;
+	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		FString MyCurrentVendorKeyId;
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		int32 MyCurrentVendorCurrency;
@@ -720,6 +722,43 @@ public:
 	UFUNCTION(Client, Reliable, Category = "UETOPIA")
 		void ClearHUDWidgets();
 	virtual void ClearHUDWidgets_Implementation();
+
+	// this function sends a local chat message - does not go through the server or backend.
+	UFUNCTION(Client, Reliable)
+		void SendLocalChatMessage(const FString& ChatMessageIn);
+
+	// Custom texture url string.
+	// THis is set via getServerInfo, and normally stored in gamestate
+	// the duplicate here is because the player needs to have a hard notification that this changes.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_OnCustomTextureChange, Category = "UETOPIA")
+		FString customTexture;
+
+	UFUNCTION(Client, Reliable)
+		virtual void OnRep_OnCustomTextureChange();
+
+	UTexture2D* LoadedTexture;
+
+	/**
+	* Delegate called when a Http request completes for reading a cloud file
+	*/
+	void ReadCustomTexture_HttpRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	/**
+	* Save a file from a given user to disk
+	*
+	* @param FileName name of file being saved
+	* @param Data data to write to disk
+	*/
+	void SaveCloudFileToDisk(const FString& Filename, const TArray<uint8>& Data);
+
+	/**
+	* Converts filename into a local file cache path
+	*
+	* @param FileName name of file being loaded
+	*
+	* @return unreal file path to be used by file manager
+	*/
+	FString GetLocalFilePath(const FString& FileName);
 
 private:
 
