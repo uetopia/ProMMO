@@ -115,6 +115,9 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & Ou
 	DOREPLIFETIME(AMyPlayerState, TeamId);
 	DOREPLIFETIME(AMyPlayerState, Level);
 	DOREPLIFETIME(AMyPlayerState, ServerLinksAuthorized);
+	
+	DOREPLIFETIME(AMyPlayerState, allowPickup);
+	DOREPLIFETIME(AMyPlayerState, allowDrop);
 }
 
 /* handles copying properties when we do seamless travel */
@@ -131,6 +134,9 @@ void AMyPlayerState::CopyProperties(class APlayerState* PlayerState)
 		MyPlayerState->Currency = Currency;
 		MyPlayerState->TeamId = TeamId;
 		MyPlayerState->Level = Level;
+
+		MyPlayerState->allowPickup = allowPickup;
+		MyPlayerState->allowDrop = allowDrop;
 	}
 
 }

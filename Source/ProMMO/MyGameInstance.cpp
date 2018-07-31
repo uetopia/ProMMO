@@ -370,6 +370,39 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] ServerTitle: %s"), *ServerTitle);
 
+				// Get our custom configuration field here.  This is just a json formatted text field, 
+				// so you can do whatever you want here.
+				// As an example, we're going to read and write an int which will set the maximum numer of pickup items which can be dropped on this server.
+				// This allows private and group instances (my vault, guild hall) to have a low default value, and accept upgrades via in-game events like crafting, or microtransactions
+				bool ConfigurationParseSuccess = false;
+
+				if (JsonParsed->HasField("configuration")) {
+					FString configuration = JsonParsed->GetStringField("configuration");
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] configuration: %s"), *configuration);
+
+					// If it fails or does not make sense, set it to a default value
+					FString ConfigurationJsonRaw = configuration;
+					TSharedPtr<FJsonObject> ConfigurationJsonParsed;
+					TSharedRef<TJsonReader<TCHAR>> ConfigurationJsonReader = TJsonReaderFactory<TCHAR>::Create(ConfigurationJsonRaw);
+					//const JsonValPtrArray *ConfigurationJson;
+
+					if (FJsonSerializer::Deserialize(ConfigurationJsonReader, ConfigurationJsonParsed))
+					{
+						UE_LOG(LogTemp, Log, TEXT("ConfigurationJsonParsed"));
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] ConfigurationJsonRaw: %s"), *ConfigurationJsonRaw);
+
+						ConfigurationParseSuccess = ConfigurationJsonParsed->TryGetNumberField("maxPickupItemCount", maxPickupItemCount);
+					}
+
+				}
+				if (!ConfigurationParseSuccess)
+				{
+					UE_LOG(LogTemp, Log, TEXT("ConfigurationJson NOT Parsed - setting default values"));
+					maxPickupItemCount = 25; 
+				}
+
+				
+
 			}
 			else
 			{
@@ -1292,6 +1325,10 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						JsonParsed->TryGetNumberField("experience", playerC->Experience);
 						JsonParsed->TryGetNumberField("experienceThisLevel", playerC->ExperienceThisLevel);
 						JsonParsed->TryGetNumberField("rank", activePlayer->rank);
+
+						// Is this player is allowed to pickup and drop items on this server.
+						JsonParsed->TryGetBoolField("allowPickup", playerS->allowPickup);
+						JsonParsed->TryGetBoolField("allowDrop", playerS->allowDrop);
 
 						playerS->playerTitle = titleTemp;
 						playerS->serverTitle = ServerTitle;
@@ -5823,17 +5860,50 @@ bool UMyGameInstance::NotifyDownReady()
 {
 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] NotifyDownReady"));
+
+	// TODO return custom server configuration variables.
+	// Like, How many items are allowed on the ground.  
+	// For a private or group instance (my vault, guild hall) This should be something that can be upgraded
+	// Either through crafting or microtransactions.  In either case, the server itself needs to be able to update this value so it can be read back in
+
+
+	//////////////////////////////////////////////////////////////
+	// Convert server configuration to JSON
+
+	FString ConfigurationOutputString;
+	TSharedPtr<FJsonObject> ConfigurationJsonObject = MakeShareable(new FJsonObject);
+	ConfigurationJsonObject->SetNumberField("maxPickupItemCount", maxPickupItemCount);
+
+	
+	TSharedRef< TJsonWriter<> > ConfigurationWriter = TJsonWriterFactory<>::Create(&ConfigurationOutputString);
+	FJsonSerializer::Serialize(ConfigurationJsonObject.ToSharedRef(), ConfigurationWriter);
+	UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] ConfigurationOutputString: %s"), *ConfigurationOutputString);
+
 	FString nonceString = "10951350917635";
 	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-	FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
+	//FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
+
+	TSharedPtr<FJsonObject> ServerJsonObj = MakeShareable(new FJsonObject);
 
 	if (ServerSessionHostAddress.Len() > 1) {
 		//UE_LOG(LogTemp, Log, TEXT("ServerSessionHostAddress: %s"), *ServerSessionHostAddress);
 		//UE_LOG(LogTemp, Log, TEXT("ServerSessionID: %s"), *ServerSessionID);
-		OutputString = OutputString + "&session_host_address=" + ServerSessionHostAddress + "&session_id=" + ServerSessionID;
+		ServerJsonObj->SetStringField("session_host_address", ServerSessionHostAddress);
+		//OutputString = OutputString + "&session_host_address=" + ServerSessionHostAddress + "&session_id=" + ServerSessionID;
 	}
+	
+	ServerJsonObj->SetStringField("nonce", "nonceString");
+	ServerJsonObj->SetStringField("encryption", encryption);
+	ServerJsonObj->SetStringField("configuration", ConfigurationOutputString);
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > FinalWriter = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(ServerJsonObj.ToSharedRef(), FinalWriter);
+
 	FString APIURI = "/api/v1/server/down_ready";
-	bool requestSuccess = PerformHttpRequest(&UMyGameInstance::NotifyDownReadyComplete, APIURI, OutputString, "");  // NO AccessToken
+	//bool requestSuccess = PerformHttpRequest(&UMyGameInstance::NotifyDownReadyComplete, APIURI, OutputString, "");  // NO AccessToken
+	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::NotifyDownReadyComplete, APIURI, JsonOutputString, ""); // NO AccessToken
+
 	return requestSuccess;
 }
 

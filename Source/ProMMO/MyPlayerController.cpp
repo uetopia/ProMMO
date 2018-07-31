@@ -1454,11 +1454,19 @@ bool AMyPlayerController::DropItem(int32 index)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::DropItem"));
 	// this is executing on the client, not server.
-	if (InventorySlots[index].quantity > 0)
+	// check to see if this player is even allowed to drop
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	if (myPlayerState->allowDrop)
 	{
-		ServerAttemptDropItem(index);
-		return true;
+		if (InventorySlots[index].quantity > 0)
+		{
+			ServerAttemptDropItem(index);
+			return true;
+		}
+		return false;
 	}
+	SendLocalChatMessage("Drop not permitted.  This could be due to server settings, or group permissions.");
 	return false;
 }
 
@@ -1472,49 +1480,82 @@ bool AMyPlayerController::ServerAttemptDropItem_Validate(int32 index)
 void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation]  "));
-	if (InventorySlots[index].quantity > 0) {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] InventorySlots[index].quantity > 0 "));
 
-		float placementDistance = 200.0f;
-		FVector ShootDir = GetPawn()->GetActorForwardVector();
-		FVector Origin = GetPawn()->GetActorLocation();
-		FVector spawnlocationstart = ShootDir * placementDistance;
-		FVector spawnlocation = spawnlocationstart + Origin;
-		FTransform const SpawnTransform(ShootDir.Rotation(), spawnlocation);
+	// check to see if this player is even allowed to drop
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
 
-		UWorld* World = GetWorld(); // get a reference to the world
-		if (World)
+	if (myPlayerState->allowDrop)
+	{
+		// check to see if the maximum count has been reached yet.
+		BasePickupsInLevel.Empty();
+		FindAllActors(GetWorld(), BasePickupsInLevel);
+		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+
+		if (BasePickupsInLevel.Num() < TheGameInstance->maxPickupItemCount)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] got world "));
-			// if world exists, spawn the blueprint actor
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] BasePickupsInLevel < TheGameInstance->maxPickupItemCount "));
+			if (InventorySlots[index].quantity > 0) {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] InventorySlots[index].quantity > 0 "));
 
-			UClass* LoadedActorOwnerClass;
-			LoadedActorOwnerClass = LoadClassFromPath(InventorySlots[index].itemClassPath);
+				float placementDistance = 200.0f;
+				FVector ShootDir = GetPawn()->GetActorForwardVector();
+				FVector Origin = GetPawn()->GetActorLocation();
+				FVector spawnlocationstart = ShootDir * placementDistance;
+				FVector spawnlocation = spawnlocationstart + Origin;
+				FTransform const SpawnTransform(ShootDir.Rotation(), spawnlocation);
 
-			//////  Instead of a stright spawn actor we need to use Deferred so we can set the attributes to something to what they are in the inventory.
-			//LoadedBasePickup->Attributes = InventorySlots[index].Attributes;
-			//World->SpawnActor<AMyBasePickup>(LoadedBasePickup, SpawnTransform);
+				UWorld* World = GetWorld(); // get a reference to the world
+				if (World)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] got world "));
+					// if world exists, spawn the blueprint actor
 
-			AMyBasePickup* pActor = World->SpawnActorDeferred<AMyBasePickup>(LoadedActorOwnerClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-			if (pActor)
-			{
-				pActor->Attributes = InventorySlots[index].Attributes;
-				pActor->bCanBeStacked = InventorySlots[index].bCanBeStacked;
-				pActor->Quantity = InventorySlots[index].quantity;
-				UGameplayStatics::FinishSpawningActor(pActor, SpawnTransform);
+					UClass* LoadedActorOwnerClass;
+					LoadedActorOwnerClass = LoadClassFromPath(InventorySlots[index].itemClassPath);
+
+					//////  Instead of a stright spawn actor we need to use Deferred so we can set the attributes to something to what they are in the inventory.
+					//LoadedBasePickup->Attributes = InventorySlots[index].Attributes;
+					//World->SpawnActor<AMyBasePickup>(LoadedBasePickup, SpawnTransform);
+
+					AMyBasePickup* pActor = World->SpawnActorDeferred<AMyBasePickup>(LoadedActorOwnerClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+					if (pActor)
+					{
+						pActor->Attributes = InventorySlots[index].Attributes;
+						pActor->bCanBeStacked = InventorySlots[index].bCanBeStacked;
+						pActor->Quantity = InventorySlots[index].quantity;
+						UGameplayStatics::FinishSpawningActor(pActor, SpawnTransform);
+					}
+
+
+				}
+
+				InventorySlots[index].quantity = 0;
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptSpawnActor_Implementation DoRep_InventoryChanged"));
+				//DoRep_InventoryChanged = !DoRep_InventoryChanged;
+
+
+
+
 			}
-
-
 		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] maxPickupItemCount exceeded. "));
 
-		InventorySlots[index].quantity = 0;
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptSpawnActor_Implementation DoRep_InventoryChanged"));
-		//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-
-
-
-
+			// Send a local chat to the player in this case
+			SendLocalChatMessage("The level cannot accept any more dropped items.");
+		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] Drop not permitted. "));
+
+		// Send a local chat to the player in this case
+		SendLocalChatMessage("Drop not permitted.  This could be due to server settings, or group permissions.");
+	}
+	
+
+	
 
 }
 

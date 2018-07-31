@@ -98,6 +98,9 @@ class PROMMO_API AMyPlayerController : public APlayerController
 		return FStringClassReference(ClassPtr).ToString();
 	}
 
+	// Array to keep track of how many pickup items are in the level 
+	TArray<AMyBasePickup*> BasePickupsInLevel;
+
 
 public:
 

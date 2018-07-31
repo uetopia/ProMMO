@@ -15,6 +15,7 @@
 #include "MyServerPortalActorParallelPriv.h"
 #include "MyServerPortalActorParallelPart.h"
 #include "MyServerPortalActorParallelGrou.h"
+#include "MyBasePickup.h"
 #include "MyTypes.h"
 #include "MyGameInstance.generated.h"
 
@@ -199,6 +200,7 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	FString ServerTitle;
 	FDateTime ServerStartDateTime;
 	FDateTime ServerLastRunningDateTime;
+	
 
 	// Populated through the get match info API call
 	int32 admissionFee;
@@ -209,14 +211,7 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	FString ServerSessionHostAddress;
 	FString ServerSessionID;
 
-	// Constructor declaration
-	//UMyGameInstance(const FObjectInitializer& ObjectInitializer);
-
-	//UMyGameInstance();
-
-
-	// Moving this to a struct for easy JSON encode/decode
-	//TArray<FMyActivePlayer> ActivePlayers;
+	
 
 	// Use this for Dedicated Server.
 	FMyActivePlayers PlayerRecord;
@@ -485,6 +480,9 @@ public:
 	bool NotifyDownReady();
 	void NotifyDownReadyComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
+	// How many items are allowed to be dropped into this level
+	int32 maxPickupItemCount;
+
 private:
 	UPROPERTY(config)
 		FString WelcomeScreenMap;
@@ -610,3 +608,17 @@ protected:
 
 
 };
+
+
+template<typename T>
+void FindAllActors(UWorld* World, TArray<T*>& Out)
+{
+	for (TActorIterator<AActor> It(World, T::StaticClass()); It; ++It)
+	{
+		T* Actor = Cast<T>(*It);
+		if (Actor && !Actor->IsPendingKill())
+		{
+			Out.Add(Actor);
+		}
+	}
+}

@@ -91,6 +91,11 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		FString teamTitle;
 
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		bool allowPickup;
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		bool allowDrop;
+
 	// Variables set via get game player api call
 
 	// doubles are not supported.

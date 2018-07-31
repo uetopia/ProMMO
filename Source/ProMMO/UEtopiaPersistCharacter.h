@@ -81,7 +81,7 @@ class AUEtopiaPersistCharacter : public ACharacter, public IAbilitySystemInterfa
 	/** player released start fire action */
 	void OnStopFire();
 
-	/* returns true if player has space for cubes in inventory */
+	/* returns true if player can pickup items - controlled by server settings and group permissions */
 	bool CanPickUp();
 
 	/** player pressed pickup action */

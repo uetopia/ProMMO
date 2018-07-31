@@ -348,35 +348,42 @@ bool AUEtopiaPersistCharacter::ServerAttemptSpawnActor_Validate()
 
 bool AUEtopiaPersistCharacter::CanPickUp()
 {
-	AMyBasePickup* ObjectInFocus = GetItemFocus();
-	bool doPickup = false;
 	AMyPlayerController* PlayerC = Cast<AMyPlayerController>(Controller);
 	AMyPlayerState* PlayerS = Cast<AMyPlayerState>(PlayerC->PlayerState);
-	if (ObjectInFocus) {
-		if (ObjectInFocus->bAnyoneCanPickUp)
-		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] bAnyoneCanPickUp "));
-			doPickup = true;
-		}
-		else if (ObjectInFocus->OwnerUserKeyId == PlayerS->playerKeyId)
-		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] OwnerUserKeyId == playerKeyId "));
-			if (ObjectInFocus->bOwnerCanPickUp)
+
+	if (PlayerS->allowPickup)
+	{
+		AMyBasePickup* ObjectInFocus = GetItemFocus();
+		bool doPickup = false;
+
+		if (ObjectInFocus) {
+			if (ObjectInFocus->bAnyoneCanPickUp)
 			{
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] bOwnerCanPickUp "));
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] bAnyoneCanPickUp "));
 				doPickup = true;
 			}
-			
-		}
-		
-		if (doPickup) {
-		
-			if (PlayerC->AddItem(ObjectInFocus, ObjectInFocus->Quantity, true)) // CHECK ONLY!
+			else if (ObjectInFocus->OwnerUserKeyId == PlayerS->playerKeyId)
 			{
-				return true;
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] OwnerUserKeyId == playerKeyId "));
+				if (ObjectInFocus->bOwnerCanPickUp)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanPickUp] bOwnerCanPickUp "));
+					doPickup = true;
+				}
+
+			}
+
+			if (doPickup) {
+
+				if (PlayerC->AddItem(ObjectInFocus, ObjectInFocus->Quantity, true)) // CHECK ONLY!
+				{
+					return true;
+				}
 			}
 		}
 	}
+	PlayerC->SendLocalChatMessage("Pickup not permitted.  This could be due to server settings, or group permissions.");
+	
 	return false;
 }
 
