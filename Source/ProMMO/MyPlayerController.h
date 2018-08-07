@@ -47,7 +47,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnVendorInfoCompleteDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAbilitiesChangedDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAbilityInterfaceChangedDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGetCharacterListCompleteDelegate);
-
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGetServerClustersCompleteDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSelectServerClusterCompleteDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGetServersCompleteDelegate);
 
 /**
 * Info associated with a party identifier
@@ -439,11 +441,65 @@ public:
 	FString APIURL;
 	bool PerformJsonHttpRequest(void(AMyPlayerController::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString);
 
+	/**
+	*	List Server Clusters
+	*	Configure server clusters on the backend.
+	*	Clusters are containers that contain servers
+	*
+	*	@param UserId user that initiated the request
+	*/
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool FindServerClusters();
+
+	void FindServerClustersComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	UPROPERTY(BlueprintReadOnly)
+		FMyServerClusterSearchResults MyServerClusterResults;
+
+	/**
+	*	Select Server Cluster
+	*	Choose a server cluster on the backend.
+	*
+	*	@param serverClusterKeyId THe key of the server cluster to select
+	*/
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool SelectServerCluster(const FString& serverClusterKeyId);
+
+	void SelectServerClusterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+
+	/**
+	*	List Servers
+	*	These are different than sessions, because they might not be online/provisioned yet.
+	*	If they are not provisioned, There is no IP address, or session information associated with it, so you can't initiate travel there.
+	*	Use xxxxx function to request that the server be brought online.
+	*
+	*	@param UserId user that initiated the request
+	*/
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool FindServers(const FString& serverClusterKeyId);
+
+	void FindServersComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	UPROPERTY(BlueprintReadOnly)
+		FMyServerSearchResults MyServerResults;
 
 	// Server allocate
-	// This should be a part of the OSS at some point.
+	// This is used to bring up ANY server in the game
+	// It uses the players currently selected server cluser (or assigns one at random)
+	// Then it uses the rules in the cluster:
+	// Try to bring up the server the user was last on
+	// If none, then find a starting server to bring up.
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		bool ServerAllocate();
+
+	// Allocate a specific server
+	// This will also check the currently selected server cluster
+	// If server travel mode is set to FREE, it will bring up the specified server.
+	// If the cluster is set to restricted, this will have no effect.
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool ServerAllocateByKey(const FString& serverKeyId);
+
 	void ServerAllocateComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 
@@ -573,6 +629,21 @@ public:
 	// When it fires, it signals that you should refresh the character list
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
 	FOnGetCharacterListCompleteDelegate OnGetCharacterListCompleteDelegate;
+
+	// This is the delegate to grab on to in the UI
+	// When it fires, it signals that you should refresh the server cluster list
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+	FOnGetServerClustersCompleteDelegate OnGetServerClustersCompleteDelegate;
+
+	// This is the delegate to grab on to in the UI
+	// When it fires, it signals that a new cluster has been selected
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+	FOnSelectServerClusterCompleteDelegate OnSelectServerClusterCompleteDelegate;
+
+	// This is the delegate to grab on to in the UI
+	// When it fires, it signals that you should refresh the server list
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+	FOnGetServersCompleteDelegate OnGetServersCompleteDelegate;
 
 	// Delegate which is triggered whenever a vendor interaction starts or ends
 	//UPROPERTY(BlueprintAssignable, Category = "UETOPIA")

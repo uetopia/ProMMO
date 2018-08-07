@@ -539,3 +539,54 @@ struct FMyServerLinks {
 };
 
 
+USTRUCT(BlueprintType)
+struct FMyServerClusterSearchResult {
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+		FString Title;
+	UPROPERTY(BlueprintReadWrite)
+		FString Description;
+	// TODO - add more data that we care about
+	UPROPERTY(BlueprintReadWrite)
+		FString key_id_str; // previous engine versions would always add .0 to int keys, so we pass them as strings as well.
+	UPROPERTY(BlueprintReadWrite)
+		int32 key_id;
+	UPROPERTY(BlueprintReadWrite)
+		FString travelMode; // "free" or "restricted"
+	// There are more fields avaialble here if you need them.  Cheack the API docs
+};
+
+USTRUCT(BlueprintType)
+struct FMyServerClusterSearchResults {
+
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FMyServerClusterSearchResult> server_clusters;
+};
+
+USTRUCT(BlueprintType)
+struct FMyServerSearchResult {
+	GENERATED_USTRUCT_BODY()
+
+		UPROPERTY(BlueprintReadWrite)
+		FString Title;
+	UPROPERTY(BlueprintReadWrite)
+		FString Description;
+	// TODO - add more data that we care about
+	UPROPERTY(BlueprintReadWrite)
+		FString key_id_str; // previous engine versions would always add .0 to int keys, so we pass them as strings as well.
+	UPROPERTY(BlueprintReadWrite)
+		int32 key_id; 
+	UPROPERTY(BlueprintReadWrite)
+		bool continuous_server_provisioned;
+	// There are more fields avaialble here if you need them.  Cheack the API docs
+};
+
+USTRUCT(BlueprintType)
+struct FMyServerSearchResults {
+
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FMyServerSearchResult> servers;
+};

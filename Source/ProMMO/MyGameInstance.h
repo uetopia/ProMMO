@@ -268,13 +268,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		bool CancelMatchmaking(ULocalPlayer* PlayerOwner);
 
+
 	/**
 	*	Find an online session
 	*
 	*	@param UserId user that initiated the request
-	*	@param SessionName name of session this search will generate
 	*	@param bIsLAN are we searching LAN matches
-	*	@param bIsPresence are we searching presence sessions
 	*/
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		bool FindSessions(ULocalPlayer* PlayerOwner, bool bLANMatch);
@@ -328,6 +327,8 @@ public:
 	void GetServerLinksComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	void AttemptSpawnReward();
+
+	
 
 	UPROPERTY(BlueprintReadOnly)
 		TArray<FMySessionSearchResult> MySessionSearchResults;

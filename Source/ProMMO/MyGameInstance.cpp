@@ -1961,6 +1961,11 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 
 						// set loaded state 
 						playerC->PlayerDataLoaded = true;
+
+						// trigger party and chat changed delegates
+						//const FUniqueNetId netID = FUniqueNetId(activePlayer->UniqueId->ToString())
+						//playerC->RefreshChatChannelList(netID)
+						//playerC->OnChatChannelsChangedUETopia.Broadcast();
 					}
 				}
 			}
@@ -4308,7 +4313,6 @@ void UMyGameInstance::SubmitReportComplete(FHttpRequestPtr HttpRequest, FHttpRes
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SubmitReport] Done!"));
 }
 
-
 /**
 * Delegate fired when a session create request has completed
 *
@@ -4594,8 +4598,10 @@ bool UMyGameInstance::JoinSession(ULocalPlayer* LocalPlayer, int32 SessionIndexI
 	{
 		AddNetworkFailureHandlers();
 
-		OnJoinSessionCompleteDelegateHandle = GameSession->OnJoinSessionComplete().AddUObject(this, &UMyGameInstance::OnJoinSessionComplete); //.AddUObject(this, &UMyGameInstance::OnJoinSessionComplete);
-																																			  // this chenged in 4.20 - it is not returning the same type anymore
+		OnJoinSessionCompleteDelegateHandle = GameSession->OnJoinSessionComplete().AddUObject(this, &UMyGameInstance::OnJoinSessionComplete); 
+		//.AddUObject(this, &UMyGameInstance::OnJoinSessionComplete);
+																																			  
+		// this chenged in 4.20 - it is not returning the same type anymore
 		FUniqueNetIdRepl playerNetId = LocalPlayer->GetPreferredUniqueNetId();
 		if (GameSession->JoinSession(playerNetId.GetUniqueNetId(), GameSessionName, SessionIndexInSearchResults))
 		{
@@ -5861,7 +5867,7 @@ bool UMyGameInstance::NotifyDownReady()
 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] NotifyDownReady"));
 
-	// TODO return custom server configuration variables.
+	// return custom server configuration variables.
 	// Like, How many items are allowed on the ground.  
 	// For a private or group instance (my vault, guild hall) This should be something that can be upgraded
 	// Either through crafting or microtransactions.  In either case, the server itself needs to be able to update this value so it can be read back in

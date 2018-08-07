@@ -1852,6 +1852,183 @@ void AMyPlayerController::AttemptVendorUpdate(const FString& Title, const FStrin
 
 
 
+bool AMyPlayerController::FindServerClusters()
+{
+	// Running on Client
+	if (!IsRunningDedicatedServer())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] FindServerClusters"));
+
+		TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+
+		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+		FString GameKey = TheGameInstance->GameKey;
+
+		FString JsonOutputString;
+		PlayerJsonObj->SetStringField("gameKeyIdStr", GameKey);
+		TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+		FString APIURI = "/_ah/api/servers/v1/serverClusterCollectionGetPage";
+
+		//bool requestSuccess = PerformHttpRequest(&UMyGameInstance::FindServerClustersComplete, APIURI, OutputString, access_token);
+
+		bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::FindServerClustersComplete, APIURI, JsonOutputString);
+
+		
+
+		// Clean out the server cluster list
+		MyServerClusterResults.server_clusters.Empty();
+
+
+		return requestSuccess;;
+
+	}
+	return false;
+
+}
+
+void AMyPlayerController::FindServerClustersComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+
+		//FString JsonRaw = *HttpResponse->GetContentAsString();
+		const FString JsonRaw = *HttpResponse->GetContentAsString();
+
+		bool jsonConvertSuccess = FJsonObjectConverter::JsonObjectStringToUStruct<FMyServerClusterSearchResults>(*JsonRaw, &MyServerClusterResults, 0, 0);
+
+	}
+	// Trigger the delegate
+	OnGetServerClustersCompleteDelegate.Broadcast();
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [FindServerClustersComplete] Done!"));
+}
+
+
+
+bool AMyPlayerController::SelectServerCluster(const FString& serverClusterKeyId)
+{
+	// Running on Client
+	if (!IsRunningDedicatedServer())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] SelectServerCluster"));
+
+		TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+
+		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+		FString GameKey = TheGameInstance->GameKey;
+
+		FString JsonOutputString;
+		PlayerJsonObj->SetStringField("key_id", GameKey);
+		PlayerJsonObj->SetStringField("lastServerClusterKeyId", serverClusterKeyId);
+		TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+		FString APIURI = "/_ah/api/games/v1/gamePlayerUpdate";
+
+		//bool requestSuccess = PerformHttpRequest(&UMyGameInstance::FindServerClustersComplete, APIURI, OutputString, access_token);
+
+		bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::SelectServerClusterComplete, APIURI, JsonOutputString);
+
+		return requestSuccess;;
+
+	}
+	return false;
+
+}
+
+void AMyPlayerController::SelectServerClusterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+
+		//We don't care too much about the results from this.  Maybe trigger a different delegate on failure or something?
+		
+	}
+	// Trigger the delegate
+	OnSelectServerClusterCompleteDelegate.Broadcast();
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [SelectServerClusterComplete] Done!"));
+}
+
+
+bool AMyPlayerController::FindServers(const FString& serverClusterKeyId)
+{
+	// Running on Client
+	if (!IsRunningDedicatedServer())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] FindServers"));
+
+		TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+
+
+		FString JsonOutputString;
+		PlayerJsonObj->SetStringField("serverClusterKeyIdStr", serverClusterKeyId);
+		TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+		FString APIURI = "/_ah/api/servers/v1/serversCollectionGetPage";
+
+		//bool requestSuccess = PerformHttpRequest(&UMyGameInstance::FindServerClustersComplete, APIURI, OutputString, access_token);
+
+		bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::FindServersComplete, APIURI, JsonOutputString);
+
+		// Clean out the server list
+		MyServerResults.servers.Empty();
+
+		return requestSuccess;;
+
+	}
+	return false;
+
+}
+
+void AMyPlayerController::FindServersComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+
+		//FString JsonRaw = *HttpResponse->GetContentAsString();
+		const FString JsonRaw = *HttpResponse->GetContentAsString();
+
+		bool jsonConvertSuccess = FJsonObjectConverter::JsonObjectStringToUStruct<FMyServerSearchResults>(*JsonRaw, &MyServerResults, 0, 0);
+
+	}
+	// Trigger the delegate
+	OnGetServersCompleteDelegate.Broadcast();
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [FindServersComplete] Done!"));
+}
+
+
 bool AMyPlayerController::ServerAllocate()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ServerAllocate"));
@@ -1867,7 +2044,30 @@ bool AMyPlayerController::ServerAllocate()
 	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
 	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
 
-	// _ah/api/vendors/v1/get
+
+	FString APIURI = "/_ah/api/games/v1/attemptServerAllocate";
+
+	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::ServerAllocateComplete, APIURI, JsonOutputString);
+
+	return requestSuccess;
+
+}
+
+bool AMyPlayerController::ServerAllocateByKey(const FString& serverKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ServerAllocate by serverKeyId"));
+
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+	FString GameKey = TheGameInstance->GameKey;
+
+	FString JsonOutputString;
+	PlayerJsonObj->SetStringField("key_id", GameKey);
+	PlayerJsonObj->SetStringField("serverKeyIdStr", serverKeyId);
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
 
 	FString APIURI = "/_ah/api/games/v1/attemptServerAllocate";
 
