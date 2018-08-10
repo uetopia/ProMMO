@@ -60,7 +60,7 @@ deltaSecondsElapsed = deltaSecondsElapsed - 60.0f;
 
 void AMyGameState::BeginPlay()
 {
-	// Call the base class  
+	// Call the base class
 	Super::BeginPlay();
 
 	if (IsRunningDedicatedServer()) {
@@ -79,6 +79,8 @@ void AMyGameState::LoadLevel()
 	if (IsRunningDedicatedServer()) {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel - Dedicated server found."));
 
+		// Uncomment for rama save
+		/*
 		// Load our old data
 		bool FileIOSuccess;
 		TArray<FString> StreamingLevelsStates;
@@ -94,6 +96,7 @@ void AMyGameState::LoadLevel()
 		else {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO FAIL."));
 		}
+		*/
 
 		// This breaks the current session - don't do this.
 		//if (IsRunningDedicatedServer()) {

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "GameFramework/Actor.h"
-#include "RamaSaveComponent.h"
+//#include "RamaSaveComponent.h"
 #include "MyObjectLookupTable.h"
 #include "MyBasePickup.generated.h"
 
@@ -29,7 +29,7 @@ public:
 
 	//UParticleSystemComponent* OurParticleSystem;
 
-	URamaSaveComponent* OurSaveComponent;
+	//URamaSaveComponent* OurSaveComponent;
 
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UETOPIA")
 	//FDataTableRowHandle  ObjectInfo;
@@ -71,7 +71,7 @@ public:
 	UPROPERTY(EditAnywhere, Replicated, BlueprintReadOnly, Category = "UETOPIA")
 	FString OwnerUserKeyId;
 
-	// Anyone can pick up this item.  
+	// Anyone can pick up this item.
 	UPROPERTY(EditAnywhere, Replicated, BlueprintReadOnly, Category = "UETOPIA")
 	bool bAnyoneCanPickUp;
 

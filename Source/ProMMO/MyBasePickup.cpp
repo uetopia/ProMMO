@@ -36,6 +36,7 @@ AMyBasePickup::AMyBasePickup()
 
 
 	// Rama Save
+	/*
 	OurSaveComponent = CreateDefaultSubobject<URamaSaveComponent>(TEXT("Save System"));
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("DataTableRowName");
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("Icon");
@@ -52,9 +53,9 @@ AMyBasePickup::AMyBasePickup()
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("bAnyoneCanPickUp");
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("bOwnerCanPickUp");
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("Attributes");
-	
-	
-	
+	*/
+
+
 
 
 	// data table setup
@@ -90,7 +91,7 @@ void AMyBasePickup::Tick( float DeltaTime )
 void AMyBasePickup::OnItemUsed(FTransform SpawnTransform, const FString& UserKeyId, UClass* BPSubClass)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] MyBasePickup OnItemUsed"));
-	// your code here to run on client.  
+	// your code here to run on client.
 	// do all the real work on the server
 	ServerAttemptUse(SpawnTransform, UserKeyId, BPSubClass);
 	return;
@@ -100,7 +101,7 @@ void AMyBasePickup::OnItemUsed(FTransform SpawnTransform, const FString& UserKey
 void AMyBasePickup::ServerAttemptUse_Implementation(FTransform SpawnTransform, const FString& UserKeyId, UClass* BPSubClass)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyBasePickup] [ServerAttemptUse_Implementation]  "));
-	
+
 	// custom OnUse Implementation here.
 }
 
@@ -126,6 +127,6 @@ void AMyBasePickup::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & Out
 	DOREPLIFETIME(AMyBasePickup, bAnyoneCanPickUp);
 	DOREPLIFETIME(AMyBasePickup, bOwnerCanPickUp);
 	DOREPLIFETIME(AMyBasePickup, OwnerUserKeyId);
-	
+
 
 }

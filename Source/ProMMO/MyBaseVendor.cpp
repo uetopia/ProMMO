@@ -34,7 +34,7 @@ AMyBaseVendor::AMyBaseVendor()
 	}
 	*/
 
-	
+
 
 
 
@@ -55,9 +55,10 @@ AMyBaseVendor::AMyBaseVendor()
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("OwnerUserKeyId");
 	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("bAnyoneCanPickUp");
 	*/
-	
-	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("VendorKeyId");
 
+	/*
+	OurSaveComponent->RamaSave_OwningActorVarsToSave.Add("VendorKeyId");
+	*/
 
 	// data table setup
 	// we're just using a string refrencing the row name now.
@@ -103,7 +104,7 @@ void AMyBaseVendor::ServerAttemptUse_Implementation(FTransform SpawnTransform, c
 	}
 	*/
 
-	
+
 	// this is not working because when we call this function the actor is not actually spawned in the world.
 	//UWorld* const World = GetWorld();
 	//if (World) {

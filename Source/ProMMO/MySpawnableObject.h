@@ -4,7 +4,7 @@
 
 #include "GameFramework/Actor.h"
 #include "Engine.h"
-#include "RamaSaveComponent.h"
+//#include "RamaSaveComponent.h"
 #include "MySpawnableObject.generated.h"
 
 UCLASS()
