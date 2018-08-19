@@ -1,9 +1,8 @@
 # PRO/MMO FOUNDATION
 Multiplayer tools for persistent worlds.
 
-4.19 OSS Enhanced Complete branch requires the 4.19 branch of the UEtopia plugin, and a patched version of the engine
-https://github.com/uetopia/uetopia-online-subsystem/tree/4.19_OSS_Enhanced
-https://github.com/uetopia/UnrealEngine/tree/4.19.0_UETOPIA_OSS_Enhancements
+4.20 OSS Enhanced Complete branch requires a patched version of the engine
+https://github.com/uetopia/UnrealEngine/tree/4.20.0_UETOPIA_OSS_ENHANCED
 
 If you don't want to use the enhanced Online Subsystem, use the 4.19 Marketplace branch.
 
