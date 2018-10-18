@@ -301,7 +301,7 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 			{
 				const FOnlineFriend& Friend = *Friends[Index];
 				const FOnlineUserPresence& Presence = Friend.GetPresence();
-				//UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *Friend.GetDisplayName(), *Friend.GetUserId()->ToDebugString());
+				//UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *Friend.GetDisplayName(), *Friend.GetUserId()->ToString());
 				//UE_LOG(LogOnline, Log, TEXT("\t\t Invite status (%s)"), EInviteStatus::ToString(Friend.GetInviteStatus()));
 				//UE_LOG(LogOnline, Log, TEXT("\t\t Presence: %s"), *Presence.Status.StatusStr);
 				//UE_LOG(LogOnline, Log, TEXT("\t\t State: %s"), EOnlinePresenceState::ToString(Presence.Status.State));
@@ -313,7 +313,7 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 
 				FMyFriend ThisFriend;
 				ThisFriend.playerTitle = Friend.GetDisplayName();
-				ThisFriend.playerKeyId = Friend.GetUserId()->ToDebugString();
+				ThisFriend.playerKeyId = Friend.GetUserId()->ToString();
 				ThisFriend.bIsOnline = Presence.bIsOnline;
 				ThisFriend.bIsPlayingThisGame = Presence.bIsPlayingThisGame;
 
@@ -367,12 +367,12 @@ void AMyPlayerController::OnReadRecentPlayersComplete(const FUniqueNetId& UserId
 			{
 				const FOnlineRecentPlayer& RecentPlayer = *RecentPlayers[Index];
 
-				//UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *RecentPlayer.GetDisplayName(), *RecentPlayer.GetUserId()->ToDebugString());
+				//UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *RecentPlayer.GetDisplayName(), *RecentPlayer.GetUserId()->ToString());
 
 
 				FMyRecentPlayer ThisRecentPlayer;
 				ThisRecentPlayer.playerTitle = RecentPlayer.GetDisplayName();
-				ThisRecentPlayer.playerKeyId = RecentPlayer.GetUserId()->ToDebugString();
+				ThisRecentPlayer.playerKeyId = RecentPlayer.GetUserId()->ToString();
 
 				MyCachedRecentPlayers.MyRecentPlayers.Add(ThisRecentPlayer);
 
@@ -1553,9 +1553,9 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 		// Send a local chat to the player in this case
 		SendLocalChatMessage("Drop not permitted.  This could be due to server settings, or group permissions.");
 	}
-	
 
-	
+
+
 
 }
 
@@ -1875,7 +1875,7 @@ bool AMyPlayerController::FindServerClusters()
 
 		bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::FindServerClustersComplete, APIURI, JsonOutputString);
 
-		
+
 
 		// Clean out the server cluster list
 		MyServerClusterResults.server_clusters.Empty();
@@ -1962,7 +1962,7 @@ void AMyPlayerController::SelectServerClusterComplete(FHttpRequestPtr HttpReques
 			*HttpResponse->GetContentAsString());
 
 		//We don't care too much about the results from this.  Maybe trigger a different delegate on failure or something?
-		
+
 	}
 	// Trigger the delegate
 	OnSelectServerClusterCompleteDelegate.Broadcast();
@@ -2153,7 +2153,7 @@ void AMyPlayerController::GetVendorInfoComplete(FHttpRequestPtr HttpRequest, FHt
 			JsonParsed->TryGetStringField("title", MyCurrentVendorTitle);
 			JsonParsed->TryGetStringField("description", MyCurrentVendorDescription);
 			JsonParsed->TryGetStringField("discordWebhook", MyCurrentVendorDiscordWebhook);
-			
+
 			JsonParsed->TryGetBoolField("bMyVendor", MyCurrentVendorIsOwnedByMe);
 			JsonParsed->TryGetNumberField("vendorCurrency", MyCurrentVendorCurrency);
 
