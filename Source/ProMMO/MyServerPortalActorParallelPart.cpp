@@ -13,7 +13,7 @@ AMyServerPortalActorParallelPart::AMyServerPortalActorParallelPart(const FObject
 	GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
 	GetStaticMeshComponent()->SetStaticMesh(SphereVisualAsset.Object);
 	GetStaticMeshComponent()->SetRelativeLocation(FVector(1.0f, 1.0f, -3.0f));
-	GetStaticMeshComponent()->SetWorldScale3D(FVector(1.0f, 0.5f, 1.0f));
+	//GetStaticMeshComponent()->SetWorldScale3D(FVector(1.0f, 0.5f, 1.0f));
 	RootComponent = GetStaticMeshComponent();
 
 	// create text render component with some default values

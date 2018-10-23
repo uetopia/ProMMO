@@ -2566,72 +2566,81 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 						APlayerState* thisPlayerState = pc->PlayerState;
 						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
-						UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
+						if (playerS)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
+							UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
 
+							// Instanced servers have different keys and need to be handled differently.
+							// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
+							// We need to update all of the server link information after every transfer request like this one.
 
+							if (allowedToTravel) {
 
-						// Instanced servers have different keys and need to be handled differently.
-						// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
-						// We need to update all of the server link information after every transfer request like this one.
-
-						if (allowedToTravel) {
-
-							// check to see if this key is already in the array
-							bool foundServerLinkAuthorized = false;
-							for (int sla = 0; sla < playerS->ServerLinksAuthorized.Num(); sla++)
-							{
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found ServerLinkAuthorized"));
-								if (playerS->ServerLinksAuthorized[sla].targetServerKeyId == targetServerKeyId)
+								// check to see if this key is already in the array
+								bool foundServerLinkAuthorized = false;
+								for (int sla = 0; sla < playerS->ServerLinksAuthorized.Num(); sla++)
 								{
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found Matching ServerLinkAuthorized"));
+									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found ServerLinkAuthorized"));
+									if (playerS->ServerLinksAuthorized[sla].targetServerKeyId == targetServerKeyId)
+									{
+										UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found Matching ServerLinkAuthorized"));
 
-									// update the record
-									playerS->ServerLinksAuthorized[sla].hostConnectionLink = instanceHostConnectionLink;
-									foundServerLinkAuthorized = true;
+										// update the record
+										playerS->ServerLinksAuthorized[sla].hostConnectionLink = instanceHostConnectionLink;
+										foundServerLinkAuthorized = true;
+									}
+								}
+
+								if (!foundServerLinkAuthorized)
+								{
+									FMyApprovedServerLink newApprovedLink;
+									newApprovedLink.hostConnectionLink = instanceHostConnectionLink;
+									newApprovedLink.targetServerKeyId = targetServerKeyId;
+									playerS->ServerLinksAuthorized.Add(newApprovedLink);
+								}
+
+								//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
+
+								// Spawn and setup the travelapproved actor visible only to the owner
+								FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
+
+								// check in case the server link is not found or does not exist.
+								if (thisServerLink.targetServerKeyId.IsEmpty()) {
+									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - thisServerLink.targetServerKeyId.IsEmpty - aborting TravelApproval"));
+									return;
+								}
+
+
+								UWorld* const World = GetWorld(); // get a reference to the world
+								if (World) {
+									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
+
+									// This is strange...
+									// moved to an RPC on CLient so the client only creates this aesthetic only object for themselves.
+
+
+									FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
+									FTransform SpawnTransform = FTransform(spawnlocation);
+									SpawnTransform.SetScale3D(FVector(2.5f, 2.5f, 2.5f));
+									SpawnTransform.SetRotation(FRotator(thisServerLink.rotationX, thisServerLink.rotationY, thisServerLink.rotationZ).Quaternion());
+
+									//AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
+									//TravelApprovedActor->setPlayerKeyId(userKeyId);
+									//TravelApprovedActor->SetOwner(pc);
+									//TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
+
+									// add the travel approved actor to our player state list.
+									// we need to keep track of it so we can delete it later.
+									//playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
+
+									// Send RPC to the client to spawn it.
+									pc->ClientTravelApprovedSpawnActor(SpawnTransform);
+
 								}
 							}
-
-							if (!foundServerLinkAuthorized)
-							{
-								FMyApprovedServerLink newApprovedLink;
-								newApprovedLink.hostConnectionLink = instanceHostConnectionLink;
-								newApprovedLink.targetServerKeyId = targetServerKeyId;
-								playerS->ServerLinksAuthorized.Add(newApprovedLink);
-							}
-
-							//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
-
-							// Spawn and setup the travelapproved actor visible only to the owner
-							FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
-
-							// check in case the server link is not found or does not exist.
-							if (thisServerLink.targetServerKeyId.IsEmpty()) {
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - thisServerLink.targetServerKeyId.IsEmpty - aborting TravelApproval"));
-								return;
-							}
-
-
-							UWorld* const World = GetWorld(); // get a reference to the world
-							if (World) {
-								//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
-								FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
-								FTransform SpawnTransform = FTransform(spawnlocation);
-								AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
-								TravelApprovedActor->setPlayerKeyId(userKeyId);
-								TravelApprovedActor->SetOwner(pc);
-								TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
-
-								// add the travel approved actor to our player state list.
-								// we need to keep track of it so we can delete it later.
-								playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
-
-
-
-
-							}
-
 						}
+
 					}
 					else
 					{

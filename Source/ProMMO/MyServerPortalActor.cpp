@@ -44,6 +44,22 @@ AMyServerPortalActor::AMyServerPortalActor(const FObjectInitializer& ObjectIniti
 
 
 	}
+
+	// ParticleSystem'/Game/Portal/p_portal.p_portal'
+	static ConstructorHelpers::FObjectFinder<UParticleSystem> PSClass(TEXT("ParticleSystem'/Game/Portal/p_portal.p_portal'"));
+
+	if (PSClass.Object != NULL) {
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyServerPortalActor] Got Particle System  "));
+		MyParticleSystem = PSClass.Object; // MyParticleSystem is a UParticleSystem pointer
+		ParticleComp = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("MyPSC"));
+		ParticleComp->SetTemplate(PSClass.Object);
+		ParticleComp->SetupAttachment(RootComponent);
+		R_PortalColor = FLinearColor(0.0, 0.0, 0.9, 1.0);
+		ParticleComp->SetColorParameter("Color", R_PortalColor);
+		ParticleComp->ActivateSystem(true);
+	}
+
+
 	bReplicates = true;
 	bReplicateMovement = true;
 }
@@ -135,6 +151,7 @@ void AMyServerPortalActor::OnRep_SetGlowAmount()
 	MaterialInstance->SetScalarParameterValue(FName("Glow Strength"), R_GlowAmount);
 	MaterialInstance->SetVectorParameterValue(FName("Color"), R_PortalColor);
 	//GetStaticMeshComponent()->SetMaterial(0, MaterialInstance);
+	ParticleComp->SetColorParameter("Color", R_PortalColor);
 }
 
 void AMyServerPortalActor::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
