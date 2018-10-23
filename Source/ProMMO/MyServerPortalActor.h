@@ -66,6 +66,12 @@ public:
 		UTextRenderComponent* _displayText;
 
 	
+	UPROPERTY(VisibleDefaultsOnly, Category = Projectile)
+		UParticleSystemComponent* ParticleComp;
+	UPROPERTY(VisibleDefaultsOnly, Category = Projectile)
+		UParticleSystem* MyParticleSystem;
+
+
 	void setTitle(FString titleIncoming);
 
 protected:

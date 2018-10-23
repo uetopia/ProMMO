@@ -164,10 +164,10 @@ void UMyGameInstance::Init()
 	//GetWorld()->GetTimerManager().SetTimer(RewardSpawnTimerHandle, this, &UMyGameInstance::AttemptSpawnReward, SpawnRewardTimerSeconds, true);
 
 
-	// Set up a timer to submit kills and stats to the backend 
+	// Set up a timer to submit kills and stats to the backend
 	// This should be anywhere from a minute to 15 minutes, depending on game load.
 	GetWorld()->GetTimerManager().SetTimer(SubmitReportTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
-	
+
 
 	MatchStarted = false;
 
@@ -320,7 +320,7 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 					serverCurrency = JsonParsed->GetIntegerField("serverCurrency");
 				}
 
-				
+
 
 
 				ServerTitle = JsonParsed->GetStringField("title");
@@ -370,7 +370,7 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] ServerTitle: %s"), *ServerTitle);
 
-				// Get our custom configuration field here.  This is just a json formatted text field, 
+				// Get our custom configuration field here.  This is just a json formatted text field,
 				// so you can do whatever you want here.
 				// As an example, we're going to read and write an int which will set the maximum numer of pickup items which can be dropped on this server.
 				// This allows private and group instances (my vault, guild hall) to have a low default value, and accept upgrades via in-game events like crafting, or microtransactions
@@ -398,10 +398,10 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 				if (!ConfigurationParseSuccess)
 				{
 					UE_LOG(LogTemp, Log, TEXT("ConfigurationJson NOT Parsed - setting default values"));
-					maxPickupItemCount = 25; 
+					maxPickupItemCount = 25;
 				}
 
-				
+
 
 			}
 			else
@@ -549,7 +549,7 @@ void  UMyGameInstance::GetServerLinks()
 			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
 			FString APIURI = "/api/v1/server/links";
 			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::GetServerLinksComplete, APIURI, OutputString, ""); // No AccessToken
-			
+
 		}
 
 	}
@@ -873,7 +873,7 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 							{
 								pc = Iterator->Get();
 
-								
+
 								AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
 								AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
 								APlayerState* thisPlayerState = pc->PlayerState;
@@ -899,7 +899,7 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 										UE_LOG(LogTemp, Log, TEXT("bIsShardedServer = false"));
 										playerC->bIsShardedServer = false;
 									}
-									
+
 								}
 							}
 
@@ -1341,8 +1341,8 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						activePlayer->experience = playerC->Experience;
 						activePlayer->score = scoreTemp;
 
-						
-						
+
+
 						////////////////////////////////////////////////////////////////////
 						// Abilities
 						////////////////////////////////////////////////////////////////////
@@ -1444,7 +1444,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							// Blueprint'/Game/Abilities/TestAbility3.TestAbility3'
 							//Blueprint'/Game/Abilities/TestAbility4.TestAbility4'
 							TArray <FString> AbilityClassPaths = { "/Game/Abilities/TestAbility2.TestAbility2_C", "/Game/Abilities/TestAbility3.TestAbility3_C", "/Game/Abilities/TestAbility4.TestAbility4_C" };
-							
+
 							UClass* LoadedActorOwnerClass;
 							UMyBaseGameplayAbility* LoadedObjectClass;
 							FMyGrantedAbility grantedAbility;
@@ -1492,7 +1492,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						// Interface
 						////////////////////////////////////////////////////////////////////
 
-						
+
 
 						// First try to parse interface ability bar as json
 						// If it fails or does not make sense, set it to a default value
@@ -1676,7 +1676,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							else
 							{
 								UE_LOG(LogTemp, Log, TEXT("InterfaceParse FAIL"));
-								
+
 								// WE don't have Interface json to work with, so we're just going to build up a blank action bar that is empty.
 								FMyAbilitySlot BlankAbility;
 								BlankAbility.Icon = nullptr;
@@ -1693,7 +1693,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									BlankAbility.GrantedAbility = grantedAbility;
 									BlankAbility.bIsValid = false;
 									LocalAbilitySlots.Add(BlankAbility);
-								
+
 								}
 
 								// trigger the delegate so we can build the UI
@@ -1701,10 +1701,10 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 								playerC->AbilitySlotsPerRow = AbilitySlotsPerRow;
 								playerC->MyAbilitySlots = LocalAbilitySlots;
 								//playerC->DoRep_AbilityInterfaceChanged = !playerC->DoRep_AbilityInterfaceChanged;
-								
-								
 
-								
+
+
+
 
 							}
 						}
@@ -1742,7 +1742,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						{
 							UE_LOG(LogTemp, Log, TEXT("InventoryParseSuccess"));
 
-							
+
 
 							// TODO - set up player controller inventory.
 							playerC->InventoryCapacity = InventoryCapacity;
@@ -1805,9 +1805,9 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 												if (attributeObj.IsValid())
 												{
 													JsonIndexName = FString::FromInt(currentIndex);
-													
+
 													attributeObj->TryGetNumberField(JsonIndexName, JsonValue);
-						
+
 													itemSlot.Attributes.Add(JsonValue);
 												}
 												currentIndex++;
@@ -1843,7 +1843,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 											}
 											*/
 
-											
+
 
 											itemSlot.bCanBeUsed = basePickupBP->bCanBeUsed;
 											itemSlot.UseText = basePickupBP->UseText;
@@ -1893,7 +1893,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							}
 
 							emptySlot.itemId = 0;
-							
+
 							emptySlot.quantity = 0;
 
 							for (int32 inventoryIndex = 0; inventoryIndex < remainingSlotsToFill; inventoryIndex++)
@@ -1937,16 +1937,16 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									emptySlot.Icon = basePickupBP->Icon;
 									emptySlot.itemTitle = basePickupBP->Title.ToString();
 								}
-								
+
 							}
 							else {
 								UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
 								emptySlot.itemTitle = "Empty";
 							}
-							
+
 							emptySlot.itemId = 0;
 							emptySlot.quantity = 0;
-							
+
 
 							for (int32 inventoryIndex = 0; inventoryIndex < 16; inventoryIndex++)
 							{
@@ -1959,7 +1959,7 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 							//playerC->DoRep_InventoryChanged = !playerC->DoRep_InventoryChanged;
 						}
 
-						// set loaded state 
+						// set loaded state
 						playerC->PlayerDataLoaded = true;
 
 						// trigger party and chat changed delegates
@@ -2300,7 +2300,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 						}
 						playerS->ServerLinksAuthorized.Empty();
 						playerS->ServerTravelApprovedActors.Empty();
-						
+
 					}
 				}
 
@@ -2319,7 +2319,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 			else {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - No Authorized players found - moving to save."));
 
-				
+
 				bool FileIOSuccess;
 				bool allComponentsSaved;
 				FString FileName = "serversavedata.dat";
@@ -2330,7 +2330,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 				else {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO FAIL."));
 				}
-				
+
 
 
 				// removing lobby level entirely. Leaving this here for reference
@@ -2353,7 +2353,7 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 
 				// Tell the backend that it's safe to bring this server down.
 				NotifyDownReady();
-				
+
 
 			}
 		}
@@ -2545,7 +2545,7 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 						DeActivatePlayer(ActivePlayer->playerID);
 						pc->ExecuteClientTravel(instanceHostConnectionLink);
 					}
-					
+
 				}
 				else
 				{
@@ -2564,72 +2564,84 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 						APlayerState* thisPlayerState = pc->PlayerState;
 						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
-						UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
+
+						if (playerS)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
+							UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
 
 
 
-						// Instanced servers have different keys and need to be handled differently.
-						// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
-						// We need to update all of the server link information after every transfer request like this one.
+							// Instanced servers have different keys and need to be handled differently.
+							// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
+							// We need to update all of the server link information after every transfer request like this one.
 
-						if (allowedToTravel) {
+							if (allowedToTravel) {
 
-							// check to see if this key is already in the array
-							bool foundServerLinkAuthorized = false;
-							for (int sla = 0; sla < playerS->ServerLinksAuthorized.Num(); sla++)
-							{
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found ServerLinkAuthorized"));
-								if (playerS->ServerLinksAuthorized[sla].targetServerKeyId == targetServerKeyId)
+								// check to see if this key is already in the array
+								bool foundServerLinkAuthorized = false;
+								for (int sla = 0; sla < playerS->ServerLinksAuthorized.Num(); sla++)
 								{
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found Matching ServerLinkAuthorized"));
+									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found ServerLinkAuthorized"));
+									if (playerS->ServerLinksAuthorized[sla].targetServerKeyId == targetServerKeyId)
+									{
+										UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found Matching ServerLinkAuthorized"));
 
-									// update the record
-									playerS->ServerLinksAuthorized[sla].hostConnectionLink = instanceHostConnectionLink;
-									foundServerLinkAuthorized = true;
+										// update the record
+										playerS->ServerLinksAuthorized[sla].hostConnectionLink = instanceHostConnectionLink;
+										foundServerLinkAuthorized = true;
+									}
+								}
+
+								if (!foundServerLinkAuthorized)
+								{
+									FMyApprovedServerLink newApprovedLink;
+									newApprovedLink.hostConnectionLink = instanceHostConnectionLink;
+									newApprovedLink.targetServerKeyId = targetServerKeyId;
+									playerS->ServerLinksAuthorized.Add(newApprovedLink);
+								}
+
+								//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
+
+								// Spawn and setup the travelapproved actor visible only to the owner
+								FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
+
+								// check in case the server link is not found or does not exist.
+								if (thisServerLink.targetServerKeyId.IsEmpty()) {
+									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - thisServerLink.targetServerKeyId.IsEmpty - aborting TravelApproval"));
+									return;
+								}
+
+
+								UWorld* const World = GetWorld(); // get a reference to the world
+								if (World) {
+									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
+
+									// This is strange...
+									// moved to an RPC on CLient so the client only creates this aesthetic only object for themselves.
+
+
+									FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
+									FTransform SpawnTransform = FTransform(spawnlocation);
+									SpawnTransform.SetScale3D(FVector(2.5f, 2.5f, 2.5f));
+									SpawnTransform.SetRotation(FRotator(thisServerLink.rotationX, thisServerLink.rotationY, thisServerLink.rotationZ).Quaternion());
+
+									//AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
+									//TravelApprovedActor->setPlayerKeyId(userKeyId);
+									//TravelApprovedActor->SetOwner(pc);
+									//TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
+
+									// add the travel approved actor to our player state list.
+									// we need to keep track of it so we can delete it later.
+									//playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
+
+									// Send RPC to the client to spawn it.
+									pc->ClientTravelApprovedSpawnActor(SpawnTransform);
+
 								}
 							}
-
-							if (!foundServerLinkAuthorized)
-							{
-								FMyApprovedServerLink newApprovedLink;
-								newApprovedLink.hostConnectionLink = instanceHostConnectionLink;
-								newApprovedLink.targetServerKeyId = targetServerKeyId;
-								playerS->ServerLinksAuthorized.Add(newApprovedLink);
-							}
-
-							//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
-
-							// Spawn and setup the travelapproved actor visible only to the owner
-							FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
-
-							// check in case the server link is not found or does not exist.
-							if (thisServerLink.targetServerKeyId.IsEmpty()) {
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - thisServerLink.targetServerKeyId.IsEmpty - aborting TravelApproval"));
-								return;
-							}
-
-
-							UWorld* const World = GetWorld(); // get a reference to the world
-							if (World) {
-								//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
-								FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
-								FTransform SpawnTransform = FTransform(spawnlocation);
-								AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
-								TravelApprovedActor->setPlayerKeyId(userKeyId);
-								TravelApprovedActor->SetOwner(pc);
-								TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
-
-								// add the travel approved actor to our player state list.
-								// we need to keep track of it so we can delete it later.
-								playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
-
-
-
-
-							}
-
 						}
+
 					}
 					else
 					{
@@ -2639,7 +2651,7 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
 							AMyPlayerController* pc = ActivePlayer->PlayerController;
 
-							
+
 							pc->ExecuteClientTravel(instanceHostConnectionLink);
 							DeActivatePlayer(ActivePlayer->playerID);
 						}
@@ -2882,7 +2894,7 @@ void UMyGameInstance::VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, F
 						if (playerS->playerKeyId == createdByUserKeyId)
 						{
 
-							
+
 							// update player inventory
 							if (itemName == "Cube") {
 							UE_LOG(LogTemp, Log, TEXT("Purchase was a cube"));
@@ -2893,14 +2905,14 @@ void UMyGameInstance::VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, F
 							// update player currency balance
 							playerRecord->currencyCurrent = playerRecord->currencyCurrent - purchaseAmount;
 							playerS->Currency = playerS->Currency - purchaseAmount;
-							
 
-							
+
+
 						}
 					}
 					*/
 
-					
+
 
 				}
 
@@ -2993,9 +3005,9 @@ void UMyGameInstance::VendorUpdateRequestComplete(FHttpRequestPtr HttpRequest, F
 								UE_LOG(LogTemp, Log, TEXT("Found the vendor in the world.  Marking as bOwnerCanPickUp"));
 								Vendor->bOwnerCanPickUp = true;
 							}
-							
+
 						}
-						
+
 					}
 				}
 			}
@@ -3356,7 +3368,7 @@ void UMyGameInstance::VendorItemDeleteRequestComplete(FHttpRequestPtr HttpReques
 
 							playerC->InventorySlots.Add(itemSlot);
 							*/
-							
+
 						}
 					}
 				}
@@ -3581,7 +3593,7 @@ void UMyGameInstance::VendorWithdrawRequestComplete(FHttpRequestPtr HttpRequest,
 			{
 				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
 				bool Success = JsonParsed->GetBoolField("success");
-				if (Success) 
+				if (Success)
 				{
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
 					// TODO - add the currency to the player
@@ -3916,7 +3928,7 @@ void UMyGameInstance::RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpRe
 					}
 					*/
 
-					
+
 				}
 			}
 		}
@@ -3938,7 +3950,7 @@ bool UMyGameInstance::QueryGameDataList(FString cursor)
 	{
 		PlayerJsonObj->SetStringField("cursor", cursor);
 	}
-	
+
 
 	FString JsonOutputString;
 	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -4066,7 +4078,7 @@ void UMyGameInstance::LoadServerStateFromFile()
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] LoadServerStateFromFile"));
 
 	/*
-	DEPRECATED - THIS LIVES IN GAME STATE 
+	DEPRECATED - THIS LIVES IN GAME STATE
 	bool FileIOSuccess;
 	//bool allComponentsLoaded;
 	//bool destroyActorsBeforeLoad = false;
@@ -4087,7 +4099,7 @@ void UMyGameInstance::LoadServerStateFromFile()
 
 	*/
 
-	
+
 
 }
 
@@ -4598,9 +4610,9 @@ bool UMyGameInstance::JoinSession(ULocalPlayer* LocalPlayer, int32 SessionIndexI
 	{
 		AddNetworkFailureHandlers();
 
-		OnJoinSessionCompleteDelegateHandle = GameSession->OnJoinSessionComplete().AddUObject(this, &UMyGameInstance::OnJoinSessionComplete); 
+		OnJoinSessionCompleteDelegateHandle = GameSession->OnJoinSessionComplete().AddUObject(this, &UMyGameInstance::OnJoinSessionComplete);
 		//.AddUObject(this, &UMyGameInstance::OnJoinSessionComplete);
-																																			  
+
 		// this chenged in 4.20 - it is not returning the same type anymore
 		FUniqueNetIdRepl playerNetId = LocalPlayer->GetPreferredUniqueNetId();
 		if (GameSession->JoinSession(playerNetId.GetUniqueNetId(), GameSessionName, SessionIndexInSearchResults))
@@ -5180,7 +5192,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordKill - Mode set to competitive"));
 		/*
 		// If we are here, this server is running in competitive/matchmaker mode.
-		// 
+		//
 		*/
 		// get attacker activeplayer
 		bool attackerPlayerIDFound = false;
@@ -5435,7 +5447,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 			}
 
 			// check to see if this victim is already in the kill list
-			
+
 			bool victimIDFoundInKillList = false;
 
 			for (int32 b = 0; b < PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Num(); b++)
@@ -5451,7 +5463,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Adding victim to kill list"));
 				PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Add(PlayerRecord.ActivePlayers[victimPlayerIndex].playerKeyId);
 			}
-			
+
 			// create an event also
 			FString eventSummary = "killed " + PlayerRecord.ActivePlayers[victimPlayerIndex].playerTitle;
 			RecordEvent(killerPlayerID, eventSummary, "location_searching", "Kill");  // look at https://material.io/icons/ for other icons
@@ -5473,7 +5485,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 
 			// Increase the killer's balance
 			//PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent + killRewardBTC;
-			
+
 			// Decrease the victim's balance
 			//PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent - incrementCurrency;
 
@@ -5494,7 +5506,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				AMyPlayerState* thisMyPlayerState = Cast<AMyPlayerState>(thisPlayerState);
 				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
 
-				
+
 				// old way
 				TSubclassOf<APlayerController> thisPlayerController = pc;
 				AMyPlayerController* thisPlayerController = Cast<AMyPlayerController>(pc);
@@ -5508,7 +5520,7 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
 				}
 				}
-				
+
 			}
 			*/
 
@@ -5707,7 +5719,7 @@ void UMyGameInstance::SpawnServerPortals()
 							PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 							PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
 							PortalActor->setTitle(ServerLinks.links[b].targetServerTitle);
-			
+
 							// determine the portal state, and set it
 							if (ServerLinks.links[b].targetStatusOnline) {
 								PortalActor->setState("Ready");
@@ -5727,8 +5739,8 @@ void UMyGameInstance::SpawnServerPortals()
 
 						}
 
-						
-						
+
+
 					}
 
 				}
@@ -5868,7 +5880,7 @@ bool UMyGameInstance::NotifyDownReady()
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] NotifyDownReady"));
 
 	// return custom server configuration variables.
-	// Like, How many items are allowed on the ground.  
+	// Like, How many items are allowed on the ground.
 	// For a private or group instance (my vault, guild hall) This should be something that can be upgraded
 	// Either through crafting or microtransactions.  In either case, the server itself needs to be able to update this value so it can be read back in
 
@@ -5880,7 +5892,7 @@ bool UMyGameInstance::NotifyDownReady()
 	TSharedPtr<FJsonObject> ConfigurationJsonObject = MakeShareable(new FJsonObject);
 	ConfigurationJsonObject->SetNumberField("maxPickupItemCount", maxPickupItemCount);
 
-	
+
 	TSharedRef< TJsonWriter<> > ConfigurationWriter = TJsonWriterFactory<>::Create(&ConfigurationOutputString);
 	FJsonSerializer::Serialize(ConfigurationJsonObject.ToSharedRef(), ConfigurationWriter);
 	UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] ConfigurationOutputString: %s"), *ConfigurationOutputString);
@@ -5897,7 +5909,7 @@ bool UMyGameInstance::NotifyDownReady()
 		ServerJsonObj->SetStringField("session_host_address", ServerSessionHostAddress);
 		//OutputString = OutputString + "&session_host_address=" + ServerSessionHostAddress + "&session_id=" + ServerSessionID;
 	}
-	
+
 	ServerJsonObj->SetStringField("nonce", "nonceString");
 	ServerJsonObj->SetStringField("encryption", encryption);
 	ServerJsonObj->SetStringField("configuration", ConfigurationOutputString);

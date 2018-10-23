@@ -100,7 +100,7 @@ class PROMMO_API AMyPlayerController : public APlayerController
 		return FStringClassReference(ClassPtr).ToString();
 	}
 
-	// Array to keep track of how many pickup items are in the level 
+	// Array to keep track of how many pickup items are in the level
 	TArray<AMyBasePickup*> BasePickupsInLevel;
 
 
@@ -119,7 +119,7 @@ public:
 	// widget in the header and to prevent circular dependency.
 	// you dont need to do that if you include the Widget Class in the .h
 	// forward declaration is just putting "class" before the class name so the compiler know its a
-	// class but its not included in the header and don't freak out. Ex. “class UUserWidget”
+	// class but its not included in the header and don't freak out. Ex. ï¿½class UUserWidgetï¿½
 
 	// Reference UMG Asset in the Editor
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widgets")
@@ -131,7 +131,7 @@ public:
 	// Override BeginPlay()
 	virtual void BeginPlay() override;
 
-	
+
 	///////////////////////////////////////////////////////////
 
 
@@ -168,6 +168,16 @@ public:
 	UFUNCTION(Client, Reliable)
 		void ExecuteClientTravel(const FString& serverUrl);
 
+	// Portal Travel Approved Actor
+	// This is a little confusing, because the travel portals are spawned on the server, in gameInstance
+	// But each player needs a separate indicator for each server.
+	// So these travel approved actors are purely client side, unreplicated, and destroyed as soon as the
+	// player logs out or travels to another server.
+	// The authority is still the server, and the list of approved actors is in playerState and replicated.
+
+	// Client function which will spawn the local only travel approved actor.
+	UFUNCTION(Client, Reliable)
+		void ClientTravelApprovedSpawnActor(FTransform SpawnTransform);
 
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		int32 Experience; // total experience all time
@@ -179,8 +189,8 @@ public:
 	// Prevent the case of a user disconnecting before the data has been populated and leading to a data wipe.
 	bool PlayerDataLoaded;
 
-	// Shard Related 
-	
+	// Shard Related
+
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "UETOPIA")
 		bool bIsShardedServer;
 
@@ -513,15 +523,15 @@ public:
 	// Character list, create, delete, and select are performed on the client before connecting to the server
 	/////////////////////////////////////////
 
-	
+
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 	bool GetCharacterList();
 	void GetCharacterListComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 	bool CreateCharacter(FString title, FString description, FString characterType, FString characterState);
 	void CreateCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 	bool DeleteCharacter(FString characterKeyId);
 	void DeleteCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
@@ -530,7 +540,7 @@ public:
 	bool SelectCharacter(FString characterKeyId);
 	void SelectCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
-	
+
 	// DELEGATES
 
 	// This is the delegate to grab on to in the UI
@@ -592,7 +602,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
 		FOnInventoryChangedDelegate OnInventoryChanged;
 
-	
+
 
 	// Delegate which signals that a user has clicked the sell button in the inventory interface.  Vendors respond by populating the sell dialog
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
@@ -615,7 +625,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
 		FOnAbilitiesChangedDelegate OnAbilitiesChanged;
 
-	
+
 	// This is the delegate to grab on to in the UI
 	// When it fires, it signals that you should refresh the hotbar
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
@@ -733,7 +743,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, Replicated, Category = "UETOPIA")
 		int32 CurrencyAvailable;
 
-	// Vendors 
+	// Vendors
 	// We cache the currently in-use vendor's information locally on each client.  Requests for purchases or sales go through the server.
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		FString MyCurrentVendorTitle;
@@ -786,7 +796,7 @@ public:
 	// Characters
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		TArray<FMyCharacterRecord> MyCachedCharacters;
-	
+
 
 	ILoginFlowManager::FOnPopupDismissed OnPopupDismissedUEtopiaDelegate;
 

@@ -15,6 +15,7 @@
 #include "Runtime/ImageWrapper/Public/IImageWrapperModule.h"
 #include "DDSLoader.h"
 #include "DynamicTextureStaticMeshActor.h"
+#include "MyTravelApprovedActor.h"
 #include "MyPlayerState.h"
 
 
@@ -255,6 +256,16 @@ void AMyPlayerController::ExecuteClientTravel_Implementation(const FString& Serv
 
 	ClientTravel(ServerUrl, ETravelType::TRAVEL_Absolute);
 
+}
+
+void AMyPlayerController::ClientTravelApprovedSpawnActor_Implementation(FTransform SpawnTransform)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ClientTravelApprovedSpawnActor_Implementation - Client Side"));
+
+	UWorld* const World = GetWorld(); // get a reference to the world
+	if (World) {
+		AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
+	}
 }
 
 void AMyPlayerController::RequestBeginPlay_Implementation()
