@@ -40,8 +40,8 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "UETOPIA")
 	class UBoxComponent* Cube1;
 
-	UPROPERTY(Category = "Rama Save Component", EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	URamaSaveComponent* OurSaveComponent;
+	//UPROPERTY(Category = "Rama Save Component", EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	//URamaSaveComponent* OurSaveComponent;
 
 
 
