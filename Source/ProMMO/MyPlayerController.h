@@ -11,7 +11,7 @@
 #include "math.h"
 //#include "Online.h"
 #include "OnlineFriendsInterface.h"
-#include "OnlineTournamentsInterface.h"
+#include "OnlineTournamentInterface.h"
 #include "ILoginFlowManager.h"
 #include "MyBasePickup.h"
 #include "MyBaseVendor.h"

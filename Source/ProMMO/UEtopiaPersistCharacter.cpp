@@ -260,7 +260,7 @@ void AUEtopiaPersistCharacter::OnStartFire()
 
 bool AUEtopiaPersistCharacter::CanFire()
 {
-	AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->PlayerState);
+	AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->GetPlayerState());
 	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
 	if (playerC->InventorySlots.Num() > 0) {
 		return true;
@@ -529,7 +529,7 @@ void AUEtopiaPersistCharacter::ServerAttemptTravel_Implementation(bool checkOnly
 			if (World) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptTravel_Implementation] Requesting Transfer  "));
 				UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
-				gameInstance->TransferPlayer(ObjectInFocus->serverKeyId, PlayerState->PlayerId, checkOnly, false);
+				gameInstance->TransferPlayer(ObjectInFocus->serverKeyId, GetPlayerState()->PlayerId, checkOnly, false);
 
 			}
 		}
@@ -932,7 +932,7 @@ void AUEtopiaPersistCharacter::Die(AController* Killer, AActor* DamageCauser, co
 		if (gameInstance)
 		{
 			// report the kill
-			AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->PlayerState);
+			AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->GetPlayerState());
 			AMyPlayerState* KillerPlayerS = Cast<AMyPlayerState>(Killer->PlayerState);
 
 			gameInstance->RecordKill(KillerPlayerS->PlayerId, PlayerS->PlayerId);

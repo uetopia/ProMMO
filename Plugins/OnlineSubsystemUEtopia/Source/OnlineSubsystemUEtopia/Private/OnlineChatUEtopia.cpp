@@ -401,15 +401,15 @@ void FOnlineChatUEtopia::GetJoinedRooms(const FUniqueNetId& UserId, TArray<FChat
 
 TSharedPtr<FChatRoomInfo> FOnlineChatUEtopia::GetRoomInfo(const FUniqueNetId& UserId, const FChatRoomId& RoomId)
 {
-	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] FOnlineChatUEtopia::GetRoomInfo"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] FOnlineChatUEtopia::GetRoomInfo"));
 
 	for (int32 Index = 0; Index < JoinedChatRoomInf.Num(); Index++)
 	{
-		//UE_LOG(LogOnline, Log, TEXT("\t\t RoomId (%s)"), *RoomId);
+		UE_LOG(LogOnline, Log, TEXT("\t\t RoomId (%s)"), *RoomId);
 		//UE_LOG(LogOnline, Log, TEXT("\t\t JoinedChatRoomInf[Index]->GetRoomId() (%s)"), *JoinedChatRoomInf[Index]->GetRoomId());
 		if (JoinedChatRoomInf[Index]->GetRoomId() == RoomId)
 		{
-			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] FOnlineChatUEtopia::GetRoomInfo Found Room"));
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] FOnlineChatUEtopia::GetRoomInfo Found Room"));
 
 			//TSharedPtr<FChatRoomInfo> FoundChatRoom = Cast<FChatRoomInfo>(JoinedChatRoomInf[Index]);
 			return JoinedChatRoomInf[Index];

@@ -95,7 +95,7 @@ void AMyRewardItemActor::ServerAttemptClaimReward_Implementation(class AActor* O
 			FString description = "You collected a coin";
 			UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
 			// cast our playerstate
-			AMyPlayerState* playerS = Cast<AMyPlayerState>(MyPC->PlayerState);
+			AMyPlayerState* playerS = Cast<AMyPlayerState>(MyPC->GetPlayerState());
 			if (playerS) {
 				gameInstance->Reward(playerS->playerKeyId, itemname, description, gameInstance->getSpawnRewardValue());
 			}
