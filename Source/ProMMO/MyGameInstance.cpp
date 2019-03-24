@@ -5152,6 +5152,11 @@ void UMyGameInstance::HandleUserLoginChanged(int32 GameUserIndex, ELoginStatus::
 void UMyGameInstance::HandleUserLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::HandleUserLoginComplete"));
+	if (PIE_Bypass)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::HandleUserLoginComplete PIE_Bypass"));
+		return;
+	}
 	if (bWasSuccessful == false)
 	{
 		return;

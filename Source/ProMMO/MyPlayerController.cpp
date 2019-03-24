@@ -129,6 +129,13 @@ void AMyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (PIE_Bypass)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::BeginPlay PIE_Bypass"));
+
+		return;
+	}
+
 	// Only run this on client
 	if (!IsRunningDedicatedServer())
 	{
@@ -224,6 +231,14 @@ void AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Implementation(cons
 void AMyPlayerController::ClientGetCurrentAccessTokenFromOSS_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ClientGetCurrentAccessTokenFromOSS"));
+
+	if (PIE_Bypass)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ClientGetCurrentAccessTokenFromOSS PIE_Bypass"));
+		ServerSetCurrentAccessTokenFromOSS("FAKE_PIE_BYPASS_TOKEN");
+		return;
+	}
+
 	// Get the access token
 	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
 
@@ -1073,6 +1088,13 @@ void AMyPlayerController::OnLoginStatusChanged(int32 LocalUserNum, ELoginStatus:
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnLoginStatusChanged"));
 
+	if (PIE_Bypass)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnLoginStatusChanged PIE_Bypass"));
+		ServerSetCurrentAccessTokenFromOSS("FAKE_PIE_BYPASS_TOKEN");
+		return;
+	}
+
 	// Get the access token
 	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();
 
@@ -1089,6 +1111,13 @@ void AMyPlayerController::OnLoginStatusChanged(int32 LocalUserNum, ELoginStatus:
 void AMyPlayerController::HandleUserLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::HandleUserLoginComplete"));
+
+	if (PIE_Bypass)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::HandleUserLoginComplete PIE_Bypass"));
+		ServerSetCurrentAccessTokenFromOSS("FAKE_PIE_BYPASS_TOKEN");
+		return;
+	}
 
 	// Get the access token
 	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get();

@@ -103,6 +103,11 @@ class PROMMO_API AMyPlayerController : public APlayerController
 	// Array to keep track of how many pickup items are in the level
 	TArray<AMyBasePickup*> BasePickupsInLevel;
 
+	// Bypasses all online subsystem calls when true, and inserts fake data
+	// For normal operations, this should be false.
+	// There is also a variable in GameInstance
+	bool PIE_Bypass = true;
+
 
 public:
 

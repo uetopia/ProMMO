@@ -186,9 +186,13 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 {
 	GENERATED_UCLASS_BODY()
 
+	// Bypasses all online subsystem calls when true, and inserts fake data
+	// For normal operations, this should be false.
+	// There is also a variable in PlayerController
+	bool PIE_Bypass = true;
 
-		// Populated through config file
-		FString UEtopiaMode;
+	// Populated through config file
+	FString UEtopiaMode;
 	FString APIURL;
 	FString ServerAPIKey;  // Reusing these for matches as well, even though it's a match Key/Secret
 	FString ServerAPISecret;  // Reusing these for matches as well, even though it's a match Key/Secret
