@@ -120,6 +120,28 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 		FString savedInterface;
 
+	// Customized and validated character data
+	UPROPERTY(BlueprintReadOnly)
+		FString savedCharacter;
+
+	// Player selected character data - Needs to be validated before use.
+	// WARNING - this may contain invalid data.  CHECK IT FIRST!
+	UPROPERTY(BlueprintReadOnly)
+		FString savedCharacterCustom;
+
+	// Store character customizations so we have access to them across respawn
+	// Add any other character customizations here.
+	// Use ints whenever possible to store this data, to keep sizes down
+	UPROPERTY(BlueprintReadOnly)
+		bool CharacterSetup;
+	UPROPERTY(BlueprintReadOnly)
+		int32 CharacterClass;
+
+	// We need something to track when the player has successfully gone through the login and character selection process
+	// Because on respawn, we want to skip loading screens and go immediately back to the spawn room.
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		bool playerLoginFlowCompleted;
+
 	// Keep track of the abilities this player has available.
 	// We need to be able to give them to the character again on respawn
 	// This is confusing so I'm going to add another array to hopefully make it more clear

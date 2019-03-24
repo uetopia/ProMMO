@@ -529,7 +529,7 @@ public:
 	void GetCharacterListComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-	bool CreateCharacter(FString title, FString description, FString characterType, FString characterState);
+	bool CreateCharacter(FString title, FString description, FString characterType, FString characterState, FString characterClass);
 	void CreateCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
@@ -539,6 +539,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 	bool SelectCharacter(FString characterKeyId);
 	void SelectCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	// Save Character Customization is performed (if it has not been completed already) after login, after getGamePlayerComplete, after the user saves in the char customize UI 
+	// Usually this is a fallback in the case that the player submitted character create (and CharacterCustom) is invalid.
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		void SaveCharacterCustomization(FString characterClass);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+		void SaveCharacterCustomizationServer(int32 characterClass);
 
 
 	// DELEGATES

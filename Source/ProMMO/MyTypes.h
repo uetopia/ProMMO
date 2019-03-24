@@ -19,6 +19,14 @@ enum class EMyActorFilterMatchType : uint8
 	MustFail,
 };
 
+UENUM(BlueprintType)		//"BlueprintType" is essential to include
+enum class EConnectUIState : uint8
+{
+	Play 	UMETA(DisplayName = "Play"),
+	Loading 	UMETA(DisplayName = "Loading"),
+	CharacterCustomize	UMETA(DisplayName = "CharacterCustomize")
+};
+
 USTRUCT(BlueprintType)
 struct FMyActorFilter
 {

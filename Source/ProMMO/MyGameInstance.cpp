@@ -1320,6 +1320,8 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						JsonParsed->TryGetStringField("equipment", playerS->savedEquipment);
 						JsonParsed->TryGetStringField("abilities", playerS->savedAbilities);
 						JsonParsed->TryGetStringField("interface", playerS->savedInterface);
+						JsonParsed->TryGetStringField("character", playerS->savedCharacter);
+						JsonParsed->TryGetStringField("characterCustom", playerS->savedCharacterCustom);
 						JsonParsed->TryGetStringField("userTitle", titleTemp);
 						JsonParsed->TryGetNumberField("level", playerS->Level);
 						JsonParsed->TryGetNumberField("experience", playerC->Experience);
@@ -1341,6 +1343,131 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 						activePlayer->experience = playerC->Experience;
 						activePlayer->score = scoreTemp;
 
+						// DO Character FIRST.  Equipment and inventory will be modifying these values so they need to be set asap.
+						// Character Customization
+						bool CharacterParseSuccess = false;
+						FString CharacterJsonRaw = playerS->savedCharacter;
+						TSharedPtr<FJsonObject> CharacterJsonParsed;
+						TSharedRef<TJsonReader<TCHAR>> CharacterJsonReader = TJsonReaderFactory<TCHAR>::Create(CharacterJsonRaw);
+						//const JsonValPtrArray *CharacterJson;
+						bool CharacterSetup = false;
+
+						if (FJsonSerializer::Deserialize(CharacterJsonReader, CharacterJsonParsed))
+						{
+							UE_LOG(LogTemp, Log, TEXT("CharacterJsonParsed"));
+							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
+
+							//
+							CharacterParseSuccess = CharacterJsonParsed->TryGetBoolField("Setup", CharacterSetup);
+						}
+
+						if (CharacterParseSuccess)
+						{
+							UE_LOG(LogTemp, Log, TEXT("CharacterParseSuccess"));
+
+							// check if character customization is complete.
+							// then change client UI state
+
+							if (CharacterSetup)
+							{
+								int32 CharacterClass = 0;
+
+								CharacterJsonParsed->TryGetNumberField("characterClass", CharacterClass);
+
+								playerS->CharacterClass = CharacterClass;
+								playerS->CharacterSetup = true;
+
+								// Signal the UI to change to PLAY State
+								playerChar->ClientChangeUIState(EConnectUIState::Play);
+
+								// Also set the playerLoginFlowCompleted so we don't get loading screen on respawn
+								playerS->playerLoginFlowCompleted = true;
+								
+							}
+							else
+							{
+								UE_LOG(LogTemp, Log, TEXT("CharacterParsed, but was not set up."));
+								playerChar->ClientChangeUIState(EConnectUIState::CharacterCustomize);
+							}
+						}
+						else
+						{
+							UE_LOG(LogTemp, Log, TEXT("CharacterParse FAIL"));
+
+							// On first connection after creating a new character, a player will not have anything inside the character field.
+							// We want to check to see if there is anything in the characterCustom field here.
+							// If there is, we want to validate it.  Users can easily forge these requests, so it is important to check it first.
+							
+							// VALIDATE THE DATA BEFORE USING IT.
+
+							bool CharacterCustomParseSuccess = false;
+							FString CharacterCustomJsonRaw = playerS->savedCharacterCustom;
+							TSharedPtr<FJsonObject> CharacterCustomJsonParsed;
+							TSharedRef<TJsonReader<TCHAR>> CharacterCustomJsonReader = TJsonReaderFactory<TCHAR>::Create(CharacterCustomJsonRaw);
+
+							bool CharacterCustomSetup = false;
+
+							if (FJsonSerializer::Deserialize(CharacterCustomJsonReader, CharacterCustomJsonParsed))
+							{
+								UE_LOG(LogTemp, Log, TEXT("CharacterCustomJsonParsed"));
+
+								CharacterCustomParseSuccess = CharacterCustomJsonParsed->TryGetBoolField("Setup", CharacterCustomSetup);
+							}
+
+							if (CharacterCustomParseSuccess)
+							{
+								UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess"));
+
+								// check if character custom data is valid.
+								// If so, save it to the player state so it can be saved in character
+								// then change client UI state
+
+								// Do validations for all of your data here.
+								FString incomingClass = "";
+
+								CharacterCustomJsonParsed->TryGetStringField("Class", incomingClass);
+
+								if (incomingClass == "Tester" || incomingClass == "Developer")
+								{
+									UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess - Data is valid."));
+
+									// convert the strings to int32
+									if (incomingClass == "Developer")
+									{
+										playerS->CharacterClass = 0;
+									}
+									else
+									{
+										playerS->CharacterClass = 1;
+									}
+
+									playerS->CharacterSetup = true;
+
+									// Signal the UI to change to PLAY State
+									playerChar->ClientChangeUIState(EConnectUIState::Play);
+
+									// Also set the playerLoginFlowCompleted so we don't get loading screen on respawn
+									playerS->playerLoginFlowCompleted = true;
+
+								}
+								else
+								{
+									UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess - Data is NOT valid."));
+									playerChar->ClientChangeUIState(EConnectUIState::CharacterCustomize);
+								}
+							}
+
+							else
+							{
+								// Character Custom field did not parse.
+								// send the player UI to the character screen
+								UE_LOG(LogTemp, Log, TEXT("CharacterCustomParse FAIL"));
+
+								playerChar->ClientChangeUIState(EConnectUIState::CharacterCustomize);
+							}
+
+							
+						}
 
 
 						////////////////////////////////////////////////////////////////////
@@ -1988,6 +2115,7 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 	FString InventoryOutputString;
 	FString AbilitiesOutputString;
 	FString InterfaceOutputString;
+	FString CharacterOutputString;
 
 	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 	{
@@ -2104,9 +2232,14 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 				FJsonSerializer::Serialize(InventoryJsonObject.ToSharedRef(), Writer);
 				//UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] InventoryOutputString: %s"), *InventoryOutputString);
 
-				// Clear out our player state inventory data here.  This is the last time we need it.
-				//playerS->InventoryCubes = 0;
-				//playerS->Currency = 0;
+				// Convert Character Customization data into json friendly 
+				// At this stage our character class data has been validated by the server and is safe to store on the backend.
+				TSharedPtr<FJsonObject> CharacterJsonObject = MakeShareable(new FJsonObject);
+				CharacterJsonObject->SetBoolField("Setup", playerS->CharacterSetup);
+				CharacterJsonObject->SetNumberField("characterClass", playerS->CharacterClass);
+
+				TSharedRef< TJsonWriter<> > CharactertWriter = TJsonWriterFactory<>::Create(&CharacterOutputString);
+				FJsonSerializer::Serialize(CharacterJsonObject.ToSharedRef(), CharactertWriter);
 
 				// Clear out active player struct too
 				//FMyActivePlayer* activePlayer = getPlayerByPlayerKey(playerKeyId);
@@ -2125,6 +2258,7 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 				PlayerJsonObj->SetStringField("equipment", "hardcoded test");
 				PlayerJsonObj->SetStringField("abilities", AbilitiesOutputString);
 				PlayerJsonObj->SetStringField("interface", InterfaceOutputString);
+				PlayerJsonObj->SetStringField("character", CharacterOutputString);
 				PlayerJsonObj->SetNumberField("rank", activePlayer->rank);
 				PlayerJsonObj->SetNumberField("score", activePlayer->score);
 				PlayerJsonObj->SetNumberField("level", 1);  // TODO set this up in the struct

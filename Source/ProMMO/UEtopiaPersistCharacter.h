@@ -226,4 +226,12 @@ public:
 
 	class AMyServerPortalActor* GetPortalFocus();
 	class AMyBaseVendor* GetVendorFocus();
+
+	// THis function is used to tell the client to load a particular UI state
+	UFUNCTION(Client, Reliable)
+		void ClientChangeUIState(EConnectUIState NewState);
+	// It calls the BP Native event, on the client, which is tied in to the UI via blueprints.
+	UFUNCTION(BlueprintNativeEvent)
+		void OnUIStateChange(EConnectUIState UIState);
+
 };

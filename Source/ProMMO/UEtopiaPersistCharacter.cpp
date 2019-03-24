@@ -1013,3 +1013,16 @@ void AUEtopiaPersistCharacter::PlayDying_Implementation()
 		*/
 	}
 }
+
+void AUEtopiaPersistCharacter::ClientChangeUIState_Implementation(EConnectUIState NewState)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] ClientChangeUIState_Implementation"));
+	//OnUIStateChange.Broadcast(NewState);
+	OnUIStateChange(NewState);
+	return;
+}
+
+void AUEtopiaPersistCharacter::OnUIStateChange_Implementation(EConnectUIState UIState)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AUEtopiaPersistCharacter::OnUIStateChange_Implementation"));
+}

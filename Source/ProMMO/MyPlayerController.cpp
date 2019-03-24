@@ -169,11 +169,14 @@ void AMyPlayerController::BeginPlay()
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
 
 			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
+			AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
 
 			// Attempting to set this up to not crash in PIE, and also still work in standalone
 				if (GetWorld()->WorldType == EWorldType::PIE)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Detected PIE - Skipping friends and recent player loading"));
+
+					playerChar->ClientChangeUIState(EConnectUIState::Play);
 				}
 				else
 				{
@@ -2538,7 +2541,7 @@ void AMyPlayerController::GetCharacterListComplete(FHttpRequestPtr HttpRequest, 
 	}
 }
 
-bool AMyPlayerController::CreateCharacter(FString title, FString description, FString characterType, FString characterState)
+bool AMyPlayerController::CreateCharacter(FString title, FString description, FString characterType, FString characterState, FString characterClass)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] CreateCharacter"));
 
@@ -2552,6 +2555,21 @@ bool AMyPlayerController::CreateCharacter(FString title, FString description, FS
 	PlayerJsonObj->SetStringField("description", description);
 	PlayerJsonObj->SetStringField("characterType", characterType);
 	PlayerJsonObj->SetStringField("characterState", characterState);
+
+	// Combine all of your custom character information, and serialize to JSON for storage in characterCustom.
+	// At this stage, it has been submitted by the player, and might contain invalid data - if the player were to forge this request
+	// The data will be verified later by the server.  
+
+	// Convert Character Customization data into json friendly 
+	TSharedPtr<FJsonObject> CharacterCustomJsonObject = MakeShareable(new FJsonObject);
+	CharacterCustomJsonObject->SetBoolField("Setup", true);
+	CharacterCustomJsonObject->SetStringField("Class", characterClass);
+	FString CharacterCustomOutputString;
+
+	TSharedRef< TJsonWriter<> > CharacterCustomWriter = TJsonWriterFactory<>::Create(&CharacterCustomOutputString);
+	FJsonSerializer::Serialize(CharacterCustomJsonObject.ToSharedRef(), CharacterCustomWriter);
+
+	PlayerJsonObj->SetStringField("characterCustom", CharacterCustomOutputString);
 
 	FString JsonOutputString;
 	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -2665,6 +2683,52 @@ void AMyPlayerController::SelectCharacterComplete(FHttpRequestPtr HttpRequest, F
 			// WE don't need to do anything in here...  Maybe trigger a delegate to start a refresh?
 		}
 	}
+}
+
+
+void AMyPlayerController::SaveCharacterCustomization(FString characterClass)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SaveCharacterCustomization"));
+
+	int32 ClassIndex;
+
+	// convert the strings to int32
+	if (characterClass == "Developer")
+	{
+		ClassIndex = 0;
+	}
+	else
+	{
+		ClassIndex = 1;
+	}
+
+
+	// Run RPC on server
+	SaveCharacterCustomizationServer(ClassIndex);
+}
+
+bool AMyPlayerController::SaveCharacterCustomizationServer_Validate(int32 characterClass)
+{
+	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
+	return true;
+}
+
+void AMyPlayerController::SaveCharacterCustomizationServer_Implementation(int32 characterClass)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SaveCharacterCustomization -running on server"));
+
+	// Set vars in playerState
+	AMyPlayerState* playerS = Cast<AMyPlayerState>(this->PlayerState);
+	AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+
+	// If you are doing anything complicated, maybe put all of these character custom fields in a struct for easier passing?
+	// because we're going to want a repnotify for it in the character.
+	playerS->CharacterSetup = true;
+	playerS->CharacterClass = characterClass;
+
+	// Tell this client to change UI state to playing
+	playerChar->ClientChangeUIState(EConnectUIState::Play);
+
 }
 
 
