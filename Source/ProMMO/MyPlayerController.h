@@ -106,7 +106,7 @@ class PROMMO_API AMyPlayerController : public APlayerController
 	// Bypasses all online subsystem calls when true, and inserts fake data
 	// For normal operations, this should be false.
 	// There is also a variable in GameInstance
-	bool PIE_Bypass = true;
+	bool PIE_Bypass = false;
 
 
 public:
@@ -545,7 +545,7 @@ public:
 	bool SelectCharacter(FString characterKeyId);
 	void SelectCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
-	// Save Character Customization is performed (if it has not been completed already) after login, after getGamePlayerComplete, after the user saves in the char customize UI 
+	// Save Character Customization is performed (if it has not been completed already) after login, after getGamePlayerComplete, after the user saves in the char customize UI
 	// Usually this is a fallback in the case that the player submitted character create (and CharacterCustom) is invalid.
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void SaveCharacterCustomization(FString characterClass);

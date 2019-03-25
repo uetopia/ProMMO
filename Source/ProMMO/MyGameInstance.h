@@ -189,7 +189,7 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	// Bypasses all online subsystem calls when true, and inserts fake data
 	// For normal operations, this should be false.
 	// There is also a variable in PlayerController
-	bool PIE_Bypass = true;
+	bool PIE_Bypass = false;
 
 	// Populated through config file
 	FString UEtopiaMode;
@@ -204,24 +204,24 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	FString ServerTitle;
 	FDateTime ServerStartDateTime;
 	FDateTime ServerLastRunningDateTime;
-	
+
 
 	// Populated through the get match info API call
 	int32 admissionFee;
 	FString MatchTitle;
-	
+
 
 	// Populated through the online subsystem
 	FString ServerSessionHostAddress;
 	FString ServerSessionID;
 
-	
+
 
 	// Use this for Dedicated Server.
 	FMyActivePlayers PlayerRecord;
 	FMyServerLinks ServerLinks;
 
-	// Keep track of which map is loaded 
+	// Keep track of which map is loaded
 	FString CurrentLevelEngineString;
 
 	// Use this for matchmaker/competitive
@@ -332,7 +332,7 @@ public:
 
 	void AttemptSpawnReward();
 
-	
+
 
 	UPROPERTY(BlueprintReadOnly)
 		TArray<FMySessionSearchResult> MySessionSearchResults;
@@ -566,10 +566,10 @@ private:
 	// We need to be aware of the HasBegunPlay function coming from gameState
 	// Certain things will fail (like spawning actors), if the loadLevel has not completed.
 
-	
+
 	void SpawnServerPortals();
 	TArray<AMyServerPortalActor*> ServerPortalActorReference;
-	
+
 
 
 	/** Whether the match is online or not */
@@ -609,7 +609,7 @@ protected:
 	// WE probably don't need two of these, but they operate on different structs, so I'm leaving them for now.
 	void CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser); // for competitive/matchmaker
 	void CalculateNewRankContinuous(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser); // for continuous
-	
+
 
 
 };
