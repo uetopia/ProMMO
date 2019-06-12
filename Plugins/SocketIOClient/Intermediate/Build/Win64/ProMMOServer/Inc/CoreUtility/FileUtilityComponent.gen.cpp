@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -48,7 +48,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 #endif
 		static const UE4CodeGen_Private::FFunctionParams FuncParams;
 	};
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::NewProp_ReturnValue = { UE4CodeGen_Private::EPropertyClass::Str, "ReturnValue", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000580, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventProjectContentsDirectory_Parms, ReturnValue), METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::NewProp_ReturnValue = { "ReturnValue", nullptr, (EPropertyFlags)0x0010000000000580, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventProjectContentsDirectory_Parms, ReturnValue), METADATA_PARAMS(nullptr, 0) };
 	const UE4CodeGen_Private::FPropertyParamsBase* const Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::PropPointers[] = {
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::NewProp_ReturnValue,
 	};
@@ -59,7 +59,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		{ "ToolTip", "Get the current project contents directory path" },
 	};
 #endif
-	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, "ProjectContentsDirectory", RF_Public|RF_Transient|RF_MarkAsNative, nullptr, (EFunctionFlags)0x14020401, sizeof(FileUtilityComponent_eventProjectContentsDirectory_Parms), Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::PropPointers), 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::Function_MetaDataParams)) };
+	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, nullptr, "ProjectContentsDirectory", sizeof(FileUtilityComponent_eventProjectContentsDirectory_Parms), Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::PropPointers), RF_Public|RF_Transient|RF_MarkAsNative, (EFunctionFlags)0x14020401, 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory_Statics::Function_MetaDataParams)) };
 	UFunction* Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory()
 	{
 		static UFunction* ReturnFunction = nullptr;
@@ -82,7 +82,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 #endif
 		static const UE4CodeGen_Private::FFunctionParams FuncParams;
 	};
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::NewProp_ReturnValue = { UE4CodeGen_Private::EPropertyClass::Str, "ReturnValue", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000580, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventProjectDirectory_Parms, ReturnValue), METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::NewProp_ReturnValue = { "ReturnValue", nullptr, (EPropertyFlags)0x0010000000000580, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventProjectDirectory_Parms, ReturnValue), METADATA_PARAMS(nullptr, 0) };
 	const UE4CodeGen_Private::FPropertyParamsBase* const Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::PropPointers[] = {
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::NewProp_ReturnValue,
 	};
@@ -93,7 +93,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		{ "ToolTip", "Get the current project directory path" },
 	};
 #endif
-	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, "ProjectDirectory", RF_Public|RF_Transient|RF_MarkAsNative, nullptr, (EFunctionFlags)0x14020401, sizeof(FileUtilityComponent_eventProjectDirectory_Parms), Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::PropPointers), 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::Function_MetaDataParams)) };
+	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, nullptr, "ProjectDirectory", sizeof(FileUtilityComponent_eventProjectDirectory_Parms), Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::PropPointers), RF_Public|RF_Transient|RF_MarkAsNative, (EFunctionFlags)0x14020401, 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory_Statics::Function_MetaDataParams)) };
 	UFunction* Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory()
 	{
 		static UFunction* ReturnFunction = nullptr;
@@ -116,7 +116,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 #endif
 		static const UE4CodeGen_Private::FFunctionParams FuncParams;
 	};
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::NewProp_ReturnValue = { UE4CodeGen_Private::EPropertyClass::Str, "ReturnValue", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000580, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventProjectSavedDirectory_Parms, ReturnValue), METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::NewProp_ReturnValue = { "ReturnValue", nullptr, (EPropertyFlags)0x0010000000000580, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventProjectSavedDirectory_Parms, ReturnValue), METADATA_PARAMS(nullptr, 0) };
 	const UE4CodeGen_Private::FPropertyParamsBase* const Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::PropPointers[] = {
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::NewProp_ReturnValue,
 	};
@@ -127,7 +127,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		{ "ToolTip", "Get the current project saved directory path" },
 	};
 #endif
-	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, "ProjectSavedDirectory", RF_Public|RF_Transient|RF_MarkAsNative, nullptr, (EFunctionFlags)0x14020401, sizeof(FileUtilityComponent_eventProjectSavedDirectory_Parms), Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::PropPointers), 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::Function_MetaDataParams)) };
+	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, nullptr, "ProjectSavedDirectory", sizeof(FileUtilityComponent_eventProjectSavedDirectory_Parms), Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::PropPointers), RF_Public|RF_Transient|RF_MarkAsNative, (EFunctionFlags)0x14020401, 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory_Statics::Function_MetaDataParams)) };
 	UFunction* Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory()
 	{
 		static UFunction* ReturnFunction = nullptr;
@@ -168,21 +168,21 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 	{
 		((FileUtilityComponent_eventReadBytesFromFile_Parms*)Obj)->ReturnValue = 1;
 	}
-	const UE4CodeGen_Private::FBoolPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_ReturnValue = { UE4CodeGen_Private::EPropertyClass::Bool, "ReturnValue", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000580, 1, nullptr, sizeof(bool), UE4CodeGen_Private::ENativeBool::Native, sizeof(FileUtilityComponent_eventReadBytesFromFile_Parms), &Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_ReturnValue_SetBit, METADATA_PARAMS(nullptr, 0) };
-	const UE4CodeGen_Private::FArrayPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_OutBytes = { UE4CodeGen_Private::EPropertyClass::Array, "OutBytes", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000180, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventReadBytesFromFile_Parms, OutBytes), METADATA_PARAMS(nullptr, 0) };
-	const UE4CodeGen_Private::FBytePropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_OutBytes_Inner = { UE4CodeGen_Private::EPropertyClass::Byte, "OutBytes", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0000000000000000, 1, nullptr, 0, nullptr, METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FBoolPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_ReturnValue = { "ReturnValue", nullptr, (EPropertyFlags)0x0010000000000580, UE4CodeGen_Private::EPropertyGenFlags::Bool | UE4CodeGen_Private::EPropertyGenFlags::NativeBool, RF_Public|RF_Transient|RF_MarkAsNative, 1, sizeof(bool), sizeof(FileUtilityComponent_eventReadBytesFromFile_Parms), &Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_ReturnValue_SetBit, METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FArrayPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_OutBytes = { "OutBytes", nullptr, (EPropertyFlags)0x0010000000000180, UE4CodeGen_Private::EPropertyGenFlags::Array, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventReadBytesFromFile_Parms, OutBytes), METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FBytePropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_OutBytes_Inner = { "OutBytes", nullptr, (EPropertyFlags)0x0000000000000000, UE4CodeGen_Private::EPropertyGenFlags::Byte, RF_Public|RF_Transient|RF_MarkAsNative, 1, 0, nullptr, METADATA_PARAMS(nullptr, 0) };
 #if WITH_METADATA
 	const UE4CodeGen_Private::FMetaDataPairParam Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName_MetaData[] = {
 		{ "NativeConst", "" },
 	};
 #endif
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName = { UE4CodeGen_Private::EPropertyClass::Str, "FileName", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000080, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventReadBytesFromFile_Parms, FileName), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName_MetaData)) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName = { "FileName", nullptr, (EPropertyFlags)0x0010000000000080, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventReadBytesFromFile_Parms, FileName), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_FileName_MetaData)) };
 #if WITH_METADATA
 	const UE4CodeGen_Private::FMetaDataPairParam Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory_MetaData[] = {
 		{ "NativeConst", "" },
 	};
 #endif
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory = { UE4CodeGen_Private::EPropertyClass::Str, "Directory", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000080, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventReadBytesFromFile_Parms, Directory), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory_MetaData)) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory = { "Directory", nullptr, (EPropertyFlags)0x0010000000000080, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventReadBytesFromFile_Parms, Directory), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_Directory_MetaData)) };
 	const UE4CodeGen_Private::FPropertyParamsBase* const Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::PropPointers[] = {
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_ReturnValue,
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::NewProp_OutBytes,
@@ -197,7 +197,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		{ "ToolTip", "Read array of bytes from file at specified directory" },
 	};
 #endif
-	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, "ReadBytesFromFile", RF_Public|RF_Transient|RF_MarkAsNative, nullptr, (EFunctionFlags)0x04420401, sizeof(FileUtilityComponent_eventReadBytesFromFile_Parms), Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::PropPointers), 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::Function_MetaDataParams)) };
+	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, nullptr, "ReadBytesFromFile", sizeof(FileUtilityComponent_eventReadBytesFromFile_Parms), Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::PropPointers), RF_Public|RF_Transient|RF_MarkAsNative, (EFunctionFlags)0x04420401, 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile_Statics::Function_MetaDataParams)) };
 	UFunction* Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile()
 	{
 		static UFunction* ReturnFunction = nullptr;
@@ -241,26 +241,26 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 	{
 		((FileUtilityComponent_eventSaveBytesToFile_Parms*)Obj)->ReturnValue = 1;
 	}
-	const UE4CodeGen_Private::FBoolPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_ReturnValue = { UE4CodeGen_Private::EPropertyClass::Bool, "ReturnValue", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000580, 1, nullptr, sizeof(bool), UE4CodeGen_Private::ENativeBool::Native, sizeof(FileUtilityComponent_eventSaveBytesToFile_Parms), &Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_ReturnValue_SetBit, METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FBoolPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_ReturnValue = { "ReturnValue", nullptr, (EPropertyFlags)0x0010000000000580, UE4CodeGen_Private::EPropertyGenFlags::Bool | UE4CodeGen_Private::EPropertyGenFlags::NativeBool, RF_Public|RF_Transient|RF_MarkAsNative, 1, sizeof(bool), sizeof(FileUtilityComponent_eventSaveBytesToFile_Parms), &Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_ReturnValue_SetBit, METADATA_PARAMS(nullptr, 0) };
 #if WITH_METADATA
 	const UE4CodeGen_Private::FMetaDataPairParam Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName_MetaData[] = {
 		{ "NativeConst", "" },
 	};
 #endif
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName = { UE4CodeGen_Private::EPropertyClass::Str, "FileName", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000080, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventSaveBytesToFile_Parms, FileName), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName_MetaData)) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName = { "FileName", nullptr, (EPropertyFlags)0x0010000000000080, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventSaveBytesToFile_Parms, FileName), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName_MetaData)) };
 #if WITH_METADATA
 	const UE4CodeGen_Private::FMetaDataPairParam Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory_MetaData[] = {
 		{ "NativeConst", "" },
 	};
 #endif
-	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory = { UE4CodeGen_Private::EPropertyClass::Str, "Directory", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000000000080, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventSaveBytesToFile_Parms, Directory), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory_MetaData)) };
+	const UE4CodeGen_Private::FStrPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory = { "Directory", nullptr, (EPropertyFlags)0x0010000000000080, UE4CodeGen_Private::EPropertyGenFlags::Str, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventSaveBytesToFile_Parms, Directory), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Directory_MetaData)) };
 #if WITH_METADATA
 	const UE4CodeGen_Private::FMetaDataPairParam Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_MetaData[] = {
 		{ "NativeConst", "" },
 	};
 #endif
-	const UE4CodeGen_Private::FArrayPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes = { UE4CodeGen_Private::EPropertyClass::Array, "Bytes", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0010000008000182, 1, nullptr, STRUCT_OFFSET(FileUtilityComponent_eventSaveBytesToFile_Parms, Bytes), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_MetaData)) };
-	const UE4CodeGen_Private::FBytePropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_Inner = { UE4CodeGen_Private::EPropertyClass::Byte, "Bytes", RF_Public|RF_Transient|RF_MarkAsNative, (EPropertyFlags)0x0000000000000000, 1, nullptr, 0, nullptr, METADATA_PARAMS(nullptr, 0) };
+	const UE4CodeGen_Private::FArrayPropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes = { "Bytes", nullptr, (EPropertyFlags)0x0010000008000182, UE4CodeGen_Private::EPropertyGenFlags::Array, RF_Public|RF_Transient|RF_MarkAsNative, 1, STRUCT_OFFSET(FileUtilityComponent_eventSaveBytesToFile_Parms, Bytes), METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_MetaData, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_MetaData)) };
+	const UE4CodeGen_Private::FBytePropertyParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_Bytes_Inner = { "Bytes", nullptr, (EPropertyFlags)0x0000000000000000, UE4CodeGen_Private::EPropertyGenFlags::Byte, RF_Public|RF_Transient|RF_MarkAsNative, 1, 0, nullptr, METADATA_PARAMS(nullptr, 0) };
 	const UE4CodeGen_Private::FPropertyParamsBase* const Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::PropPointers[] = {
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_ReturnValue,
 		(const UE4CodeGen_Private::FPropertyParamsBase*)&Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::NewProp_FileName,
@@ -275,7 +275,7 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		{ "ToolTip", "Save array of bytes to file at specified directory" },
 	};
 #endif
-	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, "SaveBytesToFile", RF_Public|RF_Transient|RF_MarkAsNative, nullptr, (EFunctionFlags)0x04420401, sizeof(FileUtilityComponent_eventSaveBytesToFile_Parms), Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::PropPointers), 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::Function_MetaDataParams)) };
+	const UE4CodeGen_Private::FFunctionParams Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::FuncParams = { (UObject*(*)())Z_Construct_UClass_UFileUtilityComponent, nullptr, "SaveBytesToFile", sizeof(FileUtilityComponent_eventSaveBytesToFile_Parms), Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::PropPointers, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::PropPointers), RF_Public|RF_Transient|RF_MarkAsNative, (EFunctionFlags)0x04420401, 0, 0, METADATA_PARAMS(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::Function_MetaDataParams, ARRAY_COUNT(Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile_Statics::Function_MetaDataParams)) };
 	UFunction* Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile()
 	{
 		static UFunction* ReturnFunction = nullptr;
@@ -304,11 +304,11 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		(UObject* (*)())Z_Construct_UPackage__Script_CoreUtility,
 	};
 	const FClassFunctionLinkInfo Z_Construct_UClass_UFileUtilityComponent_Statics::FuncInfo[] = {
-		{ &Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory, "ProjectContentsDirectory" }, // 1973118084
-		{ &Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory, "ProjectDirectory" }, // 3635349100
-		{ &Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory, "ProjectSavedDirectory" }, // 453410006
-		{ &Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile, "ReadBytesFromFile" }, // 1918768850
-		{ &Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile, "SaveBytesToFile" }, // 3705266210
+		{ &Z_Construct_UFunction_UFileUtilityComponent_ProjectContentsDirectory, "ProjectContentsDirectory" }, // 3161017070
+		{ &Z_Construct_UFunction_UFileUtilityComponent_ProjectDirectory, "ProjectDirectory" }, // 412593675
+		{ &Z_Construct_UFunction_UFileUtilityComponent_ProjectSavedDirectory, "ProjectSavedDirectory" }, // 1663658188
+		{ &Z_Construct_UFunction_UFileUtilityComponent_ReadBytesFromFile, "ReadBytesFromFile" }, // 3052797175
+		{ &Z_Construct_UFunction_UFileUtilityComponent_SaveBytesToFile, "SaveBytesToFile" }, // 1310397160
 	};
 #if WITH_METADATA
 	const UE4CodeGen_Private::FMetaDataPairParam Z_Construct_UClass_UFileUtilityComponent_Statics::Class_MetaDataParams[] = {
@@ -323,13 +323,17 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 	};
 	const UE4CodeGen_Private::FClassParams Z_Construct_UClass_UFileUtilityComponent_Statics::ClassParams = {
 		&UFileUtilityComponent::StaticClass,
-		DependentSingletons, ARRAY_COUNT(DependentSingletons),
-		0x00B000A4u,
-		FuncInfo, ARRAY_COUNT(FuncInfo),
-		nullptr, 0,
 		"Engine",
 		&StaticCppClassTypeInfo,
-		nullptr, 0,
+		DependentSingletons,
+		FuncInfo,
+		nullptr,
+		nullptr,
+		ARRAY_COUNT(DependentSingletons),
+		ARRAY_COUNT(FuncInfo),
+		0,
+		0,
+		0x00B000A4u,
 		METADATA_PARAMS(Z_Construct_UClass_UFileUtilityComponent_Statics::Class_MetaDataParams, ARRAY_COUNT(Z_Construct_UClass_UFileUtilityComponent_Statics::Class_MetaDataParams))
 	};
 	UClass* Z_Construct_UClass_UFileUtilityComponent()
@@ -341,7 +345,11 @@ void EmptyLinkFunctionForGeneratedCodeFileUtilityComponent() {}
 		}
 		return OuterClass;
 	}
-	IMPLEMENT_CLASS(UFileUtilityComponent, 876948176);
+	IMPLEMENT_CLASS(UFileUtilityComponent, 886538857);
+	template<> COREUTILITY_API UClass* StaticClass<UFileUtilityComponent>()
+	{
+		return UFileUtilityComponent::StaticClass();
+	}
 	static FCompiledInDefer Z_CompiledInDefer_UClass_UFileUtilityComponent(Z_Construct_UClass_UFileUtilityComponent, &UFileUtilityComponent::StaticClass, TEXT("/Script/CoreUtility"), TEXT("UFileUtilityComponent"), false, nullptr, nullptr, nullptr);
 	DEFINE_VTABLE_PTR_HELPER_CTOR(UFileUtilityComponent);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

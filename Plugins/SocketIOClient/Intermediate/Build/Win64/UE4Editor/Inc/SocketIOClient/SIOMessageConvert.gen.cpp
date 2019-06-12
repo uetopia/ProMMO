@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -49,13 +49,17 @@ void EmptyLinkFunctionForGeneratedCodeSIOMessageConvert() {}
 	};
 	const UE4CodeGen_Private::FClassParams Z_Construct_UClass_USIOMessageConvert_Statics::ClassParams = {
 		&USIOMessageConvert::StaticClass,
-		DependentSingletons, ARRAY_COUNT(DependentSingletons),
-		0x001000A0u,
-		nullptr, 0,
-		nullptr, 0,
 		nullptr,
 		&StaticCppClassTypeInfo,
-		nullptr, 0,
+		DependentSingletons,
+		nullptr,
+		nullptr,
+		nullptr,
+		ARRAY_COUNT(DependentSingletons),
+		0,
+		0,
+		0,
+		0x001000A0u,
 		METADATA_PARAMS(Z_Construct_UClass_USIOMessageConvert_Statics::Class_MetaDataParams, ARRAY_COUNT(Z_Construct_UClass_USIOMessageConvert_Statics::Class_MetaDataParams))
 	};
 	UClass* Z_Construct_UClass_USIOMessageConvert()
@@ -67,7 +71,11 @@ void EmptyLinkFunctionForGeneratedCodeSIOMessageConvert() {}
 		}
 		return OuterClass;
 	}
-	IMPLEMENT_CLASS(USIOMessageConvert, 2237202520);
+	IMPLEMENT_CLASS(USIOMessageConvert, 17331576);
+	template<> SOCKETIOCLIENT_API UClass* StaticClass<USIOMessageConvert>()
+	{
+		return USIOMessageConvert::StaticClass();
+	}
 	static FCompiledInDefer Z_CompiledInDefer_UClass_USIOMessageConvert(Z_Construct_UClass_USIOMessageConvert, &USIOMessageConvert::StaticClass, TEXT("/Script/SocketIOClient"), TEXT("USIOMessageConvert"), false, nullptr, nullptr, nullptr);
 	DEFINE_VTABLE_PTR_HELPER_CTOR(USIOMessageConvert);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

@@ -6,7 +6,7 @@ Socket.io client plugin for UE4.
 
 [Socket.io](http://socket.io/) is a performant real-time bi-directional communication library. There are two parts, the server written in node.js and the client typically javascript for the web. There are alternative client implementations and this repo uses the [C++11 client library](https://github.com/socketio/socket.io-client-cpp) ported to UE4.
 
-Based on [Socket.io prebuild libraries for VS2015](https://github.com/getnamo/socketio-client-prebuild) and SIOJson forked from ufna's [VaRest](https://github.com/ufna/VaRest)
+Socket.IO Lib uses _asio_, _rapidjson_, and _websocketpp_. SIOJson is originally forked from ufna's [VaRest](https://github.com/ufna/VaRest)
 
 [Unreal Forum Thread](https://forums.unrealengine.com/showthread.php?110680-Plugin-Socket-io-Client)
 
@@ -17,9 +17,7 @@ Recommended socket.io server version: 1.4+.
 
 Missing static libraries and support for platforms:
 
-* Android - see [issue 21](https://github.com/getnamo/socketio-client-ue4/issues/21)
-* iOS - see [issue 19](https://github.com/getnamo/socketio-client-ue4/issues/19)
-* MacOS - see [issue 15](https://github.com/getnamo/socketio-client-ue4/issues/15) 
+* iOS untested - see [issue 19](https://github.com/getnamo/socketio-client-ue4/issues/19)
 
 HTTPS currently not yet supported
 * OpenSSL Support - [issue39](https://github.com/getnamo/socketio-client-ue4/issues/39), temporary [workaround available](https://github.com/getnamo/socketio-client-ue4/issues/72#issuecomment-371956821).
@@ -117,6 +115,43 @@ There are many ways to decode your *SIOJsonValue* message, it all depends on you
 
 ![IMG](http://i.imgur.com/urAh2TH.png)
 
+Make sure your server is sending the correct type of data, you should not be encoding your data into json strings on the server side if you want to decode them directly into objects in the Unreal side, send the objects as is and the socket.io protocol will handle serialization on both ends.
+
+#### Json Object to Struct Example
+
+Keep in mind that you need to match your json object names (case doesn't matter) and if you are using objects of objects, the sub-objects will need their own structs to build the full main struct. For example if we have the following json object:
+
+```json
+{
+	"Title":
+	{
+		"Text":"Example",
+		"Caption":"Used to guide developers"
+	}
+}
+```
+
+##### Defined Struct
+
+Make a substruct for the _Title_ object with two string variables, _Text_ and _Caption_ matching your json object format.
+
+![title substruct](https://i.imgur.com/1L8T4Tl.png)
+
+and then make the main struct with the substruct and a member variable with the _Title_ property name to match your json.
+
+![main struct](https://i.imgur.com/gcyDK1l.png)
+
+##### Alternative Struct
+
+If you know that you will have a set of properties of the same type (blueprints only support maps of same type), then you can use a Map property. In this example our title sub-object only has String:String type properties so we could use a String:String map named _Title_ instead of the sub-struct.
+
+![alt struct](https://i.imgur.com/w6tttIh.png)
+
+If you wish to mix types in an object, you will need to use defined structs as before.
+
+##### Arrays of array
+An Array of arrays is not supported in Unreal structs, a workaround is to use an array of structs that contains an array of the data type you want. The server side will need to adapt what it sends or you can decode using json fields.
+
 ### Conversion
 
 Most primitive types have auto-conversion nodes to simplify your workflow. E.g. if you wanted to emit a float literal you can get a reference to your float and simply drag to the *message* parameter to auto-convert into a *SIOJsonValue*.
@@ -188,10 +223,10 @@ This does mean that you may not receive events during times your actor does not 
 
 ### Setup
 
-To use the C++ code from the plugin add it as a dependency module in your project build.cs
+To use the C++ code from the plugin add _SocketIOClient_, _SocketIOLib_, and _Json_ as dependency modules in your project build.cs. If you're using conversion methods you will also have to add _SIOJson_.
 
 ```c#
-PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "SocketIOClient"});
+PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "SocketIOClient", "SocketIOLib", "Json", "SIOJson" });
 ```
 
 This guide assumes you want to use the client component method. See the [_FSocketIONative_](https://github.com/getnamo/socketio-client-ue4#c-fsocketionative) section for non-actor based C++ details.
@@ -245,14 +280,18 @@ SIOClientComponent->Connect(FString("http://127.0.0.1:3000"));
 
 ### Receiving Events
 
-To receive events call _OnNativeEvent_ and pass in your expected event name and callback lambda or function with ```void(const FString&, const TSharedPtr<FJsonValue>&)``` signature. Optionally pass in another FString to specify namespace, omit if not using a namespace.
+To receive events call _OnNativeEvent_ and pass in your expected event name and callback lambda or function with ```void(const FString&, const TSharedPtr<FJsonValue>&)``` signature. Optionally pass in another FString to specify namespace, omit if not using a namespace (default ```TEXT("/")```). 
 
 ```c++
 SIOClientComponent->OnNativeEvent(FString("MyEvent"), [](const FString& Event, const TSharedPtr<FJsonValue>& Message)
 {
 	//Called when the event is received
-}, FString("Optional Namespace"));
+});
 ```
+
+Message parameter is a [FJsonValue](http://api.unrealengine.com/INT/API/Runtime/Json/Dom/FJsonValue/), if you have a complex message you'll most commonly want to decode it into a [FJsonObject](http://api.unrealengine.com/INT/API/Runtime/Json/Dom/FJsonObject/) via ```AsObject()```.
+
+Note that this is equivalent to the blueprint ```BindEventToFunction``` function and should be typically called once e.g. on beginplay.
 
 ### Emitting Events
 
@@ -408,7 +447,7 @@ SIOClientComponent->EmitNative(FString("callbackTest"),  FTestCppStruct::StaticS
 
 ## C++ FSocketIONative
 
-If you do not wish to use UE4 AActors or UObjects, you can use the native base class [FSocketIONative](https://github.com/getnamo/socketio-client-ue4/blob/master/Source/SocketIOClient/Public/SocketIONative.h). Please see the class header for API. It generally follows a similar pattern to ```USocketIOClientComponent``` with the exception of native callbacks which you can for example see in use here: https://github.com/getnamo/socketio-client-ue4/blob/master/Source/SocketIOClient/Private/SocketIOClientComponent.cpp#L140
+If you do not wish to use UE4 AActors or UObjects, you can use the native base class [FSocketIONative](https://github.com/getnamo/socketio-client-ue4/blob/master/Source/SocketIOClient/Public/SocketIONative.h). Please see the class header for API. It generally follows a similar pattern to ```USocketIOClientComponent``` with the exception of native callbacks which you can for example see in use here: https://github.com/getnamo/socketio-client-ue4/blob/master/Source/SocketIOClient/Private/SocketIOClientComponent.cpp#L81
 
 ## Alternative Raw C++ Complex message using sio::message
 

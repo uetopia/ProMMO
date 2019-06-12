@@ -2,8 +2,11 @@
 
 
 #include "SIOJConvert.h"
-#include "Runtime/Json/Public/Json.h"
+//#include "Runtime/Json/Public/Json.h"
+#include "JsonGlobals.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
 #include "Runtime/JsonUtilities/Public/JsonObjectConverter.h"
+#include "Runtime/Core/Public/Misc/FileHelper.h"
 #include "SIOJsonValue.h"
 #include "SIOJsonObject.h"
 
@@ -251,6 +254,42 @@ bool USIOJConvert::JsonObjectToUStruct(TSharedPtr<FJsonObject> JsonObject, UStru
 	{
 		return FJsonObjectConverter::JsonObjectToUStruct(JsonObject.ToSharedRef(), Struct, StructPtr, 0, 0);
 	}
+}
+
+bool USIOJConvert::JsonFileToUStruct(const FString& FilePath, UStruct* Struct, void* StructPtr, bool IsBlueprintStruct /*= false*/)
+{
+	//Read bytes from file
+	TArray<uint8> OutBytes;
+	if (!FFileHelper::LoadFileToArray(OutBytes, *FilePath)) 
+	{
+		return false;
+	}
+
+	//Convert to json string
+	FString JsonString;
+	FFileHelper::BufferToString(JsonString, OutBytes.GetData(), OutBytes.Num());
+
+	//Read into struct
+	return JsonObjectToUStruct(ToJsonObject(JsonString), Struct, StructPtr, IsBlueprintStruct);
+}
+	
+
+bool USIOJConvert::ToJsonFile(const FString& FilePath, UStruct* Struct, void* StructPtr, bool IsBlueprintStruct /*= false*/)
+{
+	//Get json object with trimmed values
+	TSharedPtr<FJsonObject> JsonObject = ToJsonObject(Struct, StructPtr, IsBlueprintStruct);
+	TSharedPtr<FJsonValue> TrimmedValue = MakeShareable(new FJsonValueObject(JsonObject));
+	TrimValueKeyNames(TrimmedValue);
+
+	//Convert to string
+	FString JsonString = ToJsonString(TrimmedValue);
+	FTCHARToUTF8 Utf8String(*JsonString);
+
+	TArray<uint8> Bytes;
+	Bytes.Append((uint8*)Utf8String.Get(), Utf8String.Length());
+
+	//flush to disk
+	return FFileHelper::SaveArrayToFile(Bytes, *FilePath);
 }
 
 void USIOJConvert::TrimValueKeyNames(const TSharedPtr<FJsonValue>& JsonValue)

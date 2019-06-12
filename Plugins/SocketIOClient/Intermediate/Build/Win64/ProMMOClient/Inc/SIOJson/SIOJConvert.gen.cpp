@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -49,13 +49,17 @@ void EmptyLinkFunctionForGeneratedCodeSIOJConvert() {}
 	};
 	const UE4CodeGen_Private::FClassParams Z_Construct_UClass_USIOJConvert_Statics::ClassParams = {
 		&USIOJConvert::StaticClass,
-		DependentSingletons, ARRAY_COUNT(DependentSingletons),
-		0x001000A0u,
-		nullptr, 0,
-		nullptr, 0,
 		nullptr,
 		&StaticCppClassTypeInfo,
-		nullptr, 0,
+		DependentSingletons,
+		nullptr,
+		nullptr,
+		nullptr,
+		ARRAY_COUNT(DependentSingletons),
+		0,
+		0,
+		0,
+		0x001000A0u,
 		METADATA_PARAMS(Z_Construct_UClass_USIOJConvert_Statics::Class_MetaDataParams, ARRAY_COUNT(Z_Construct_UClass_USIOJConvert_Statics::Class_MetaDataParams))
 	};
 	UClass* Z_Construct_UClass_USIOJConvert()
@@ -67,7 +71,11 @@ void EmptyLinkFunctionForGeneratedCodeSIOJConvert() {}
 		}
 		return OuterClass;
 	}
-	IMPLEMENT_CLASS(USIOJConvert, 610950762);
+	IMPLEMENT_CLASS(USIOJConvert, 537224713);
+	template<> SIOJSON_API UClass* StaticClass<USIOJConvert>()
+	{
+		return USIOJConvert::StaticClass();
+	}
 	static FCompiledInDefer Z_CompiledInDefer_UClass_USIOJConvert(Z_Construct_UClass_USIOJConvert, &USIOJConvert::StaticClass, TEXT("/Script/SIOJson"), TEXT("USIOJConvert"), false, nullptr, nullptr, nullptr);
 	DEFINE_VTABLE_PTR_HELPER_CTOR(USIOJConvert);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

@@ -4,6 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/Package.h"
+#include "UObject/ObjectMacros.h"
 #include "Runtime/Json/Public/Dom/JsonObject.h"
 #include "Runtime/Json/Public/Dom/JsonValue.h"
 #include "SIOJConvert.generated.h"
@@ -41,6 +43,10 @@ public:
 
 	//Expects a JsonObject, if blueprint struct it will lengthen the names to fill properly
 	static bool JsonObjectToUStruct(TSharedPtr<FJsonObject> JsonObject, UStruct* Struct, void* StructPtr, bool IsBlueprintStruct = false);
+	
+	//Files - convenience read/write files
+	static bool JsonFileToUStruct(const FString& FilePath, UStruct* Struct, void* StructPtr, bool IsBlueprintStruct = false);
+	static bool ToJsonFile(const FString& FilePath, UStruct* Struct, void* StructPtr, bool IsBlueprintStruct = false);
 		
 
 	//typically from callbacks

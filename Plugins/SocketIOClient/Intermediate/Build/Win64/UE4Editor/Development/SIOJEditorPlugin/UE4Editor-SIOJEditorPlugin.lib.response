@@ -6,8 +6,9 @@
 /NAME:"UE4Editor-SIOJEditorPlugin.dll"
 /IGNORE:4221
 /NODEFAULTLIB
-"C:\ue\421_UETOPIA\Engine\Intermediate\Build\Win64\UE4Editor\Development\UnrealEd\SharedPCH.UnrealEd.h.obj"
-"C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SIOJEditorPlugin\Module.SIOJEditorPlugin.cpp.obj"
-"C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SIOJEditorPlugin\Module.SIOJEditorPlugin.gen.cpp.obj"
-"C:\ue\421_UETOPIA\Engine\Intermediate\Build\Win64\UE4Editor\Development\PCLaunch.rc.res"
-/OUT:"C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SIOJEditorPlugin\UE4Editor-SIOJEditorPlugin.lib"
+"D:\ue_storage\422-GH\Engine\Intermediate\Build\Win64\UE4Editor\Development\UnrealEd\SharedPCH.UnrealEd.h.obj"
+"F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SIOJEditorPlugin\Module.SIOJEditorPlugin.cpp.obj"
+"F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SIOJEditorPlugin\Module.SIOJEditorPlugin.gen.cpp.obj"
+"D:\ue_storage\422-GH\Engine\Intermediate\Build\Win64\UE4Editor\Development\Default.rc2.res"
+/OUT:"F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SIOJEditorPlugin\UE4Editor-SIOJEditorPlugin.lib"
+/INCLUDE:IMPLEMENT_MODULE_SIOJEditorPlugin

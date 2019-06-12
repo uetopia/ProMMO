@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -20,7 +20,7 @@ enum class ESIORequestVerb : uint8;
 #endif
 #define SIOJSON_SIOJRequestJSON_generated_h
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_76_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_76_DELEGATE \
 struct _Script_SIOJson_eventOnRequestFail_Parms \
 { \
 	USIOJRequestJSON* Request; \
@@ -33,7 +33,7 @@ static inline void FOnRequestFail_DelegateWrapper(const FMulticastScriptDelegate
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_75_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_75_DELEGATE \
 struct _Script_SIOJson_eventOnRequestComplete_Parms \
 { \
 	USIOJRequestJSON* Request; \
@@ -46,7 +46,7 @@ static inline void FOnRequestComplete_DelegateWrapper(const FMulticastScriptDele
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS \
  \
 	DECLARE_FUNCTION(execHasTag) \
 	{ \
@@ -279,7 +279,7 @@ static inline void FOnRequestComplete_DelegateWrapper(const FMulticastScriptDele
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS_NO_PURE_DECLS \
  \
 	DECLARE_FUNCTION(execHasTag) \
 	{ \
@@ -512,7 +512,7 @@ static inline void FOnRequestComplete_DelegateWrapper(const FMulticastScriptDele
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesUSIOJRequestJSON(); \
 	friend struct Z_Construct_UClass_USIOJRequestJSON_Statics; \
@@ -521,7 +521,7 @@ public: \
 	DECLARE_SERIALIZER(USIOJRequestJSON)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS \
 private: \
 	static void StaticRegisterNativesUSIOJRequestJSON(); \
 	friend struct Z_Construct_UClass_USIOJRequestJSON_Statics; \
@@ -530,7 +530,7 @@ public: \
 	DECLARE_SERIALIZER(USIOJRequestJSON)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_STANDARD_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_STANDARD_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API USIOJRequestJSON(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(USIOJRequestJSON) \
@@ -543,7 +543,7 @@ private: \
 public:
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_ENHANCED_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_ENHANCED_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API USIOJRequestJSON(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()) : Super(ObjectInitializer) { }; \
 private: \
@@ -556,38 +556,40 @@ DEFINE_VTABLE_PTR_HELPER_CTOR_CALLER(USIOJRequestJSON); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(USIOJRequestJSON)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_PRIVATE_PROPERTY_OFFSET \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_PRIVATE_PROPERTY_OFFSET \
 	FORCEINLINE static uint32 __PPO__RequestJsonObj() { return STRUCT_OFFSET(USIOJRequestJSON, RequestJsonObj); } \
 	FORCEINLINE static uint32 __PPO__RequestBytes() { return STRUCT_OFFSET(USIOJRequestJSON, RequestBytes); } \
 	FORCEINLINE static uint32 __PPO__BinaryContentType() { return STRUCT_OFFSET(USIOJRequestJSON, BinaryContentType); } \
 	FORCEINLINE static uint32 __PPO__ResponseJsonObj() { return STRUCT_OFFSET(USIOJRequestJSON, ResponseJsonObj); }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_85_PROLOG
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_GENERATED_BODY_LEGACY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_85_PROLOG
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_GENERATED_BODY_LEGACY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_STANDARD_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_STANDARD_CONSTRUCTORS \
 public: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_GENERATED_BODY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_ENHANCED_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_RPC_WRAPPERS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_INCLASS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h_88_ENHANCED_CONSTRUCTORS \
 static_assert(false, "Unknown access specifier for GENERATED_BODY() macro in class SIOJRequestJSON."); \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
+template<> SIOJSON_API UClass* StaticClass<class USIOJRequestJSON>();
+
 #undef CURRENT_FILE_ID
-#define CURRENT_FILE_ID ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h
+#define CURRENT_FILE_ID ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJRequestJSON_h
 
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

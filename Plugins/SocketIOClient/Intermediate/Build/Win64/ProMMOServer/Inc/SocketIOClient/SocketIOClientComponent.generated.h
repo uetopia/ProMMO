@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -16,7 +16,7 @@ class USIOJsonObject;
 #endif
 #define SOCKETIOCLIENT_SocketIOClientComponent_generated_h
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_15_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_15_DELEGATE \
 struct _Script_SocketIOClient_eventSIOConnectionProblemSignature_Parms \
 { \
 	int32 Attempts; \
@@ -33,7 +33,7 @@ static inline void FSIOConnectionProblemSignature_DelegateWrapper(const FMultica
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_14_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_14_DELEGATE \
 struct _Script_SocketIOClient_eventSIOCEventJsonSignature_Parms \
 { \
 	FString Event; \
@@ -48,7 +48,7 @@ static inline void FSIOCEventJsonSignature_DelegateWrapper(const FMulticastScrip
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_13_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_13_DELEGATE \
 struct _Script_SocketIOClient_eventSIOCCloseEventSignature_Parms \
 { \
 	TEnumAsByte<ESIOConnectionCloseReason> Reason; \
@@ -61,7 +61,7 @@ static inline void FSIOCCloseEventSignature_DelegateWrapper(const FMulticastScri
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_12_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_12_DELEGATE \
 struct _Script_SocketIOClient_eventSIOCOpenEventSignature_Parms \
 { \
 	FString SessionId; \
@@ -76,7 +76,7 @@ static inline void FSIOCOpenEventSignature_DelegateWrapper(const FMulticastScrip
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_11_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_11_DELEGATE \
 struct _Script_SocketIOClient_eventSIOCSocketEventSignature_Parms \
 { \
 	FString Namespace; \
@@ -89,14 +89,14 @@ static inline void FSIOCSocketEventSignature_DelegateWrapper(const FMulticastScr
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_10_DELEGATE \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_10_DELEGATE \
 static inline void FSIOCEventSignature_DelegateWrapper(const FMulticastScriptDelegate& SIOCEventSignature) \
 { \
 	SIOCEventSignature.ProcessMulticastDelegate<UObject>(NULL); \
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS \
  \
 	DECLARE_FUNCTION(execBindEventToFunction) \
 	{ \
@@ -164,7 +164,7 @@ static inline void FSIOCEventSignature_DelegateWrapper(const FMulticastScriptDel
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS_NO_PURE_DECLS \
  \
 	DECLARE_FUNCTION(execBindEventToFunction) \
 	{ \
@@ -232,7 +232,7 @@ static inline void FSIOCEventSignature_DelegateWrapper(const FMulticastScriptDel
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesUSocketIOClientComponent(); \
 	friend struct Z_Construct_UClass_USocketIOClientComponent_Statics; \
@@ -241,7 +241,7 @@ public: \
 	DECLARE_SERIALIZER(USocketIOClientComponent)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS \
 private: \
 	static void StaticRegisterNativesUSocketIOClientComponent(); \
 	friend struct Z_Construct_UClass_USocketIOClientComponent_Statics; \
@@ -250,7 +250,7 @@ public: \
 	DECLARE_SERIALIZER(USocketIOClientComponent)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_STANDARD_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_STANDARD_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API USocketIOClientComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(USocketIOClientComponent) \
@@ -263,7 +263,7 @@ private: \
 public:
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_ENHANCED_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_ENHANCED_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API USocketIOClientComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()) : Super(ObjectInitializer) { }; \
 private: \
@@ -276,32 +276,34 @@ DEFINE_VTABLE_PTR_HELPER_CTOR_CALLER(USocketIOClientComponent); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(USocketIOClientComponent)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_PRIVATE_PROPERTY_OFFSET
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_17_PROLOG
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_GENERATED_BODY_LEGACY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_PRIVATE_PROPERTY_OFFSET
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_17_PROLOG
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_GENERATED_BODY_LEGACY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_STANDARD_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_STANDARD_CONSTRUCTORS \
 public: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_GENERATED_BODY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_ENHANCED_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_RPC_WRAPPERS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_INCLASS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h_20_ENHANCED_CONSTRUCTORS \
 static_assert(false, "Unknown access specifier for GENERATED_BODY() macro in class SocketIOClientComponent."); \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
+template<> SOCKETIOCLIENT_API UClass* StaticClass<class USocketIOClientComponent>();
+
 #undef CURRENT_FILE_ID
-#define CURRENT_FILE_ID ProMMO_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h
+#define CURRENT_FILE_ID ProMMO_4_22_Plugins_SocketIOClient_Source_SocketIOClient_Public_SocketIOClientComponent_h
 
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

@@ -2,15 +2,19 @@
 /nologo
 /Oi
 /c
+/Gw
 /Gy
 /Zm850
 /wd4819
 /D_CRT_STDIO_LEGACY_WIDE_SPECIFIERS=1
 /D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS=1
 /D_WINDLL
-/source-charset:utf-8 /execution-charset:utf-8
+/D_DISABLE_EXTENDED_ALIGNED_STORAGE
+/source-charset:utf-8
+/execution-charset:utf-8
 /Ox
 /Ot
+/GF
 /Ob2
 /errorReport:prompt
 /EHsc
@@ -24,7 +28,7 @@
 /wd4838
 /we4668
 /I .
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\SocketIOClient\Private
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SocketIOClient\Private
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\CoreUObject
 /I Runtime
 /I Runtime\CoreUObject\Public
@@ -77,6 +81,7 @@
 /I Runtime\Engine\Public\EdGraph
 /I Runtime\Engine\Public\Internationalization
 /I Runtime\Engine\Public\Net
+/I Runtime\Engine\Public\Net\Util
 /I Runtime\Engine\Public\PacketHandlers
 /I Runtime\Engine\Public\Performance
 /I Runtime\Engine\Public\Physics
@@ -85,6 +90,7 @@
 /I Runtime\Engine\Public\ProfilingDebugging
 /I Runtime\Engine\Public\Rendering
 /I Runtime\Engine\Public\Slate
+/I Runtime\Engine\Public\Subsystems
 /I Runtime\Engine\Public\Tests
 /I Runtime\Engine\Public\VisualLogger
 /I Runtime\ApplicationCore\Public
@@ -109,13 +115,13 @@
 /I Runtime\SlateCore\Public\Fonts
 /I Runtime\SlateCore\Public\Input
 /I Runtime\SlateCore\Public\Layout
-/I Runtime\SlateCore\Public\Logging
 /I Runtime\SlateCore\Public\Rendering
 /I Runtime\SlateCore\Public\Sound
 /I Runtime\SlateCore\Public\Styling
 /I Runtime\SlateCore\Public\Textures
 /I Runtime\SlateCore\Public\Types
 /I Runtime\SlateCore\Public\Widgets
+/I Runtime\SlateCore\Public\Widgets\Images
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\InputCore
 /I Runtime\InputCore\Classes
 /I Runtime\InputCore\Public
@@ -156,8 +162,6 @@
 /I Runtime\MessagingCommon
 /I Runtime\RenderCore\Public
 /I Runtime\RenderCore
-/I Runtime\ShaderCore\Public
-/I Runtime\ShaderCore
 /I Runtime\Sockets\Public
 /I Runtime\Sockets
 /I Runtime\UtilityShaders\Public
@@ -181,8 +185,6 @@
 /I Runtime\GameplayTags\Classes
 /I Runtime\GameplayTags\Public
 /I Runtime\GameplayTags
-/I Runtime\DatabaseSupport\Public
-/I Runtime\DatabaseSupport
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\PacketHandler
 /I Runtime\PacketHandlers
 /I Runtime\PacketHandlers\PacketHandler\Classes
@@ -198,6 +200,8 @@
 /I Runtime\MeshDescription
 /I Runtime\PakFile\Public
 /I Runtime\PakFile
+/I Runtime\RSA\Public
+/I Runtime\RSA
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd
 /I Editor
 /I Programs\UnrealLightmass\Public
@@ -214,6 +218,7 @@
 /I Editor\UnrealEd\Public\Kismet2
 /I Editor\UnrealEd\Public\Layers
 /I Editor\UnrealEd\Public\Settings
+/I Editor\UnrealEd\Public\Subsystems
 /I Editor\UnrealEd\Public\Tests
 /I Editor\UnrealEd\Public\Toolkits
 /I Editor\BspMode\Public
@@ -248,6 +253,9 @@
 /I Editor\BlueprintGraph\Classes
 /I Editor\BlueprintGraph\Public
 /I Editor\BlueprintGraph
+/I ..\Intermediate\Build\Win64\UE4Editor\Inc\EditorSubsystem
+/I Editor\EditorSubsystem\Public
+/I Editor\EditorSubsystem
 /I Runtime\Online
 /I Runtime\Online\HTTP\Public
 /I Runtime\Online\HTTP
@@ -320,6 +328,7 @@
 /I Runtime\UMG\Public\Binding
 /I Runtime\UMG\Public\Blueprint
 /I Runtime\UMG\Public\Components
+/I Runtime\UMG\Public\Editor
 /I Runtime\UMG\Public\Slate
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\MovieScene
 /I Runtime\MovieScene\Public
@@ -355,6 +364,9 @@
 /I Runtime\NavigationSystem\Public\NavFilters
 /I Runtime\NavigationSystem\Public\NavGraph
 /I Runtime\NavigationSystem\Public\NavMesh
+/I ..\Intermediate\Build\Win64\UE4Editor\Inc\MeshDescriptionOperations
+/I Developer\MeshDescriptionOperations\Public
+/I Developer\MeshDescriptionOperations
 /I Developer\MeshBuilder\Public
 /I Developer\MeshBuilder
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\MaterialShaderQualitySettings
@@ -410,35 +422,38 @@
 /I Runtime\AudioMixer
 /I Runtime\AudioMixer\Public\Components
 /I Runtime\AudioMixer\Public\DSP
+/I Runtime\AudioMixer\Public\DSP\Encoders
+/I Runtime\AudioMixer\Public\SoundFileIO
 /I ThirdParty
 /I ThirdParty\libSampleRate\Public
 /I ThirdParty\libSampleRate
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Inc\SocketIOClient
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\ThirdParty\SocketIO\Include
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\SocketIOClient\Public
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\SocketIOClient
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SocketIOLib\Public
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SocketIOLib
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Inc\SocketIOClient
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SocketIOClient\Public
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SocketIOClient
 /I ..\Intermediate\Build\Win64\UE4Editor\Inc\JsonUtilities
 /I Runtime\JsonUtilities\Public
 /I Runtime\JsonUtilities
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Inc\SIOJson
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\SIOJson\Public
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\SIOJson
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Inc\CoreUtility
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\CoreUtility\Public
-/I C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Source\CoreUtility
-/I "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.15.26726\INCLUDE"
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Inc\SIOJson
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SIOJson\Public
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\SIOJson
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Inc\CoreUtility
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\CoreUtility\Public
+/I F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Source\CoreUtility
+/I "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.16.27023\INCLUDE"
 /I "C:\Program Files (x86)\Windows Kits\NETFXSDK\4.6.1\include\um"
 /I "C:\Program Files (x86)\Windows Kits\10\include\10.0.16299.0\ucrt"
 /I "C:\Program Files (x86)\Windows Kits\10\include\10.0.16299.0\shared"
 /I "C:\Program Files (x86)\Windows Kits\10\include\10.0.16299.0\um"
 /I "C:\Program Files (x86)\Windows Kits\10\include\10.0.16299.0\winrt"
-/FI"C:\ue\421_UETOPIA\Engine\Intermediate\Build\Win64\UE4Editor\Development\Engine\SharedPCH.Engine.h"
-/Yu"C:\ue\421_UETOPIA\Engine\Intermediate\Build\Win64\UE4Editor\Development\Engine\SharedPCH.Engine.h"
-/Fp"C:\ue\421_UETOPIA\Engine\Intermediate\Build\Win64\UE4Editor\Development\Engine\SharedPCH.Engine.h.pch"
-"C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SocketIOClient\Module.SocketIOClient.gen.cpp"
-/FI"C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SocketIOClient\Definitions.SocketIOClient.h"
-/Fo"C:\ue_projects_active\ProMMO\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SocketIOClient\Module.SocketIOClient.gen.cpp.obj"
+/FI"D:\ue_storage\422-GH\Engine\Intermediate\Build\Win64\UE4Editor\Development\Engine\SharedPCH.Engine.h"
+/Yu"D:\ue_storage\422-GH\Engine\Intermediate\Build\Win64\UE4Editor\Development\Engine\SharedPCH.Engine.h"
+/Fp"D:\ue_storage\422-GH\Engine\Intermediate\Build\Win64\UE4Editor\Development\Engine\SharedPCH.Engine.h.pch"
+"F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SocketIOClient\Module.SocketIOClient.gen.cpp"
+/FI"F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SocketIOClient\Definitions.SocketIOClient.h"
+/Fo"F:\Unreal_build_tests\ProMMO-4.22\Plugins\SocketIOClient\Intermediate\Build\Win64\UE4Editor\Development\SocketIOClient\Module.SocketIOClient.gen.cpp.obj"
 /TP
 /GR-
 /W4

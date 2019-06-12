@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -15,7 +15,7 @@ enum class EImageFormatBPType : uint8;
 #endif
 #define COREUTILITY_CoreUtilityBPLibrary_generated_h
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS \
  \
 	DECLARE_FUNCTION(execGetLoginId) \
 	{ \
@@ -72,7 +72,7 @@ enum class EImageFormatBPType : uint8;
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS_NO_PURE_DECLS \
  \
 	DECLARE_FUNCTION(execGetLoginId) \
 	{ \
@@ -129,7 +129,7 @@ enum class EImageFormatBPType : uint8;
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesUCoreUtilityBPLibrary(); \
 	friend struct Z_Construct_UClass_UCoreUtilityBPLibrary_Statics; \
@@ -138,7 +138,7 @@ public: \
 	DECLARE_SERIALIZER(UCoreUtilityBPLibrary)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS \
 private: \
 	static void StaticRegisterNativesUCoreUtilityBPLibrary(); \
 	friend struct Z_Construct_UClass_UCoreUtilityBPLibrary_Statics; \
@@ -147,7 +147,7 @@ public: \
 	DECLARE_SERIALIZER(UCoreUtilityBPLibrary)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_STANDARD_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_STANDARD_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API UCoreUtilityBPLibrary(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(UCoreUtilityBPLibrary) \
@@ -160,7 +160,7 @@ private: \
 public:
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_ENHANCED_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_ENHANCED_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API UCoreUtilityBPLibrary(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()) : Super(ObjectInitializer) { }; \
 private: \
@@ -173,32 +173,34 @@ DEFINE_VTABLE_PTR_HELPER_CTOR_CALLER(UCoreUtilityBPLibrary); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(UCoreUtilityBPLibrary)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_PRIVATE_PROPERTY_OFFSET
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_42_PROLOG
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_GENERATED_BODY_LEGACY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_PRIVATE_PROPERTY_OFFSET
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_42_PROLOG
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_GENERATED_BODY_LEGACY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_STANDARD_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_STANDARD_CONSTRUCTORS \
 public: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_GENERATED_BODY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_ENHANCED_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_RPC_WRAPPERS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_INCLASS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h_45_ENHANCED_CONSTRUCTORS \
 private: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
+template<> COREUTILITY_API UClass* StaticClass<class UCoreUtilityBPLibrary>();
+
 #undef CURRENT_FILE_ID
-#define CURRENT_FILE_ID ProMMO_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h
+#define CURRENT_FILE_ID ProMMO_4_22_Plugins_SocketIOClient_Source_CoreUtility_Public_CoreUtilityBPLibrary_h
 
 
 #define FOREACH_ENUM_EIMAGEFORMATBPTYPE(op) \
@@ -210,4 +212,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	op(EImageFormatBPType::ICO) \
 	op(EImageFormatBPType::EXR) \
 	op(EImageFormatBPType::ICNS) 
+
+enum class EImageFormatBPType : uint8;
+template<> COREUTILITY_API UEnum* StaticEnum<EImageFormatBPType>();
+
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

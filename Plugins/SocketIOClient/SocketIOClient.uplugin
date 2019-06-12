@@ -1,8 +1,8 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "0.10.0",
-	"EngineVersion" : "4.21.0",
+	"VersionName": "1.0.0",
+	"EngineVersion" : "4.22.0",
 	"FriendlyName": "Socket.IO Client",
 	"Description": "Real-time networking library Socket.IO Client usable from blueprints and c++.",
 	"Category": "Networking",
@@ -24,6 +24,7 @@
 				"Win64",
 				"Win32",
 				"Linux",
+				"Mac",
 				"Android"
 			]
 		},
@@ -35,8 +36,20 @@
 				"Win64",
 				"Win32",
 				"Linux",
-				"Android",
-				"Mac"
+				"Mac",
+				"Android"
+			]
+		},
+		{
+			"Name": "SocketIOLib",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault",
+			"WhitelistPlatforms": [
+				"Win64",
+				"Win32",
+				"Linux",
+				"Mac",
+				"Android"
 			]
 		},
 		{
@@ -47,10 +60,8 @@
 				"Win64",
 				"Win32",
 				"Linux",
-				"Android",
 				"Mac",
-				"IOS",
-				"HTML5"
+				"Android"
 			]
 		},
 		{

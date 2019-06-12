@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -25,13 +25,17 @@ void EmptyLinkFunctionForGeneratedCodeSocketIONative() {}
 		}
 		return Singleton;
 	}
+	template<> SOCKETIOCLIENT_API UEnum* StaticEnum<ESIOConnectionCloseReason>()
+	{
+		return ESIOConnectionCloseReason_StaticEnum();
+	}
 	static FCompiledInDeferEnum Z_CompiledInDeferEnum_UEnum_ESIOConnectionCloseReason(ESIOConnectionCloseReason_StaticEnum, TEXT("/Script/SocketIOClient"), TEXT("ESIOConnectionCloseReason"), false, nullptr, nullptr);
-	uint32 Get_Z_Construct_UEnum_SocketIOClient_ESIOConnectionCloseReason_CRC() { return 3957715309U; }
+	uint32 Get_Z_Construct_UEnum_SocketIOClient_ESIOConnectionCloseReason_Hash() { return 2604996341U; }
 	UEnum* Z_Construct_UEnum_SocketIOClient_ESIOConnectionCloseReason()
 	{
 #if WITH_HOT_RELOAD
 		UPackage* Outer = Z_Construct_UPackage__Script_SocketIOClient();
-		static UEnum* ReturnEnum = FindExistingEnumIfHotReloadOrDynamic(Outer, TEXT("ESIOConnectionCloseReason"), 0, Get_Z_Construct_UEnum_SocketIOClient_ESIOConnectionCloseReason_CRC(), false);
+		static UEnum* ReturnEnum = FindExistingEnumIfHotReloadOrDynamic(Outer, TEXT("ESIOConnectionCloseReason"), 0, Get_Z_Construct_UEnum_SocketIOClient_ESIOConnectionCloseReason_Hash(), false);
 #else
 		static UEnum* ReturnEnum = nullptr;
 #endif // WITH_HOT_RELOAD
@@ -49,14 +53,14 @@ void EmptyLinkFunctionForGeneratedCodeSocketIONative() {}
 #endif
 			static const UE4CodeGen_Private::FEnumParams EnumParams = {
 				(UObject*(*)())Z_Construct_UPackage__Script_SocketIOClient,
-				UE4CodeGen_Private::EDynamicType::NotDynamic,
-				"ESIOConnectionCloseReason",
-				RF_Public|RF_Transient|RF_MarkAsNative,
 				nullptr,
-				(uint8)UEnum::ECppForm::Regular,
+				"ESIOConnectionCloseReason",
 				"ESIOConnectionCloseReason",
 				Enumerators,
 				ARRAY_COUNT(Enumerators),
+				RF_Public|RF_Transient|RF_MarkAsNative,
+				UE4CodeGen_Private::EDynamicType::NotDynamic,
+				(uint8)UEnum::ECppForm::Regular,
 				METADATA_PARAMS(Enum_MetaDataParams, ARRAY_COUNT(Enum_MetaDataParams))
 			};
 			UE4CodeGen_Private::ConstructUEnum(ReturnEnum, EnumParams);

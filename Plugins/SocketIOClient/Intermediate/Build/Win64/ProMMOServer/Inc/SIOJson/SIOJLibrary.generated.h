@@ -1,4 +1,4 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 /*===========================================================================
 	Generated code exported from UnrealHeaderTool.
 	DO NOT modify this manually! Edit the corresponding .h files instead!
@@ -20,12 +20,14 @@ class UProperty;
 #endif
 #define SIOJSON_SIOJLibrary_generated_h
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_21_GENERATED_BODY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_21_GENERATED_BODY \
 	friend struct Z_Construct_UScriptStruct_FSIOJCallResponse_Statics; \
 	SIOJSON_API static class UScriptStruct* StaticStruct();
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_16_DELEGATE \
+template<> SIOJSON_API UScriptStruct* StaticStruct<struct FSIOJCallResponse>();
+
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_16_DELEGATE \
 struct _Script_SIOJson_eventSIOJCallDelegate_Parms \
 { \
 	USIOJRequestJSON* Request; \
@@ -38,7 +40,7 @@ static inline void FSIOJCallDelegate_DelegateWrapper(const FScriptDelegate& SIOJ
 }
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS \
  \
 	DECLARE_FUNCTION(execCallURL) \
 	{ \
@@ -210,7 +212,7 @@ static inline void FSIOJCallDelegate_DelegateWrapper(const FScriptDelegate& SIOJ
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS_NO_PURE_DECLS \
  \
 	DECLARE_FUNCTION(execCallURL) \
 	{ \
@@ -382,7 +384,7 @@ static inline void FSIOJCallDelegate_DelegateWrapper(const FScriptDelegate& SIOJ
 	}
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS_NO_PURE_DECLS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesUSIOJLibrary(); \
 	friend struct Z_Construct_UClass_USIOJLibrary_Statics; \
@@ -391,7 +393,7 @@ public: \
 	DECLARE_SERIALIZER(USIOJLibrary)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS \
 private: \
 	static void StaticRegisterNativesUSIOJLibrary(); \
 	friend struct Z_Construct_UClass_USIOJLibrary_Statics; \
@@ -400,7 +402,7 @@ public: \
 	DECLARE_SERIALIZER(USIOJLibrary)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_STANDARD_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_STANDARD_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API USIOJLibrary(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(USIOJLibrary) \
@@ -413,7 +415,7 @@ private: \
 public:
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_ENHANCED_CONSTRUCTORS \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_ENHANCED_CONSTRUCTORS \
 	/** Standard constructor, called after all reflected properties have been initialized */ \
 	NO_API USIOJLibrary(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get()) : Super(ObjectInitializer) { }; \
 private: \
@@ -426,32 +428,34 @@ DEFINE_VTABLE_PTR_HELPER_CTOR_CALLER(USIOJLibrary); \
 	DEFINE_DEFAULT_OBJECT_INITIALIZER_CONSTRUCTOR_CALL(USIOJLibrary)
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_PRIVATE_PROPERTY_OFFSET
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_46_PROLOG
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_GENERATED_BODY_LEGACY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_PRIVATE_PROPERTY_OFFSET
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_46_PROLOG
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_GENERATED_BODY_LEGACY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_STANDARD_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_STANDARD_CONSTRUCTORS \
 public: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
-#define ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_GENERATED_BODY \
+#define ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_PRIVATE_PROPERTY_OFFSET \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS_NO_PURE_DECLS \
-	ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_ENHANCED_CONSTRUCTORS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_PRIVATE_PROPERTY_OFFSET \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_RPC_WRAPPERS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_INCLASS_NO_PURE_DECLS \
+	ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h_49_ENHANCED_CONSTRUCTORS \
 private: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 
+template<> SIOJSON_API UClass* StaticClass<class USIOJLibrary>();
+
 #undef CURRENT_FILE_ID
-#define CURRENT_FILE_ID ProMMO_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h
+#define CURRENT_FILE_ID ProMMO_4_22_Plugins_SocketIOClient_Source_SIOJson_Public_SIOJLibrary_h
 
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
