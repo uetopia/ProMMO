@@ -329,6 +329,11 @@ bool FOnlinePartyUEtopia::JoinParty(const FUniqueNetId& LocalUserId, const IOnli
 	return false;
 }
 
+bool FOnlinePartyUEtopia::JIPFromWithinParty(const FUniqueNetId& LocalUserId, const FOnlinePartyId& PartyId, const FUniqueNetId& PartyLeaderId)
+{
+	return false;
+}
+
 void FOnlinePartyUEtopia::QueryPartyJoinability(const FUniqueNetId& LocalUserId, const IOnlinePartyJoinInfo& OnlinePartyJoinInfo, const FOnQueryPartyJoinabilityComplete& Delegate /*= FOnQueryPartyJoinabilityComplete() */)
 {
 	return;
@@ -442,6 +447,11 @@ void FOnlinePartyUEtopia::LeaveParty_HttpRequestComplete(FHttpRequestPtr HttpReq
 }
 
 bool FOnlinePartyUEtopia::ApproveJoinRequest(const FUniqueNetId& LocalUserId, const FOnlinePartyId& PartyId, const FUniqueNetId& RecipientId, bool bIsApproved, int32 DeniedResultCode)
+{
+	return false;
+}
+
+bool FOnlinePartyUEtopia::ApproveJIPRequest(const FUniqueNetId& LocalUserId, const FOnlinePartyId& PartyId, const FUniqueNetId& RecipientId, bool bIsApproved, int32 DeniedResultCode)
 {
 	return false;
 }
