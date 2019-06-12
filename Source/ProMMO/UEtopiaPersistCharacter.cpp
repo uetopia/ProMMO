@@ -674,7 +674,9 @@ class AMyBasePickup* AUEtopiaPersistCharacter::GetItemFocus() {
 	*/
 
 	FCollisionQueryParams TraceParams(FName(TEXT("")), true, this);
-	TraceParams.bTraceAsyncScene = true;
+
+	// removed in 4.22
+	//TraceParams.bTraceAsyncScene = true;
 	TraceParams.bReturnPhysicalMaterial = true;
 
 	FHitResult Hit(ForceInit);
@@ -791,7 +793,9 @@ AMyServerPortalActor* AUEtopiaPersistCharacter::GetPortalFocus() {
 															   */
 
 	FCollisionQueryParams TraceParams(FName(TEXT("")), true, this);
-	TraceParams.bTraceAsyncScene = true;
+
+	// Removed in 4.22
+	//TraceParams.bTraceAsyncScene = true;
 	TraceParams.bReturnPhysicalMaterial = true;
 
 	FHitResult Hit(ForceInit);
@@ -813,7 +817,9 @@ AMyBaseVendor* AUEtopiaPersistCharacter::GetVendorFocus() {
 	const FVector EndTrace = StartTrace + Direction * 3000.0f; //where 300 is the distance it checks
 
 	FCollisionQueryParams TraceParams(FName(TEXT("")), true, this);
-	TraceParams.bTraceAsyncScene = true;
+
+	// Removed in 4.22
+	//TraceParams.bTraceAsyncScene = true;
 	TraceParams.bReturnPhysicalMaterial = true;
 
 	FHitResult Hit(ForceInit);

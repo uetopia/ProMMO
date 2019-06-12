@@ -138,7 +138,7 @@ ILoginFlowManager::FOnPopupDismissed UMyUserWidget::OnDisplayLoginWidget(const T
 
 void UMyUserWidget::OnDismissLoginWidget()
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnDismissLoginWidget"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyUserWidget] OnDismissLoginWidget"));
 	// Widget dismissed by login flow or possibly game related Blueprint code
 	// For slate typically
 	//Overlay->RemoveSlot(LoginFlow.ToSharedRef());
