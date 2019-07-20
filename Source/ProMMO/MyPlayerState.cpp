@@ -3,6 +3,7 @@
 #include "MyPlayerState.h"
 #include "ProMMO.h"
 #include "Net/UnrealNetwork.h"
+#include "UEtopiaPersistCharacter.h"
 #include "MyGameInstance.h"
 
 
@@ -103,6 +104,26 @@ void AMyPlayerState::ReceiveChatMessage_Implementation(const FText& ChatSender, 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerState] ReceiveChatMessage_Implementation Done."));
 }
 
+void AMyPlayerState::OnRep_OnDropsChange()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnRep_OnDropsChange."));
+
+	AActor* ActorOwner = GetOwner();
+
+	AController* playerController = Cast<AController>(ActorOwner);
+	if (playerController)
+	{
+		AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(playerController->GetPawn());
+		if (playerChar)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerState] OnRep_OnDropsChange - found playerChar"));
+
+			playerChar->OnDropsChangedBP();
+		}
+	}
+
+}
+
 void AMyPlayerState::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -118,6 +139,7 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & Ou
 	
 	DOREPLIFETIME(AMyPlayerState, allowPickup);
 	DOREPLIFETIME(AMyPlayerState, allowDrop);
+	DOREPLIFETIME(AMyPlayerState, MyDrops);
 }
 
 /* handles copying properties when we do seamless travel */
@@ -137,6 +159,7 @@ void AMyPlayerState::CopyProperties(class APlayerState* PlayerState)
 
 		MyPlayerState->allowPickup = allowPickup;
 		MyPlayerState->allowDrop = allowDrop;
+		MyPlayerState->MyDrops = MyDrops;
 	}
 
 }

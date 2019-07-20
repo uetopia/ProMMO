@@ -3079,6 +3079,40 @@ bool AMyPlayerController::ServerAttemptShardSwitch_Validate(const FString& Shard
 }
 
 
+bool AMyPlayerController::ServerAttemptClaimDrop_Validate(const FString& dropKeyId)
+{
+	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
+	return true;
+}
+
+
+void AMyPlayerController::ServerAttemptClaimDrop_Implementation(const FString& dropKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptClaimDrop_Implementation"));
+
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	// find an empty slot
+	int32 emptyInventorySlotIndex = SearchEmptySlot();
+
+	if (emptyInventorySlotIndex == -1)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SaveLootItemToInventory NO Space in inventory"));
+		return;
+	}
+
+	// tell game instance to run the request
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+
+	if (TheGameInstance)
+	{
+		TheGameInstance->ClaimPlayerDrop(myPlayerState->playerKeyId, dropKeyId);
+	}
+
+
+}
+
+
 void AMyPlayerController::SendLocalChatMessage_Implementation(const FString& ChatMessageIn)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SendLocalChatMessage"));

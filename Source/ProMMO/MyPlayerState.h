@@ -168,4 +168,11 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	TArray< AMyTravelApprovedActor* >  ServerTravelApprovedActors;
 
+	// Keep track of this player's drops
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_OnDropsChange, Category = "UETOPIA")
+		TArray<FLootDrop> MyDrops;
+
+	UFUNCTION()
+		void OnRep_OnDropsChange();
+
 };

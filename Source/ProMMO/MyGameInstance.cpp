@@ -4070,6 +4070,199 @@ void UMyGameInstance::RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpRe
 }
 
 
+bool UMyGameInstance::GetPlayerDrops(FString playerKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] Purchase"));
+
+	FString nonceString = "10951350917635";
+	FString encryption = "off";  // Allowing unencrypted on sandbox for now.  
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("nonce", "nonceString");
+	PlayerJsonObj->SetStringField("encryption", encryption);
+	PlayerJsonObj->SetStringField("userKeyId", playerKeyId);
+
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+	FString APIURI = "/api/v1/game/drops/";
+
+	FMyActivePlayer* CurrentActivePlayer = getPlayerByPlayerKey(playerKeyId);
+	if (CurrentActivePlayer)
+	{
+		FString access_token = CurrentActivePlayer->PlayerController->CurrentAccessTokenFromOSS;
+		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::GetPlayerDropsRequestComplete, APIURI, JsonOutputString, access_token);
+		return requestSuccess;
+	}
+
+	return false;
+}
+
+void UMyGameInstance::GetPlayerDropsRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			bool Authorization = JsonParsed->GetBoolField("authorization");
+			UE_LOG(LogTemp, Log, TEXT("Authorization"));
+			if (Authorization)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+				bool Success = JsonParsed->GetBoolField("success");
+				if (Success) {
+					UE_LOG(LogTemp, Log, TEXT("Success True"));
+					FString userKeyId = JsonParsed->GetStringField("userKeyId");
+
+					//FMyMatchPlayer* playerRecord = getMatchPlayerByPlayerKey(userKeyId);
+					FMyActivePlayer* playerRecord = getPlayerByPlayerKey(userKeyId);
+					if (playerRecord)
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] GetPlayerDropsRequestComplete Player found by Key"));
+
+						APlayerState* thisPlayerState = playerRecord->PlayerController->PlayerState;
+						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
+
+						if (playerS)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] GetPlayerDropsRequestComplete Got player state"));
+
+							// Clear out the old Drops if any
+							playerS->MyDrops.Empty();
+
+							// Parse out the Array of returned Drops and add them to the state.
+							TArray<TSharedPtr<FJsonValue>> dropsArray = JsonParsed->GetArrayField("drops");
+
+							for (int32 i = 0; i < dropsArray.Num(); i++)
+							{
+								TSharedPtr<FJsonValue> value = dropsArray[i];
+								TSharedPtr<FJsonObject> json = value->AsObject();
+
+								FLootDrop NewDrop;
+								NewDrop.key_id = json->GetStringField("key_id");
+								NewDrop.title = json->GetStringField("title");
+								NewDrop.uiIcon = json->GetStringField("uiIcon");
+								NewDrop.expires = json->GetStringField("expires");
+
+								playerS->MyDrops.Add(NewDrop);
+
+							}
+
+						}
+
+					}
+				}
+			}
+		}
+	}
+}
+
+
+bool UMyGameInstance::ClaimPlayerDrop(FString playerKeyId, FString dropKeyId)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] ClaimPlayerDrop"));
+
+	FString nonceString = "10951350917635";
+	FString encryption = "off";  // Allowing unencrypted on sandbox for now.  
+
+	TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+	PlayerJsonObj->SetStringField("nonce", "nonceString");
+	PlayerJsonObj->SetStringField("encryption", encryption);
+
+
+	FString JsonOutputString;
+	TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+	FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+	FString APIURI = "/api/v1/game/drops/" + dropKeyId;
+
+	//FMyMatchPlayer* MatchPlayer = getMatchPlayerByPlayerKey(playerKeyId);
+	FMyActivePlayer* playerRecord = getPlayerByPlayerKey(playerKeyId);
+	if (playerRecord)
+	{
+		FString access_token = playerRecord->PlayerController->CurrentAccessTokenFromOSS;
+		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::ClaimPlayerDropRequestComplete, APIURI, JsonOutputString, access_token);
+		return requestSuccess;
+	}
+
+	return false;
+}
+
+void UMyGameInstance::ClaimPlayerDropRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
+{
+	if (!HttpResponse.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
+			*HttpRequest->GetVerb(),
+			*HttpRequest->GetURL(),
+			HttpResponse->GetResponseCode(),
+			*HttpResponse->GetContentAsString());
+		FString JsonRaw = *HttpResponse->GetContentAsString();
+		TSharedPtr<FJsonObject> JsonParsed;
+		TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(JsonRaw);
+		if (FJsonSerializer::Deserialize(JsonReader, JsonParsed))
+		{
+			bool Authorization = JsonParsed->GetBoolField("authorization");
+			UE_LOG(LogTemp, Log, TEXT("Authorization"));
+			if (Authorization)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+				bool Success = JsonParsed->GetBoolField("success");
+				if (Success) {
+					UE_LOG(LogTemp, Log, TEXT("Success True"));
+					FString userKeyId = JsonParsed->GetStringField("userKeyId");
+
+					FMyActivePlayer* playerRecord = getPlayerByPlayerKey(userKeyId);
+					if (playerRecord)
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] ClaimPlayerDropRequestComplete Player found by Key"));
+
+						// Add the item to the inventory.
+						// Parse out the data field
+
+
+						FString DropDataJsonRaw = JsonParsed->GetStringField("data");
+						TSharedPtr<FJsonObject> DropDataJsonParsed;
+						TSharedRef<TJsonReader<TCHAR>> DropDataJsonReader = TJsonReaderFactory<TCHAR>::Create(DropDataJsonRaw);
+						//const JsonValPtrArray *DropDataJson;
+
+						if (FJsonSerializer::Deserialize(DropDataJsonReader, DropDataJsonParsed))
+						{
+							UE_LOG(LogTemp, Log, TEXT("DropDataJsonParsed"));
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] DropDataJsonRaw: %s"), *DropDataJsonRaw);
+
+							// TODO  - add the drop to your inventory.  I use data tables for this.  Ping me if you want to see my code.
+
+							// refresh the drop list
+							GetPlayerDrops(JsonParsed->GetStringField("userKeyId"));
+
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
 bool UMyGameInstance::QueryGameDataList(FString cursor)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] QueryGameDataList"));

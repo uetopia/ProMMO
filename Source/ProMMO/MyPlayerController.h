@@ -342,6 +342,13 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 		void ServerAttemptAddToIndex(int32 indexFrom, int32 indexTo);
 
+	/////////////////////////////////////////
+	// Drops
+	/////////////////////////////////////////
+
+	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
+		void ServerAttemptClaimDrop(const FString& dropKeyId);
+
 	///////////////////////////
 	// VENDOR RELATED FUNCTIONS
 	///////////////////////////

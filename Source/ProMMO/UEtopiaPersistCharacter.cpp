@@ -1032,3 +1032,8 @@ void AUEtopiaPersistCharacter::OnUIStateChange_Implementation(EConnectUIState UI
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AUEtopiaPersistCharacter::OnUIStateChange_Implementation"));
 }
+
+void AUEtopiaPersistCharacter::OnDropsChangedBP_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AUEtopiaCompetitiveCharacter::OnDropsChangedBP_Implementation"));
+}

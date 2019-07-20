@@ -40,7 +40,7 @@ enum class AbilityInput : uint8
 
 
 UCLASS()
-class AUEtopiaPersistCharacter : public ACharacter, public IAbilitySystemInterface
+class PROMMO_API AUEtopiaPersistCharacter : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_UCLASS_BODY()
 
@@ -173,6 +173,9 @@ public:
 	bool bIsDying;
 
 	FTimerHandle PlayDyingTimerHandle;
+
+	UFUNCTION(BlueprintNativeEvent)
+		void OnDropsChangedBP();
 
 
 private:

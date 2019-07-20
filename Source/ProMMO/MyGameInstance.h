@@ -430,6 +430,13 @@ public:
 	bool Reward(FString playerKeyId, FString itemName, FString description, int32 amount);
 	void RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
+	bool GetPlayerDrops(FString playerKeyId);
+	void GetPlayerDropsRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	bool ClaimPlayerDrop(FString playerKeyId, FString dropKeyId);
+	void ClaimPlayerDropRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+
 	// Game data access
 	// set these up on the backend
 	bool QueryGameDataList(FString cursor);
