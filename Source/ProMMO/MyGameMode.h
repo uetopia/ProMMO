@@ -39,8 +39,6 @@ protected:
 
 
 public:
-	//AMyGameMode();
-	//virtual void PreLogin(const FString& Options, const FString& Address, const TSharedPtr<const FUniqueNetId>& UniqueId, FString& ErrorMessage) override;
 
 	void Logout(AController* Exiting);
 
@@ -48,11 +46,14 @@ public:
 
 	virtual void RestartPlayer(class AController* NewPlayer) override;
 
-	// -------------------------------------------------------------------------------------------
-	//			GameplayAbility System Sample
-	// -------------------------------------------------------------------------------------------
+	AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
+	// This is intended to be overridden by your specific game modes, as each game mode will have specific rules for killing/dying
+	virtual void RecordKill(int32 killerPlayerID, int32 victimPlayerID);
 
 	void KilledBy(AController* Killer, AActor* DamageCauser, AController* KilledContoller, AActor* KilledActor, const struct FGameplayEffectSpec& KillingEffectSpec);
 
-
+	/** Is combat allowed in this game mode?  */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UEtopia")
+		bool bCombatEnabled;
 };

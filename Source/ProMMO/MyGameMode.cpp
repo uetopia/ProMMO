@@ -2,14 +2,13 @@
 
 #include "MyGameMode.h"
 #include "ProMMO.h"
-//#include "MyPawn.h"
 #include "MyPlayerState.h"
 #include "MyGameState.h"
 #include "MyGameSession.h"
 #include "MyGameInstance.h"
 #include "MyPlayerController.h"
 #include "UEtopiaPersistCharacter.h"
-//#include "PersistCharacter.h"
+#include "MyPlayerStart.h"
 #include "Blueprint/UserWidget.h"
 
 
@@ -17,9 +16,8 @@
 AMyGameMode::AMyGameMode(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	// set default pawn class to our flying pawn
-	//DefaultPawnClass = AUEtopiaPlugCharacter::StaticClass();
+
 	static ConstructorHelpers::FClassFinder<ACharacter> PlayerPawnBPClass(TEXT("/Game/MyUEtopiaPersistCharacter"));
-	//static ConstructorHelpers::FClassFinder<APawn> PlayerPawnBPClass(TEXT("/Game/ThirdPersonCPP/Blueprints/ThirdPersonCharacter"));
 	if (PlayerPawnBPClass.Class != NULL)
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
@@ -27,7 +25,6 @@ AMyGameMode::AMyGameMode(const FObjectInitializer& ObjectInitializer) : Super(Ob
 	else {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] PlayerPawnBPClass.Class = NUL"));
 	}
-	//DefaultPawnClass = PlayerPawnOb.Class;
 
 	PlayerStateClass = AMyPlayerState::StaticClass();
 	GameStateClass = AMyGameState::StaticClass();
@@ -44,39 +41,12 @@ AMyGameMode::AMyGameMode(const FObjectInitializer& ObjectInitializer) : Super(Ob
 void AMyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (HUDWidgetClass != nullptr)
-	{
-		CurrentWidget = CreateWidget<UUserWidget>(GetWorld(), HUDWidgetClass);
-		if (CurrentWidget != nullptr)
-		{
-			CurrentWidget->AddToViewport();
-		}
-	}
-
-	// Tried to set the player name.  not working like this.
-	/*
-	APlayerController* pc = NULL;
-	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-	{
-	pc = Iterator->Get();
-	//AMyPlayerController* Mypc = Cast(pc);
-
-	AUEtopiaCompetitiveCharacter* pawn = Cast<AUEtopiaCompetitiveCharacter>(pc->GetCharacter());
-	pawn->Text->SetText(FText::FromString(pc->PlayerState->PlayerName));
-	// TODO set color
-	}
-	*/
-
-
-
 }
 
 /** Returns game session class to use */
 TSubclassOf<AGameSession> AMyGameMode::GetGameSessionClass() const
 {
 	return AMyGameSession::StaticClass();
-	//return AMyGameSession::StaticClass();
 }
 
 
@@ -95,8 +65,6 @@ FString AMyGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 
 	if (PlayerS)
 	{
-
-
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] InitNewPlayer Param1: %s"), *Name);
 
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [InitNewPlayer] - Found My player state"));
@@ -104,16 +72,13 @@ FString AMyGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [InitNewPlayer] - Set platformID"));
 	}
 
-
 	// TODO: this should only run on dedicated server
 	if (IsRunningDedicatedServer())
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyGameMode::InitNewPlayer RUNNING ON DEDICATED SERVER!"));
-
-
 		int32 playerId = PlayerS->PlayerId; // NewPlayerController->PlayerState->PlayerId;
 
-		// TESTING...  This number is always 0 even with multiple players logged in...  
+		// This number is always 0 even with multiple players logged in...  
 
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] InitNewPlayer playerId: %d"), playerId);
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] InitNewPlayer Options: %s"), *Options);
@@ -124,17 +89,9 @@ FString AMyGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		*/
 		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
 		AMyPlayerController* playerC = Cast<AMyPlayerController>(NewPlayerController);
-		
 
 		// Register the player with the session
-		// The uniqueId changed incoming and it's breaking everything else downstream
-		//Tring to reconstruct it
-
-		// Testing with this disabled..  
-		// Results in the playerID not getting set correctly, and causes the deactivate routine to fail.
-		// bug persists.
 		const TSharedPtr<const FUniqueNetId> UniqueIdTemp = UniqueId.GetUniqueNetId();
-
 		GameSession->RegisterPlayer(NewPlayerController, UniqueIdTemp, UGameplayStatics::HasOption(Options, TEXT("bIsFromInvite")));
 
 		// Moving the activate routine below register allows us to use the actual UE playerID instead of 0
@@ -178,6 +135,330 @@ FString AMyGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 	return ErrorMessage;
 }
 
+
+AActor* AMyGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [ChoosePlayerStart] "));
+
+	TArray<AMyPlayerStart*> Starts;
+
+	// First try for team slots - team info is in playerstate.
+	if (Player)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [ChoosePlayerStart] Found Player "));
+		AMyPlayerState* PS = Cast<AMyPlayerState>(Player->PlayerState);
+		if (PS)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [ChoosePlayerStart] Found PlayerState "));
+
+			for (TActorIterator<AMyPlayerStart> StartItr(GetWorld()); StartItr; ++StartItr)
+			{
+				if (StartItr->teamIndex == PS->TeamId)
+				{
+					// Also check teamplayerIndex
+					if (StartItr->playerIndex == PS->TeamPlayerIndex)
+					{
+						Starts.Add(*StartItr);
+					}
+				}
+			}
+			if (Starts.Num())
+			{
+				return Starts[FMath::RandRange(0, Starts.Num() - 1)];
+			}
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [ChoosePlayerStart] Could not find a start by team "));
+
+	// Try for any start if we can't get playerstate 
+	for (TActorIterator<AMyPlayerStart> StartItr(GetWorld()); StartItr; ++StartItr)
+	{
+		Starts.Add(*StartItr);
+	}
+
+	if (Starts.Num())
+	{
+		return Starts[FMath::RandRange(0, Starts.Num() - 1)];
+	}
+	return NULL;
+}
+
+void AMyGameMode::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] "));
+
+	FTimerDelegate TimerDel;
+
+	FTimerHandle TimerHandle;
+
+	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+
+	if (TheGameInstance)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] Got game instance"));
+
+		// TODO EXAMPLE GAME - move this all to GameMode
+		if (TheGameInstance->UEtopiaMode == "competitive") {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] RecordKill - Mode set to competitive"));
+			/*
+			// If we are here, this server is running in competitive/matchmaker mode.
+			//
+			*/
+			// get attacker activeplayer
+			bool attackerPlayerIDFound = false;
+			int32 killerPlayerIndex = 0;
+			// sum all the round kills while we're looping
+			int32 roundKillsTotal = 0;
+
+			// NOT refactoring to use get by function becaseu we do want to loop through them in this case to count round kills.
+			//FMyActivePlayer* KillerPlayer = TheGameInstance->getPlayerByPlayerId(killerPlayerID);
+
+			for (int32 b = 0; b < TheGameInstance->MatchInfo.players.Num(); b++)
+			{
+				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
+				if (TheGameInstance->MatchInfo.players[b].playerID == killerPlayerID) {
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - FOUND MATCHING killer playerID"));
+					attackerPlayerIDFound = true;
+					killerPlayerIndex = b;
+				}
+				roundKillsTotal = roundKillsTotal + TheGameInstance->MatchInfo.players[b].roundKills;
+			}
+			// we need one more since this kill has not been added to the list yet
+			roundKillsTotal = roundKillsTotal + 1;
+
+			if (killerPlayerID == victimPlayerID) {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] suicide"));
+			}
+			else {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] Not a suicide"));
+
+				// get victim
+				// not refactoring here becasue we need the index later for calculate ranks
+				bool victimPlayerIDFound = false;
+				int32 victimPlayerIndex = 0;
+
+				for (int32 b = 0; b < TheGameInstance->MatchInfo.players.Num(); b++)
+				{
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
+					if (TheGameInstance->MatchInfo.players[b].playerID == victimPlayerID) {
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - FOUND MATCHING victim playerID"));
+						victimPlayerIDFound = true;
+						victimPlayerIndex = b;
+						// set currentRoundAlive
+						TheGameInstance->MatchInfo.players[b].currentRoundAlive = false;
+					}
+				}
+
+				// check to see if this victim is already in the kill list
+
+				bool victimIDFoundInKillList = false;
+
+				for (int32 b = 0; b < TheGameInstance->MatchInfo.players[killerPlayerIndex].killed.Num(); b++)
+				{
+					if (TheGameInstance->MatchInfo.players[killerPlayerIndex].killed[b] == TheGameInstance->MatchInfo.players[victimPlayerIndex].userKeyId)
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Victim already in kill list"));
+						victimIDFoundInKillList = true;
+					}
+				}
+
+				if (victimIDFoundInKillList == false) {
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Adding victim to kill list"));
+					TheGameInstance->MatchInfo.players[killerPlayerIndex].killed.Add(TheGameInstance->MatchInfo.players[victimPlayerIndex].userKeyId);
+				}
+
+				// Increase the killer's kill count
+				TheGameInstance->MatchInfo.players[killerPlayerIndex].roundKills = TheGameInstance->MatchInfo.players[killerPlayerIndex].roundKills + 1;
+				// And increase the victim's deaths
+				TheGameInstance->MatchInfo.players[victimPlayerIndex].roundDeaths = TheGameInstance->MatchInfo.players[victimPlayerIndex].roundDeaths + 1;
+
+				// Give the killer some xp and score
+				TheGameInstance->MatchInfo.players[killerPlayerIndex].score = TheGameInstance->MatchInfo.players[killerPlayerIndex].score + 100;
+				TheGameInstance->MatchInfo.players[killerPlayerIndex].experience = TheGameInstance->MatchInfo.players[killerPlayerIndex].experience + 10;
+
+				//calculate new ranks;
+				TheGameInstance->CalculateNewRank(killerPlayerIndex, victimPlayerIndex, true);
+
+				//Calculate winning team
+
+
+			}
+
+			AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
+			AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
+
+
+			// Check to see if the round is over
+			// reset the level if one team is all dead
+			// If you have a game that has more than two teams you should rewrite this for your end round logic
+			bool anyTeamDead = false;
+			int32 stillAliveTeamId = 0;
+			for (int32 b = 0; b <= TheGameInstance->teamCount; b++) // b is the team ID we're checking
+			{
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] Checking team %d"), b);
+				bool thisTeamAlive = false;
+
+				for (int32 ip = 0; ip < TheGameInstance->MatchInfo.players.Num(); ip++) // ip is player index
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [CalculateNewRank] Checking player %d"), ip);
+					if (TheGameInstance->MatchInfo.players[ip].teamId == b) {
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Player is a member of this team"));
+						// current round alive boolean check
+						if (TheGameInstance->MatchInfo.players[ip].currentRoundAlive) {
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Player is alive"));
+							thisTeamAlive = true;
+							stillAliveTeamId = b;
+						}
+						else {
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Player is dead"));
+						}
+					}
+				}
+
+				if (thisTeamAlive == false) {
+					anyTeamDead = true;
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - A team is dead"));
+				}
+
+
+			}
+
+			// Get the index from our TeamList struct - it might not be the same index!
+			int32 TeamStillAliveTeamListIndex = 0;
+			for (int32 b = 0; b < TheGameInstance->TeamList.teams.Num(); b++)
+			{
+				if (TheGameInstance->TeamList.teams[b].number == stillAliveTeamId)
+				{
+					TeamStillAliveTeamListIndex = b;
+				}
+			}
+
+			if (anyTeamDead) {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Detected dead team"));
+				// flag and count the team win
+				// this is only for two teams - if you have more, change this.
+				for (int32 b = 0; b < TheGameInstance->MatchInfo.players.Num(); b++)
+				{
+					if (TheGameInstance->MatchInfo.players[b].teamId == stillAliveTeamId) {
+						TheGameInstance->MatchInfo.players[b].score = TheGameInstance->MatchInfo.players[b].score + 200;
+						TheGameInstance->MatchInfo.players[b].experience = TheGameInstance->MatchInfo.players[b].experience + 75;
+					}
+				}
+
+				TheGameInstance->TeamList.teams[TeamStillAliveTeamListIndex].roundWinCount = TheGameInstance->TeamList.teams[TeamStillAliveTeamListIndex].roundWinCount + 1;
+
+			}
+		}
+		else {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] RecordKill - Mode set to continuous"));
+			// get attacker activeplayer
+			bool attackerPlayerIDFound = false;
+			int32 killerPlayerIndex = 0;
+			// sum all the round kills while we're looping
+			int32 roundKillsTotal = 0;
+
+			// TODO refactor this to use our get player function instead
+
+			for (int32 b = 0; b < TheGameInstance->MatchInfo.players.Num(); b++)
+			{
+				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
+				if (TheGameInstance->MatchInfo.players[b].playerID == killerPlayerID) {
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - FOUND MATCHING killer playerID"));
+					attackerPlayerIDFound = true;
+					killerPlayerIndex = b;
+				}
+				roundKillsTotal = roundKillsTotal + TheGameInstance->MatchInfo.players[b].roundKills;
+			}
+			// we need one more since this kill has not been added to the list yet
+			roundKillsTotal = roundKillsTotal + 1;
+
+			if (killerPlayerID == victimPlayerID) {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] suicide"));
+			}
+			else {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] Not a suicide"));
+
+				// get victim activeplayer
+				bool victimPlayerIDFound = false;
+				int32 victimPlayerIndex = 0;
+
+				for (int32 b = 0; b < TheGameInstance->MatchInfo.players.Num(); b++)
+				{
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
+					if (TheGameInstance->MatchInfo.players[b].playerID == victimPlayerID) {
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - FOUND MATCHING victim playerID"));
+						victimPlayerIDFound = true;
+						victimPlayerIndex = b;
+						break;
+					}
+				}
+
+				// check to see if this victim is already in the kill list
+
+				bool victimIDFoundInKillList = false;
+
+				for (int32 b = 0; b < TheGameInstance->MatchInfo.players[killerPlayerIndex].killed.Num(); b++)
+				{
+					if (TheGameInstance->MatchInfo.players[killerPlayerIndex].killed[b] == TheGameInstance->MatchInfo.players[victimPlayerIndex].userKeyId)
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Victim already in kill list"));
+						victimIDFoundInKillList = true;
+					}
+				}
+
+				if (victimIDFoundInKillList == false) {
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [RecordKill] - Adding victim to kill list"));
+					TheGameInstance->MatchInfo.players[killerPlayerIndex].killed.Add(TheGameInstance->MatchInfo.players[victimPlayerIndex].userKeyId);
+				}
+
+				// create an event also
+				FString eventSummary = "killed " + TheGameInstance->MatchInfo.players[victimPlayerIndex].playerTitle;
+				TheGameInstance->RecordEvent(killerPlayerID, eventSummary, "location_searching", "Kill");  // look at https://material.io/icons/ for other icons
+
+				// Increase the killer's kill count
+				TheGameInstance->MatchInfo.players[killerPlayerIndex].roundKills = TheGameInstance->MatchInfo.players[killerPlayerIndex].roundKills + 1;
+				// And increase the victim's deaths
+				TheGameInstance->MatchInfo.players[victimPlayerIndex].roundDeaths = TheGameInstance->MatchInfo.players[victimPlayerIndex].roundDeaths + 1;
+
+				// Give the killer some xp and score
+				TheGameInstance->MatchInfo.players[killerPlayerIndex].score = TheGameInstance->MatchInfo.players[killerPlayerIndex].score + 100;
+				TheGameInstance->MatchInfo.players[killerPlayerIndex].experience = TheGameInstance->MatchInfo.players[killerPlayerIndex].experience + 10;
+
+				//Change rank
+				TheGameInstance->CalculateNewRank(killerPlayerIndex, victimPlayerIndex, true);
+
+				// Optionally, you can also have a CRED cost associated with killing/dying.
+				// Leaving it muted here, since it's not a standard MMO feature.
+
+				// Increase the killer's balance
+				//PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent + killRewardBTC;
+
+				// Decrease the victim's balance
+				//PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent - incrementCurrency;
+
+				// TODO kick the victim if it falls below the minimum?
+
+			}
+
+		}
+
+
+		/*
+
+		//FMyMatchPlayer* killerMatchPlayer = TheGameInstance->getMatchPlayerByPlayerId(killerPlayerID);
+		FMyActivePlayer* victimPlayer = TheGameInstance->getMatchPlayerByPlayerId(victimPlayerID);
+
+		// It could have been an AI kill which would not have a killerMatchPlayer - but we still want the player to respawn.
+		if (victimPlayer)
+		{
+			TimerDel.BindUFunction(this, FName("RestartPlayer"), victimPlayer->PlayerController);
+			GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDel, 5.0f, false);
+		}
+		*/
+	}
+}
+
 void AMyGameMode::Logout(AController* Exiting)
 {
 	// Handle users that disconnect from the server.
@@ -190,6 +471,9 @@ void AMyGameMode::Logout(AController* Exiting)
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameMode] [Logout] ExitingPlayerId: %i"), ExitingPlayerId);
 
 	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+
+	//Save off PlayerState vars that we need
+	TheGameInstance->BackupExitingPlayerState(ExitingPlayerId, ExitingPlayerState);
 
 	TheGameInstance->DeActivatePlayer(ExitingPlayerId);
 

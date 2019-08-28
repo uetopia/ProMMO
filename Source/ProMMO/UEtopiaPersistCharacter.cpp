@@ -50,23 +50,6 @@ AUEtopiaPersistCharacter::AUEtopiaPersistCharacter(const FObjectInitializer& Obj
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	// Our ability system component.
-	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
-	AttributeSet = CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
-
-
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character)
-	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
-
-	// set up a reference to our blueprint spawnable
-	// this does not work.
-	//static ConstructorHelpers::FObjectFinder<UBlueprint> InstanceOfSpawnableObject(TEXT("Blueprint'/Game/BPMySpawnableObject.BPMySpawnableObject'")); // not found
-	//static ConstructorHelpers::FObjectFinder<UBlueprint> InstanceOfSpawnableObject(TEXT("Blueprint'/Game/BPMySpawnableObject.BPMySpawnableObject_C'")); // not found
-
-
-	//if (InstanceOfSpawnableObject.Object) {
-	//	BlueprintVar = (UClass*)InstanceOfSpawnableObject.Object->GeneratedClass;
-	//}
 
 	bReplicates = true;
 	bReplicateMovement = true;
@@ -74,9 +57,6 @@ AUEtopiaPersistCharacter::AUEtopiaPersistCharacter(const FObjectInitializer& Obj
 	// mouse showing default true
 	bMouseShowing = true;
 
-	// Bind to the ability interface changed delegate
-	//AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
-	//FOnAbilityInterfaceChangedDelegate(this, &AUEtopiaPersistCharacter::RemapAbilities);
 }
 
 
@@ -84,20 +64,28 @@ void AUEtopiaPersistCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	
+	// playerController might not exist yet
+	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
+	if (playerC)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] Found a valid player controller"));
+		playerC->OnFriendsChanged.Broadcast();
+		playerC->OnRecentPlayersChanged.Broadcast();
+		playerC->OnPartyDataReceivedUETopiaDisplayUI.Broadcast();
+	}
 }
 
 void AUEtopiaPersistCharacter::PossessedBy(AController* NewController)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [PossessedBy]  "));
 	Super::PossessedBy(NewController);
-	if (AbilitySystem)
+	if (GetAbilitySystemComponent())
 	{
 		//if (HasAuthority() && Ability)
 		//{
 		//AbilitySystem->GiveAbility(FGameplayAbilitySpec(Ability.GetDefaultObject(), 1, 0));
 		//}
-		AbilitySystem->InitAbilityActorInfo(this, this);
+		GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
 		InitAbilitySystemClient();
 	}
 
@@ -109,13 +97,13 @@ void AUEtopiaPersistCharacter::PossessedBy(AController* NewController)
 void AUEtopiaPersistCharacter::InitAbilitySystemClient_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [InitAbilitySystemClient]  "));
-	if (AbilitySystem)
+	if (GetAbilitySystemComponent())
 	{
 		//if (HasAuthority() && Ability)
 		//{
 		//AbilitySystem->GiveAbility(FGameplayAbilitySpec(Ability.GetDefaultObject(), 1, 0));
 		//}
-		AbilitySystem->InitAbilityActorInfo(this, this);
+		GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
 	}
 }
 
@@ -144,47 +132,84 @@ void AUEtopiaPersistCharacter::Tick(float DeltaTime)
 //////////////////////////////////////////////////////////////////////////
 // Input
 
-void AUEtopiaPersistCharacter::SetupPlayerInputComponent(class UInputComponent* InputComponent)
+void AUEtopiaPersistCharacter::SetupPlayerInputComponent(class UInputComponent* InputComponentIn)
 {
 	// Set up gameplay key bindings
-	check(InputComponent);
-	InputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
-	InputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+	check(InputComponentIn);
+	InputComponentIn->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	InputComponentIn->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 
-	InputComponent->BindAction("Fire", IE_Pressed, this, &AUEtopiaPersistCharacter::OnStartFire);
-	InputComponent->BindAction("Fire", IE_Released, this, &AUEtopiaPersistCharacter::OnStopFire);
+	InputComponentIn->BindAction("Fire", IE_Pressed, this, &AUEtopiaPersistCharacter::OnStartFire);
+	InputComponentIn->BindAction("Fire", IE_Released, this, &AUEtopiaPersistCharacter::OnStopFire);
 
-	InputComponent->BindAction("Pickup", IE_Pressed, this, &AUEtopiaPersistCharacter::OnPickUp);
+	InputComponentIn->BindAction("Pickup", IE_Pressed, this, &AUEtopiaPersistCharacter::OnPickUp);
 
-	InputComponent->BindAction("Travel", IE_Pressed, this, &AUEtopiaPersistCharacter::OnTravel);
+	InputComponentIn->BindAction("Travel", IE_Pressed, this, &AUEtopiaPersistCharacter::OnTravel);
 
-	InputComponent->BindAction("Interact", IE_Pressed, this, &AUEtopiaPersistCharacter::OnInteractWithVendor);
+	InputComponentIn->BindAction("Interact", IE_Pressed, this, &AUEtopiaPersistCharacter::OnInteractWithVendor);
 
-	InputComponent->BindAction("ToggleMouse", IE_Pressed, this, &AUEtopiaPersistCharacter::OnToggleMouse);
+	InputComponentIn->BindAction("ToggleMouse", IE_Pressed, this, &AUEtopiaPersistCharacter::OnToggleMouse);
 
-	InputComponent->BindAxis("MoveForward", this, &AUEtopiaPersistCharacter::MoveForward);
-	InputComponent->BindAxis("MoveRight", this, &AUEtopiaPersistCharacter::MoveRight);
+	InputComponentIn->BindAxis("MoveForward", this, &AUEtopiaPersistCharacter::MoveForward);
+	InputComponentIn->BindAxis("MoveRight", this, &AUEtopiaPersistCharacter::MoveRight);
 
 	// We have 2 versions of the rotation bindings to handle different kinds of devices differently
 	// "turn" handles devices that provide an absolute delta, such as a mouse.
 	// "turnrate" is for devices that we choose to treat as a rate of change, such as an analog joystick
-	InputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
-	InputComponent->BindAxis("TurnRate", this, &AUEtopiaPersistCharacter::TurnAtRate);
-	InputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
-	InputComponent->BindAxis("LookUpRate", this, &AUEtopiaPersistCharacter::LookUpAtRate);
+	InputComponentIn->BindAxis("Turn", this, &APawn::AddControllerYawInput);
+	InputComponentIn->BindAxis("TurnRate", this, &AUEtopiaPersistCharacter::TurnAtRate);
+	InputComponentIn->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+	InputComponentIn->BindAxis("LookUpRate", this, &AUEtopiaPersistCharacter::LookUpAtRate);
 
 	// handle touch devices
-	InputComponent->BindTouch(IE_Pressed, this, &AUEtopiaPersistCharacter::TouchStarted);
-	InputComponent->BindTouch(IE_Released, this, &AUEtopiaPersistCharacter::TouchStopped);
+	InputComponentIn->BindTouch(IE_Pressed, this, &AUEtopiaPersistCharacter::TouchStarted);
+	InputComponentIn->BindTouch(IE_Released, this, &AUEtopiaPersistCharacter::TouchStopped);
 
 	// Map the "InputIDs" to the ability system
-	AbilitySystem->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds("ConfirmInput", "CancelInput", "AbilityInput"));
+	if (GetAbilitySystemComponent())
+	{
+		GetAbilitySystemComponent()->BindAbilityActivationToInputComponent(InputComponentIn, FGameplayAbilityInputBinds("ConfirmInput", "CancelInput", "AbilityInput"));
+	}
+	
 
-
-	//AttributeSet->CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
-	//AttributeSet = CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
 }
 
+UAbilitySystemComponent* AUEtopiaPersistCharacter::GetAbilitySystemComponent() const
+{
+	AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->GetPlayerState());
+	if (PlayerS)
+	{
+		return PlayerS->GetAbilitySystemComponent();
+	}
+	return nullptr;
+
+}
+
+
+void AUEtopiaPersistCharacter::Restart()
+{
+	Super::Restart();
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaCompetitiveCharacter] [Restart]  "));
+
+	// Server ONLY
+	if (IsRunningDedicatedServer())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaCompetitiveCharacter] [Restart] - Server "));
+
+		static UProperty* HealthProperty = FindFieldChecked<UProperty>(UMyAttributeSet::StaticClass(), GET_MEMBER_NAME_CHECKED(UMyAttributeSet, Health));
+		static UProperty* MaxHealthProperty = FindFieldChecked<UProperty>(UMyAttributeSet::StaticClass(), GET_MEMBER_NAME_CHECKED(UMyAttributeSet, MaxHealth));
+		float maxHealth = GetAbilitySystemComponent()->GetNumericAttributeBase(MaxHealthProperty);
+		GetAbilitySystemComponent()->SetNumericAttributeBase(FGameplayAttribute(HealthProperty), maxHealth);
+
+
+		// TODO - this is a good place to set up any GameplayEffects
+		// Like if you have Equipment that grants effects...
+		//ServerSetUpEquipmentEffects();
+
+		
+	}
+
+}
 
 void AUEtopiaPersistCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
@@ -260,28 +285,7 @@ void AUEtopiaPersistCharacter::OnStartFire()
 
 bool AUEtopiaPersistCharacter::CanFire()
 {
-	AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->GetPlayerState());
-	AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
-	if (playerC->InventorySlots.Num() > 0) {
-		return true;
-	}
-
-	/*
-	if (PlayerS != NULL) {
-	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanFire] Player State found. "));
-	if (PlayerS->InventoryCubes > 0) {
-	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanFire] true. "));
 	return true;
-	}
-	else {
-	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [CanFire] false. "));
-	return false;
-	}
-	}
-	return false;
-	*/
-	return false;
-	
 }
 
 void AUEtopiaPersistCharacter::OnStopFire()
@@ -301,14 +305,13 @@ void AUEtopiaPersistCharacter::ServerAttemptSpawnActor_Implementation()
 		FVector spawnlocationstart = ShootDir * placementDistance;
 		FVector spawnlocation = spawnlocationstart + Origin;
 		// Spawn the actor
-		//Spawn a bomb
+
 		FTransform const SpawnTransform(ShootDir.Rotation(), spawnlocation);
 		//int32 playerID = PlayerState->PlayerId;
 
 		UWorld* const World = GetWorld(); // get a reference to the world
 		if (World) {
 			// if world exists, spawn the blueprint actor
-			// this does not work
 			// note:  take a look at the constructor above which attempts to find the bp object.
 			//AMySpawnableObject* YC = World->SpawnActor<AMySpawnableObject>(BlueprintVar, SpawnTransform);
 
@@ -316,26 +319,15 @@ void AUEtopiaPersistCharacter::ServerAttemptSpawnActor_Implementation()
 			
 			AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
 
-			// doing it using the c++ class for now
-			// hardcoding this for testing.
-			//World->SpawnActor<AMyBasePickup>(playerC->InventorySlots[0].itemClass->GetDefaultObject()->GetClass(), SpawnTransform);
+			AMyPlayerState* PlayerS = Cast<AMyPlayerState>(playerC->PlayerState);
 
-			UClass* LoadedActorOwnerClass;
-			LoadedActorOwnerClass = LoadClassFromPath(playerC->InventorySlots[0].itemClassPath);
-
-			World->SpawnActor<AMyBasePickup>(LoadedActorOwnerClass, SpawnTransform);
-
-			//World->SpawnActor<AMyBasePickup>(playerC->InventorySlots[0].itemClass->GetClass(), SpawnTransform);
+			if (PlayerS)
+			{
+				UClass* LoadedActorOwnerClass;
+				LoadedActorOwnerClass = LoadClassFromPath(PlayerS->InventorySlots[0].itemClassPath);
+				World->SpawnActor<AMyBasePickup>(LoadedActorOwnerClass, SpawnTransform);
+			}
 		}
-
-		//AMyPlayerState* PlayerS = Cast<AMyPlayerState>(this->PlayerState);
-		//if (PlayerS != NULL) {
-		//	PlayerS->InventoryCubes--;
-		//}
-
-		// this spawns the C++ actor
-		//GetWorld()->SpawnActor<AMySpawnableObject>(AMySpawnableObject::StaticClass(), SpawnTransform);
-		//BombActor->setPlayerID(playerID);s
 	}
 
 }
@@ -645,15 +637,6 @@ bool AUEtopiaPersistCharacter::ServerAttemptBuy_Validate()
 }
 
 
-void AUEtopiaPersistCharacter::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	// Replicate to everyone
-	DOREPLIFETIME(AUEtopiaPersistCharacter, Health);
-
-}
-
 class AMyBasePickup* AUEtopiaPersistCharacter::GetItemFocus() {
 	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetItemFocus]  "));
 	// Attempt to use Raycasts to view an object and echo it back
@@ -836,7 +819,7 @@ FGameplayAbilitySpecHandle AUEtopiaPersistCharacter::AttemptGiveAbility( UGamepl
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [AttemptGiveAbility]  "));
 
-	FGameplayAbilitySpecHandle AbilityHandle = AbilitySystem->GiveAbility(FGameplayAbilitySpec(Ability, 1, INDEX_NONE)); // assigning abilities to -1 by default makes them not triggerable
+	FGameplayAbilitySpecHandle AbilityHandle = GetAbilitySystemComponent()->GiveAbility(FGameplayAbilitySpec(Ability, 1, INDEX_NONE)); // assigning abilities to -1 by default makes them not triggerable
 	// For abilities to be triggerable, RemapAbilities must be run first, which looks at the ability bar setup
 	return AbilityHandle;
 }
@@ -868,14 +851,14 @@ void AUEtopiaPersistCharacter::RemapAbilities_Implementation()
 
 	for (int32 abilitySlotIndex = 0; abilitySlotIndex < playerC->MyAbilitySlots.Num(); abilitySlotIndex++)
 	{
-		Spec = AbilitySystem->FindAbilitySpecFromHandle(playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.AbilityHandle);
+		Spec = GetAbilitySystemComponent()->FindAbilitySpecFromHandle(playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.AbilityHandle);
 		if (Spec)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] classPath: %s "), *playerC->MyAbilitySlots[abilitySlotIndex].GrantedAbility.classPath);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] Spec->InputID: %d "), Spec->InputID);
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [RemapAbilities] abilitySlotIndex: %d "), abilitySlotIndex);
 			Spec->InputID = abilitySlotIndex;
-			AbilitySystem->MarkAbilitySpecDirty(*Spec);
+			GetAbilitySystemComponent()->MarkAbilitySpecDirty(*Spec);
 		}
 		
 	}
@@ -892,23 +875,50 @@ return true;
 }
 */
 
+void AUEtopiaPersistCharacter::OnRep_PlayerState()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [OnRep_PlayerState]  "));
+
+	Super::OnRep_PlayerState();
+
+	// This should be running client side...  ???
+
+	AMyPlayerState* PlayerS = Cast<AMyPlayerState>(GetPlayerState());
+	if (PlayerS)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [OnRep_PlayerState] Found a valid player state"));
+
+		AMyPlayerController* playerC = Cast<AMyPlayerController>(Controller);
+		if (playerC)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] OnRep_PlayerState Found a valid player controller"));
+			playerC->OntitleChangedBP();
+		}
+	}
+}
 
 float AUEtopiaPersistCharacter::GetCooldownTimeRemaining(FGameplayAbilitySpecHandle CallingAbilityHandle, float& TotalDuration)
 {
-	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining]"));
-	FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(CallingAbilityHandle);
-	if (Spec)
+	if (CallingAbilityHandle.IsValid())
 	{
-		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining] found spec"));
-		UGameplayAbility* AbilityToCheck = Spec->Ability;
-		UAbilitySystemComponent* AbilityComp = Cast<IAbilitySystemInterface>(this) ? Cast<IAbilitySystemInterface>(this)->GetAbilitySystemComponent() : nullptr;
-
-		if (AbilityToCheck && AbilityComp)
+		if (GetAbilitySystemComponent())
 		{
-			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining] AbilityToCheck && AbilityComp"));
-			float CurrentDuration;
-			AbilityToCheck->GetCooldownTimeRemainingAndDuration(CallingAbilityHandle, AbilityComp->AbilityActorInfo.Get(), CurrentDuration, TotalDuration);
-			return CurrentDuration;
+			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining]"));
+			FGameplayAbilitySpec* Spec = GetAbilitySystemComponent()->FindAbilitySpecFromHandle(CallingAbilityHandle);
+			if (Spec)
+			{
+				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining] found spec"));
+				UGameplayAbility* AbilityToCheck = Spec->Ability;
+				UAbilitySystemComponent* AbilityComp = Cast<IAbilitySystemInterface>(this) ? Cast<IAbilitySystemInterface>(this)->GetAbilitySystemComponent() : nullptr;
+
+				if (AbilityToCheck && AbilityComp)
+				{
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [GetCooldownTimeRemaining] AbilityToCheck && AbilityComp"));
+					float CurrentDuration;
+					AbilityToCheck->GetCooldownTimeRemainingAndDuration(CallingAbilityHandle, AbilityComp->AbilityActorInfo.Get(), CurrentDuration, TotalDuration);
+					return CurrentDuration;
+				}
+			}
 		}
 	}
 	return 0.f;
@@ -1020,18 +1030,6 @@ void AUEtopiaPersistCharacter::PlayDying_Implementation()
 	}
 }
 
-void AUEtopiaPersistCharacter::ClientChangeUIState_Implementation(EConnectUIState NewState)
-{
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] ClientChangeUIState_Implementation"));
-	//OnUIStateChange.Broadcast(NewState);
-	OnUIStateChange(NewState);
-	return;
-}
-
-void AUEtopiaPersistCharacter::OnUIStateChange_Implementation(EConnectUIState UIState)
-{
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AUEtopiaPersistCharacter::OnUIStateChange_Implementation"));
-}
 
 void AUEtopiaPersistCharacter::OnDropsChangedBP_Implementation()
 {

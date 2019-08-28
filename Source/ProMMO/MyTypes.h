@@ -24,7 +24,9 @@ enum class EConnectUIState : uint8
 {
 	Play 	UMETA(DisplayName = "Play"),
 	Loading 	UMETA(DisplayName = "Loading"),
-	CharacterCustomize	UMETA(DisplayName = "CharacterCustomize")
+	CharacterCustomize	UMETA(DisplayName = "CharacterCustomize"),
+	MatchResults 	UMETA(DisplayName = "MatchResults"),
+	Lobby 	UMETA(DisplayName = "Lobby")
 };
 
 USTRUCT(BlueprintType)
@@ -325,6 +327,36 @@ struct FMyInventorySlot {
 		int32 MaxStackSize;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		TArray<float> Attributes;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 DataTableId;
+
+	// Other things you might want to include in your Inventory slot data:
+	/*
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<int32> InventoryGrantedAbilities;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<int32> EquipmentGrantedAbilities;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<int32> EquipmentGrantedAbilitiesKeyIndex;
+	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+	//	TSubclassOf<UGameplayEffect> InventoryEffect;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TSubclassOf<UGameplayEffect> EquipmentEffect;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<int32> ValidEquipmentMeshes;
+	///
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray <int32> EquipHidesOtherSlots;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray <int32> EquipBlocksOtherSlots;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bIsEquipHidden;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bIsEquipBlocked;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FActiveGameplayEffectHandle GamePlayEffectHandle;
+	*/
 };
 
 
@@ -426,6 +458,19 @@ struct FMyCharacterRecord {
 		bool currentlySelectedActive;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		UTexture2D* Icon;
+
+	// These are just used for UI - Add whatever you need.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 gender;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 mesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 rank;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 score;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 level;
 
 };
 
@@ -614,5 +659,86 @@ struct FLootDrop {
 		FString uiIcon;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString expires;
+
+};
+
+USTRUCT(BlueprintType)
+struct FZoneDetails {
+
+	GENERATED_USTRUCT_BODY()
+
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 control;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 energy;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 materials;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString title;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString customTitle;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString factionTag;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString mapTitle;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool validZone;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 regionKeyId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 mapKeyId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 key_id;
+};
+
+
+UENUM(BlueprintType)		//"BlueprintType" is essential to include
+enum class EGameStateHUDType : uint8
+{
+	None 	UMETA(DisplayName = "None"),
+	Deathmatch 	UMETA(DisplayName = "Deathmatch"),
+	KOTH  	UMETA(DisplayName = "King Of The Hill"),
+	Payload	UMETA(DisplayName = "Payload/Escort"),
+	ThreeCP	UMETA(DisplayName = "ThreeCP"),
+};
+
+USTRUCT(BlueprintType)
+struct FScoreboardKOTH {
+
+	GENERATED_USTRUCT_BODY()
+		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float ClaimPercentageSpeed;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float CapturePercentageSpeed;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString Team1Title;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString Team2Title;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float Team1Percentage;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float Team2Percentage;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float Team1ClaimPercentage;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		float Team2ClaimPercentage;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bTeam1HasControl;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bTeam2HasControl;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bTeam1Claiming;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bTeam2Claiming;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool bIsContested;
 
 };

@@ -17,7 +17,6 @@
 #include "MyBaseVendor.h"
 #include "GameplayAbilitySpec.h"
 #include "MyTypes.h"
-//#include "VictoryBPFunctionLibrary.h"
 #include "MyPlayerController.generated.h"
 
 // 4.16 login flow thing
@@ -39,6 +38,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnChatRoomMessageReceivedDisplay
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnChatPrivateMessageReceivedDisplayUIDelegate, FString, SenderUserKeyId, FString, ChatMessage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTournamentListChangedUETopiaDisplayUIDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTournamentDataReadUETopiaDisplayUIDelegate);
+// These delegates were not working reliably, so I moved to a direct RPC approach instead.
+// TODO EXAMPLE GAME - delete unused
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChangedDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemSellStartedDelegate, int32, Index);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnVendorInteractDisplayUIDelegate, AMyBaseVendor*, VendorRef);
@@ -116,6 +117,10 @@ public:
 	FString playerKeyId;
 	int32 playerIDTemp;
 
+	UPROPERTY(BlueprintReadOnly)
+		bool UEtopiaCharactersEnabled; // Switch for running with or without characters
+
+
 	///////////////////////////////////////////////////////////
 	// This section from
 	// https://wiki.unrealengine.com/UMG,_Referencing_UMG_Widgets_in_Code
@@ -140,11 +145,6 @@ public:
 	///////////////////////////////////////////////////////////
 
 
-	// Deprecated - Unused.
-	// Use the login function inside the LoginFlow Widget Instead.
-	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-	//	void Login();
-
 	// Unused in Most MMOs
 	// This can be used if servers should have a lobby before gameplay begins.
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA", Server, Reliable, WithValidation)
@@ -163,6 +163,8 @@ public:
 	// Tell the client to update the player access token
 	UFUNCTION(Client, Reliable)
 		void ClientGetCurrentAccessTokenFromOSS();
+
+	FTimerHandle RespawnTimerHandle;
 
 	//////////////////////////////////
 
@@ -184,21 +186,23 @@ public:
 	UFUNCTION(Client, Reliable)
 		void ClientTravelApprovedSpawnActor(FTransform SpawnTransform);
 
-	UPROPERTY(Replicated, BlueprintReadOnly)
-		int32 Experience; // total experience all time
+	// DEPRECATED - Moved to playerState
+	//UPROPERTY(Replicated, BlueprintReadOnly)
+	//	int32 Experience; // total experience all time
 
-	UPROPERTY(Replicated, BlueprintReadOnly)
-		int32 ExperienceThisLevel;  // Experience so far in this level
+	//UPROPERTY(Replicated, BlueprintReadOnly)
+	//	int32 ExperienceThisLevel;  // Experience so far in this level
 
 	// Keep track of the state of this player's persistent data
 	// Prevent the case of a user disconnecting before the data has been populated and leading to a data wipe.
 	bool PlayerDataLoaded;
 
+	/////////////////
 	// Shard Related
+	/////////////////
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "UETOPIA")
 		bool bIsShardedServer;
-
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void AttemptShardSwitch(const FString& ShardKeyId);
@@ -206,7 +210,6 @@ public:
 	// This is the function that gets called on the server
 	UFUNCTION(Server, Reliable, WithValidation)
 		void ServerAttemptShardSwitch(const FString& ShardKeyId);
-
 
 	///////////////////
 	// Friend Functions
@@ -258,6 +261,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		void ExitChatChannel(int32 CurrentChannelIndex);
+
+	// this function sends a local chat message - does not go through the server or backend.
+	UFUNCTION(Client, Reliable)
+		void SendLocalChatMessage(const FString& ChatMessageIn);
 
 	///////////////////////////////
 	// TOURNAMENT related Functions
@@ -568,10 +575,6 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
 		FOnFriendsChangedDelegate OnFriendsChanged;
 
-	// when this fires, the OSS has received a friend invite.
-	//UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
-	//	FOnFriendInviteReceivedUETopiaDelegate OnFriendInviteReceived;
-
 	// when this fires, display the friend invitation UI
 	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
 		FOnFriendInviteReceivedUETopiaDisplayUIDelegate OnFriendInviteReceivedDisplayUI;
@@ -619,8 +622,8 @@ public:
 
 	// This is the delegate to grab on to in the UI
 	// When it fires, it signals that you should refresh the inventory
-	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
-		FOnInventoryChangedDelegate OnInventoryChanged;
+	//UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+	//	FOnInventoryChangedDelegate OnInventoryChanged;
 
 
 
@@ -738,21 +741,51 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 		bool IAmCaptain;
 
+	// Blueprint Native functions are used to trigger actions inside the HUD
+	// These are only going to run on the client.
+	// But, they cannot be declared as client only, so we need to trigger them from a Client RPC or OnRep Function
+
+	UFUNCTION(BlueprintNativeEvent)
+		void OnInventoryChangedBP();
+
+	// We still need this equipment changed function in order to set the icon in player overhead.
+	UFUNCTION(BlueprintNativeEvent)
+		void OnEquipmentChangedBP();
+
+	UFUNCTION(BlueprintNativeEvent)
+		void OnUIStateChange(EConnectUIState UIState);
+	UFUNCTION(BlueprintNativeEvent)
+		void OnChatChannelsChangedChangedBP();
+	UFUNCTION(BlueprintNativeEvent)
+		void OnAttributesChangedBP();
+	UFUNCTION(BlueprintNativeEvent)
+		void OnDropsChangedBP();
+	UFUNCTION(BlueprintNativeEvent)
+		void OntitleChangedBP();
+
+	// UI STATE
+	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "UETOPIA")
+		void ClientChangeUIState(EConnectUIState NewState);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UETOPIA")
+		EConnectUIState CurrentUIState;
+
+
 	// Inventory
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_OnInventoryChange, Category = "UETOPIA")
-		TArray<FMyInventorySlot> InventorySlots;
+	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_OnInventoryChange, Category = "UETOPIA")
+	//	TArray<FMyInventorySlot> InventorySlots;
 
 	// Rep notify to tell the client to load the new inventory
 	//UPROPERTY(ReplicatedUsing = OnRep_OnInventoryChange)
 	//	bool DoRep_InventoryChanged;
 
 	// this function just calls the delegate.
-	UFUNCTION(Client, Reliable)
-		void OnRep_OnInventoryChange();
+	//UFUNCTION(Client, Reliable)
+	//	void OnRep_OnInventoryChange();
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		int32 InventoryCapacity;
+	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+	//	int32 InventoryCapacity;
 
 	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "UETOPIA")
 	//	TArray<FMyAbilitySlot> AbilitySlots;
@@ -760,8 +793,8 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 AbilityCapacity;
 
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "UETOPIA")
-		int32 CurrencyAvailable;
+	//UPROPERTY(BlueprintReadOnly, Replicated, Category = "UETOPIA")
+	//	int32 CurrencyAvailable;
 
 	// Vendors
 	// We cache the currently in-use vendor's information locally on each client.  Requests for purchases or sales go through the server.
@@ -784,6 +817,7 @@ public:
 		TArray<FMyVendorItem> MyCurrentVendorInventory;
 
 	// Abilities
+	// This should move to PS too
 	UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_OnAbilityInterfaceChange, Category = "UETOPIA")
 		TArray<FMyAbilitySlot> MyAbilitySlots;
 
@@ -805,7 +839,7 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 		void GrantCachedAbilities();
 
-	// Rep notify to tell the client to load the new inventory
+	// Rep notify to tell the client to load the new abilities
 	//UPROPERTY(ReplicatedUsing = OnRep_OnAbilitiesChange)
 	//	bool DoRep_AbilitiesChanged;
 
@@ -827,55 +861,10 @@ public:
 		void ClearHUDWidgets();
 	virtual void ClearHUDWidgets_Implementation();
 
-	// this function sends a local chat message - does not go through the server or backend.
-	UFUNCTION(Client, Reliable)
-		void SendLocalChatMessage(const FString& ChatMessageIn);
-
-	// Custom texture url string.
-	// THis is set via getServerInfo, and normally stored in gamestate
-	// the duplicate here is because the player needs to have a hard notification that this changes.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_OnCustomTextureChange, Category = "UETOPIA")
-		FString customTexture;
-
-	UFUNCTION(Client, Reliable)
-		virtual void OnRep_OnCustomTextureChange();
-
-	UTexture2D* LoadedTexture;
-
-	/**
-	* Delegate called when a Http request completes for reading a cloud file
-	*/
-	void ReadCustomTexture_HttpRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
-
-	/**
-	* Save a file from a given user to disk
-	*
-	* @param FileName name of file being saved
-	* @param Data data to write to disk
-	*/
-	void SaveCloudFileToDisk(const FString& Filename, const TArray<uint8>& Data);
-
-	/**
-	* Converts filename into a local file cache path
-	*
-	* @param FileName name of file being loaded
-	*
-	* @return unreal file path to be used by file manager
-	*/
-	FString GetLocalFilePath(const FString& FileName);
 
 private:
 
-	// 4.16 login flow stuff - moving to loginwidget
-	//void FOnPopupDismissed(const TSharedRef<SWidget>& DisplayWidget);
-	//ILoginFlowManager::FOnPopupDismissed OnDisplayLoginWidget(const TSharedRef<SWidget>& DisplayWidget);
-	//void OnDismissLoginWidget();
-	//FReply CancelLoginFlow();
-
 	TSharedPtr<ILoginFlowManager> LoginFlowManager;
-
-	//TSharedPtr<class SWebBrowser> WebBrowserWidget;
-
 	TSharedPtr<SWidget> DisplayWidgetRef;
 
 

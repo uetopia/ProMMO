@@ -15,19 +15,13 @@ class PROMMO_API AMyGameState : public AGameState
 {
 	GENERATED_UCLASS_BODY()
 
-		//UMyGameInstance gameInstance;
-
 		virtual void BeginPlay();
-
-	// Tick does not exist here
-	//virtual void Tick(float DeltaSeconds) override;
 
 	void LoadLevel();
 
 	/* Handle to manage the timer */
 	FTimerHandle ServerPortalsTimerHandle;
 
-	//void SpawnServerPortals();
 
 public:
 
@@ -42,7 +36,20 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		FMyTeamList TeamList;
-	//TArray<AMyServerPortalActor*> ServerPortalActorReference;
+	
+	// ZoneDetail comes from metagame, put any json there to pass through to the game
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		FZoneDetails ZoneDetail;
+
+	// Most games need a bunch of values to handle score, progress etc.
+	// Each game mode will have different requirements, and we may want to have game states specifically for each of the game modes.
+
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		EGameStateHUDType GameStateHUDType;
+
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		FScoreboardKOTH KOTHScore;
+
 
 	// Day/Night Cycle 
 	// Rep notify to tell the client to load the new inventory
@@ -58,10 +65,20 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 		float sunAngleMultiplier = 1.0f;
 
+	// Control for servers that do not allow conbat.
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		bool bCombatEnabled = true;
+
+	// prevent duplicate results.
+	UPROPERTY(VisibleAnywhere, Category = "UETOPIA")
+		bool bRoundWinProcessing = false;
+
+
 	// Server shards
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "UETOPIA")
 	TArray<FMyServerShard> ServerShards;
 
+	
 
 };

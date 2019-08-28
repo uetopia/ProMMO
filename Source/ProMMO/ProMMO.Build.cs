@@ -18,6 +18,7 @@ public class ProMMO : ModuleRules
                 "Slate",
                 "SlateCore",
                 "GameplayAbilities",
+                "GameplayTasks",
 	            "GameplayTags",
                 "RamaSaveSystem"
          });

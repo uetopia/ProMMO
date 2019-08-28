@@ -16,6 +16,7 @@
 #include "MyServerPortalActorParallelPart.h"
 #include "MyServerPortalActorParallelGrou.h"
 #include "MyBasePickup.h"
+#include "MyPlayerState.h"
 #include "MyTypes.h"
 #include "MyGameInstance.generated.h"
 
@@ -30,13 +31,25 @@ struct FMyActivePlayer {
 	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 	//	FString platformID;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		FString playerKeyId;
+		FString userKeyId;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString playerTitle;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		bool authorized;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		bool deactivateStarted; // the deactivation process has started - don't start it again.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool joined;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 teamId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 teamPlayerIndex;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString teamKeyId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString teamTitle;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool win;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 roundKills;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
@@ -46,22 +59,53 @@ struct FMyActivePlayer {
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		TArray<FUserEvent> events;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool currentRoundAlive;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 rank;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 experience;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 experienceThisLevel;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 score;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 level;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 currencyCurrent;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString gamePlayerKeyId;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FUniqueNetIdRepl UniqueId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool characterCustomized;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool gamePlayerDataLoaded;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		bool twitchCurrentlyStreaming;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString twitchChannelId;
+
+	// PlayerState Backup Fields
+	// These are used when a player disconnects.
+	// The player state will be deleted, so we copy all of the information we need for SaveGamePlayer
+	bool PSBackupCharacterSetup;
+	int32 PSBackupCharacterGender;
+	int32 PSBackupCharacterMesh;
+	int32 PSBackupInventoryCapacity;
+	TArray<FMyInventorySlot> PSBackupInventorySlots;
+	TArray<FMyInventorySlot> PSBackupMyEquipment;
+
 	//UPROPERTY(BlueprintReadOnly, Category = "UETOPIA")
 	AMyPlayerController* PlayerController;
 
 	FTimerHandle GetPlayerInfoDelayHandle;
 	FTimerDelegate GetPlayerInfoTimerDel;
+
+	// Is the player currently connected?  Can we get the controller and playerstate?
+	bool bIsConnected;
+	// Was the player connected previously?  Can we get the backed-up playerstate?
+	bool bWasConnected;
 
 };
 
@@ -127,7 +171,7 @@ struct FMyMatchInfo {
 
 	GENERATED_USTRUCT_BODY()
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		TArray<FMyMatchPlayer> players;
+		TArray<FMyActivePlayer> players;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 admissionFee;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
@@ -140,6 +184,16 @@ struct FMyMatchInfo {
 		FString encryption;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString nonce;
+	// Keep track of which game mode this match should be using
+	// The keyId is the unique identifier, and the title is the Subsystem reference
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 gameModeKeyId;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString gameModeTitle;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		TArray<FString> sponsors;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		FString metaMatchTravelUrl;
 };
 
 USTRUCT(BlueprintType)
@@ -147,13 +201,15 @@ struct FMyTeamInfo {
 
 	GENERATED_USTRUCT_BODY()
 		UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
-		TArray<FMyMatchPlayer> players;
+		TArray<FMyActivePlayer> players;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		FString title;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 number;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 roundWinCount;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 averageRank;
 };
 
 USTRUCT(BlueprintType)
@@ -209,6 +265,8 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	// Populated through the get match info API call
 	int32 admissionFee;
 	FString MatchTitle;
+	bool UEtopiaCharactersEnabled; // Switch for running with or without characters
+	FString metaMatchCustom;
 
 
 	// Populated through the online subsystem
@@ -218,6 +276,7 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 
 
 	// Use this for Dedicated Server.
+	// DEPRECATED - TODO DELETE
 	FMyActivePlayers PlayerRecord;
 	FMyServerLinks ServerLinks;
 
@@ -227,7 +286,8 @@ class PROMMO_API UMyGameInstance : public UGameInstance
 	// Use this for matchmaker/competitive
 	FMyMatchInfo MatchInfo;
 	bool MatchStarted;
-	int32 RoundWinsNeededToWinMatch;
+	//int32 RoundWinsNeededToWinMatch;
+	FZoneDetails ZoneDetail;
 
 	bool PerformHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString, FString AccessToken);
 	bool PerformJsonHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString, FString AccessToken);
@@ -371,15 +431,44 @@ public:
 	bool DeActivatePlayer(int32 playerID);
 	void DeActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
+	// Copy the player State values into and out of the Array when they leave and join.
+	bool BackupExitingPlayerState(int32 playerID, AMyPlayerState* playerState);
+	bool RestoreJoiningPlayerState(FString playerKeyId); // can lookup the PS
+
+	// Players that disconnect and re-connect need some of the housekeeping of Activate player, but we don't actually need to activate them.
+	bool ReconnectPlayer(class AMyPlayerController* NewPlayerController, FString playerKeyId, int32 playerID, const FUniqueNetIdRepl& UniqueId);
+
 	// Deprecated.  Use chat in OSS instead!
-	bool OutgoingChat(int32 playerID, FText message);
-	void OutgoingChatComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+	//bool OutgoingChat(int32 playerID, FText message);
+	//void OutgoingChatComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	void SubmitReport();
 	void SubmitReportComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	bool SubmitMatchMakerResults();
 	void SubmitMatchMakerResultsComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	// Timer handles for submit matchmaker
+	FTimerHandle SubmitMMResultsDelayHandle;
+	FTimerDelegate SubmitMMResultsTimerDel;
+
+	// Switch to match results UI state.  This needs a function becasue we want to do it after a short delay.
+	UFUNCTION()
+		bool ShowMatchResults();
+
+	FTimerHandle ShowMatchResultsDelayHandle;
+	FTimerDelegate ShowMatchResultsTimerDel;
+
+	// We want to kick players off the server so they can return to the lobby and start matchmaking again.
+	// We'll do this on a timer as well so they can see the match results page for a few seconds first.
+	UFUNCTION()
+		bool KickPlayersFromServer();
+
+	FTimerHandle KickPlayersDelayHandle;
+	FTimerDelegate KickPlayersTimerDel;
+
+	// prevent possible duplicate matchmaker submissions
+	bool MatchMakerResultsSubmitted = false;
 
 	UFUNCTION()
 	bool GetGamePlayer(FString playerKeyId, bool bAttemptLock);
@@ -447,8 +536,9 @@ public:
 
 	void RequestBeginPlay();
 
-	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
-		void LoadServerStateFromFile();
+	// DEPRECATED as of 4.22.2
+	//UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+	//	void LoadServerStateFromFile();
 
 	// Get a player out of our custom array struct
 	// PlayerID is the internal Unreal engine Integer ID
@@ -460,7 +550,8 @@ public:
 	void deletePlayerByPlayerKey(FString playerKeyId);
 
 	// Get Match player
-	FMyMatchPlayer* getMatchPlayerByPlayerId(int32 playerID);
+	// DEPRECATED - Use ActivePlayer
+	FMyActivePlayer* getMatchPlayerByPlayerId(int32 playerID);
 
 	// Get a server out of our custom array struct
 	FMyServerLink* getServerByKey(FString serverKey);
@@ -488,12 +579,24 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
 		int32 teamCount;
 
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool RecordRoundWin(int32 winnerTeamID);
+
+	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
+		bool RecordMatchWin(int32 winnerTeamID);
+
 	// THis is called when the last player leaves the server to notify the backend that it is safe to destroy this server.
 	bool NotifyDownReady();
 	void NotifyDownReadyComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
 
 	// How many items are allowed to be dropped into this level
 	int32 maxPickupItemCount;
+
+	// Is combat enabled on this server?
+	bool combatEnabled = true;
+
+	void CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser);
 
 private:
 	UPROPERTY(config)
@@ -566,17 +669,12 @@ private:
 
 	void HandleUserLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
 
-
-
-
-
 	// We need to be aware of the HasBegunPlay function coming from gameState
 	// Certain things will fail (like spawning actors), if the loadLevel has not completed.
 
 
 	void SpawnServerPortals();
 	TArray<AMyServerPortalActor*> ServerPortalActorReference;
-
 
 
 	/** Whether the match is online or not */
@@ -602,6 +700,8 @@ private:
 	// Custom texture url string.
 	FString customTexture;
 
+	
+
 protected:
 	/** Delegate for creating a new session */
 	//FOnCreateSessionCompleteDelegate OnCreateSessionCompleteDelegate;
@@ -613,11 +713,10 @@ protected:
 	*/
 	virtual void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
 
-	// WE probably don't need two of these, but they operate on different structs, so I'm leaving them for now.
-	void CalculateNewRank(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser); // for competitive/matchmaker
+	// TODO EXAMPLE GAME - remove
 	void CalculateNewRankContinuous(int32 WinnerPlayerIndex, int32 LoserPlayerIndex, bool penalizeLoser); // for continuous
 
-
+	void CalculateNewTeamRank(int32 WinnerTeamIndex, int32 LoserTeamIndex);
 
 };
 

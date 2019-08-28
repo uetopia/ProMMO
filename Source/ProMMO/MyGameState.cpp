@@ -11,8 +11,26 @@ AMyGameState::AMyGameState(const FObjectInitializer& ObjectInitializer) : Super(
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] CONSTRUCT"));
 
-	//GetWorld()->GetTimerManager().SetTimer(ServerPortalsTimerHandle, this, &AMyGameState::SpawnServerPortals, 20.0f, true);
 	ServerShards.Empty();
+
+	KOTHScore.Team1Percentage = 0.0f;
+	KOTHScore.Team2Percentage = 0.0f;
+
+	KOTHScore.ClaimPercentageSpeed = 0.005f;
+	KOTHScore.CapturePercentageSpeed = 0.001f;
+
+	GameStateHUDType = EGameStateHUDType::None;
+
+	// populate the zone Info - skip if it does not exist
+	if (GetWorld())
+	{
+		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+		if (TheGameInstance)
+		{
+			ZoneDetail = TheGameInstance->ZoneDetail;
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] Copied ZoneInfo From GameInstance"));
+		}
+	}
 
 
 }
@@ -24,39 +42,14 @@ void AMyGameState::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutL
 	DOREPLIFETIME(AMyGameState, serverTitle);
 	DOREPLIFETIME(AMyGameState, ServerLinks);
 	DOREPLIFETIME(AMyGameState, TeamList);
+	DOREPLIFETIME(AMyGameState, KOTHScore);
+	DOREPLIFETIME(AMyGameState, GameStateHUDType);
+	DOREPLIFETIME(AMyGameState, ZoneDetail);
 	DOREPLIFETIME(AMyGameState, ServerShards);
+	DOREPLIFETIME(AMyGameState, bCombatEnabled);
 	//DOREPLIFETIME(AMyGameState, bIsShardedServer);
 
 }
-
-/*
-
-Tick does not exist here.
-void AMyGameState::Tick(float DeltaTime)
-{
-Super::Tick(DeltaTime);
-
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] tick"));
-
-// we want to update the sun angle, but we only need to do it like once a minute or even less.
-deltaSecondsElapsed = deltaSecondsElapsed + DeltaTime;
-if (deltaSecondsElapsed > 60.0f)
-{
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] Updating Sun Angle."));
-if (sunAngle >= 360.0f)
-{
-sunAngle = sunAngle - 360.0f + (0.25f * sunAngleMultiplier);
-}
-else
-{
-sunAngle = sunAngle + (0.25f * sunAngleMultiplier);
-}
-deltaSecondsElapsed = deltaSecondsElapsed - 60.0f;
-}
-
-}
-*/
-
 
 void AMyGameState::BeginPlay()
 {
@@ -65,6 +58,15 @@ void AMyGameState::BeginPlay()
 
 	if (IsRunningDedicatedServer()) {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] Dedicated server found."));
+
+		// populate the team names - skip if they don't exist yet.
+		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
+
+		if (TheGameInstance->TeamList.teams.Num() > 1)
+		{
+			KOTHScore.Team1Title = TheGameInstance->TeamList.teams[0].title;
+			KOTHScore.Team2Title = TheGameInstance->TeamList.teams[1].title;
+		}
 
 		FTimerHandle UnusedHandle;
 		GetWorldTimerManager().SetTimer(
@@ -86,20 +88,12 @@ void AMyGameState::LoadLevel()
 
 		URamaSaveLibrary::RamaSave_LoadFromFile(GetWorld(), FileIOSuccess, FileName);
 
-		//URamaSaveLibrary::RamaSave_LoadFromFile(GetWorld(), FileIOSuccess, FileName, true, true, true, "PersistentLevel");
-		//URamaSaveLibrary::RamaSave_LoadStreamingStateFromFile(GetWorld(), FileIOSuccess, FileName, StreamingLevelsStates);
 		if (FileIOSuccess) {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO Success."));
 		}
 		else {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyGameState] LoadLevel File IO FAIL."));
 		}
-
-		// This breaks the current session - don't do this.
-		//if (IsRunningDedicatedServer()) {
-		//	gameInstance->FindSessions(false);
-		//}
-		//SpawnServerPortals();
 	}
 }
 

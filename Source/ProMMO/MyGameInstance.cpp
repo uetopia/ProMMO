@@ -3,6 +3,7 @@
 #include "MyGameInstance.h"
 #include "ProMMO.h"
 #include "MyGameState.h"
+#include "MyGameMode.h"
 #include "MyGameSession.h"
 #include "MyPlayerState.h"
 #include "MyPlayerController.h"
@@ -91,6 +92,13 @@ UMyGameInstance::UMyGameInstance(const FObjectInitializer& ObjectInitializer)
 		GGameIni
 		);
 
+	GConfig->GetBool(
+		TEXT("UEtopia.Client"),
+		TEXT("CharactersEnabled"),
+		UEtopiaCharactersEnabled,
+		GGameIni
+	);
+
 	bRequestBeginPlayStarted = false;
 
 	// set up our reward spawning values
@@ -109,8 +117,11 @@ UMyGameInstance::UMyGameInstance(const FObjectInitializer& ObjectInitializer)
 
 	CubeStoreCost = 100;
 
-	MinimumKillsBeforeResultsSubmit = 3; // When a player has a score of x, submit match results
-	RoundWinsNeededToWinMatch = 3; // when a team wins 3 rounds submit match results
+	// THis happens in gamemode now.
+	//MinimumKillsBeforeResultsSubmit = 3; // When a player has a score of x, submit match results
+	//RoundWinsNeededToWinMatch = 3; // when a team wins 3 rounds submit match results
+
+	metaMatchCustom = "";
 
 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE CONSTRUCTOR - DONE"));
@@ -137,36 +148,26 @@ void UMyGameInstance::Init()
 	const auto FriendsInterface = OnlineSub->GetFriendsInterface();
 	check(FriendsInterface.IsValid());
 
-	// bind any OSS delegates we needs to handle
+	// bind any OSS delegates we need to handle
 	for (int i = 0; i < MAX_LOCAL_PLAYERS; ++i)
 	{
 		IdentityInterface->AddOnLoginStatusChangedDelegate_Handle(i, FOnLoginStatusChangedDelegate::CreateUObject(this, &UMyGameInstance::HandleUserLoginChanged));
 		IdentityInterface->AddOnLoginCompleteDelegate_Handle(i, FOnLoginCompleteDelegate::CreateUObject(this, &UMyGameInstance::HandleUserLoginComplete));
-		// moved this to player controller.  We don't want it here.
-		//FriendsInterface->AddOnFriendsChangeDelegate_Handle(i, FOnFriendsChangeDelegate::CreateUObject(this, &UMyGameInstance::OnFriendsChange));
 	}
 
 	SessionInterface->AddOnSessionFailureDelegate_Handle(FOnSessionFailureDelegate::CreateUObject(this, &UMyGameInstance::HandleSessionFailure));
 
-
-
 	OnEndSessionCompleteDelegate = FOnEndSessionCompleteDelegate::CreateUObject(this, &UMyGameInstance::OnEndSessionComplete);
-	//OnCreateSessionCompleteDelegate = FOnCreateSessionCompleteDelegate::CreateUObject(this, &UMyGameInstance::OnCreateSessionComplete);
-
-	// Trying to cancel matchmaking when the world is destroyed...  Can't get it.
-	//OnPreWorldFinishDestroy.AddDynamic(this, &AMyPlayerController::TestFunction);
-	//FWorldDelegates::OnPreWorldFinishDestroy.Add( &UMyGameInstance::CancelMatchmaking);
-
-	// TODO:  Bind to the FCoreDelegates::OnPreExit multicast delegate
-
 
 	GetWorld()->GetTimerManager().SetTimer(ServerLinksTimerHandle, this, &UMyGameInstance::GetServerLinks, 20.0f, true);
-	//GetWorld()->GetTimerManager().SetTimer(RewardSpawnTimerHandle, this, &UMyGameInstance::AttemptSpawnReward, SpawnRewardTimerSeconds, true);
 
-
-	// Set up a timer to submit kills and stats to the backend
+	// Set up a timer to submit kills and stats to the backend if this is a continuous server
 	// This should be anywhere from a minute to 15 minutes, depending on game load.
-	GetWorld()->GetTimerManager().SetTimer(SubmitReportTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
+	if (UEtopiaMode == "continuous")
+	{
+		GetWorld()->GetTimerManager().SetTimer(SubmitReportTimerHandle, this, &UMyGameInstance::SubmitReport, 60.0f, true);
+	}
+	
 
 
 	MatchStarted = false;
@@ -194,8 +195,6 @@ AMyGameSession* UMyGameInstance::GetGameSession() const
 bool UMyGameInstance::PerformHttpRequest(void(UMyGameInstance::*delegateCallback)(FHttpRequestPtr, FHttpResponsePtr, bool), FString APIURI, FString ArgumentString, FString AccessToken)
 {
 	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] PerformHttpRequest"));
-
-	// TODO put access_token in the args, so that we can include it in the headers
 
 	FHttpModule* Http = &FHttpModule::Get();
 	if (!Http) { return false; }
@@ -240,8 +239,8 @@ bool UMyGameInstance::PerformJsonHttpRequest(void(UMyGameInstance::*delegateCall
 	FString TargetHost = "http://" + APIURL + APIURI;
 
 	UE_LOG(LogTemp, Log, TEXT("TargetHost: %s"), *TargetHost);
-	UE_LOG(LogTemp, Log, TEXT("ServerAPIKey: %s"), *ServerAPIKey);
-	UE_LOG(LogTemp, Log, TEXT("ServerAPISecret: %s"), *ServerAPISecret);
+	//UE_LOG(LogTemp, Log, TEXT("ServerAPIKey: %s"), *ServerAPIKey);
+	//UE_LOG(LogTemp, Log, TEXT("ServerAPISecret: %s"), *ServerAPISecret);
 
 	TSharedRef < IHttpRequest > Request = Http->CreateRequest();
 	Request->SetVerb("POST");
@@ -320,9 +319,6 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 					serverCurrency = JsonParsed->GetIntegerField("serverCurrency");
 				}
 
-
-
-
 				ServerTitle = JsonParsed->GetStringField("title");
 
 				FString GameLevel = JsonParsed->GetStringField("gameLevel");
@@ -361,6 +357,7 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 					bIsShardedServer = JsonParsed->GetBoolField("sharded");
 				}
 
+
 				if (JsonParsed->HasField("custom_in_game_texture")) {
 					FString custom_in_game_texture = JsonParsed->GetStringField("custom_in_game_texture");
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] custom_in_game_texture: %s"), *custom_in_game_texture);
@@ -392,6 +389,7 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetServerInfoComplete] ConfigurationJsonRaw: %s"), *ConfigurationJsonRaw);
 
 						ConfigurationParseSuccess = ConfigurationJsonParsed->TryGetNumberField("maxPickupItemCount", maxPickupItemCount);
+						ConfigurationParseSuccess = ConfigurationJsonParsed->TryGetBoolField("combatEnabled", combatEnabled);
 					}
 
 				}
@@ -399,6 +397,7 @@ void UMyGameInstance::GetServerInfoComplete(FHttpRequestPtr HttpRequest, FHttpRe
 				{
 					UE_LOG(LogTemp, Log, TEXT("ConfigurationJson NOT Parsed - setting default values"));
 					maxPickupItemCount = 25;
+					combatEnabled = true;
 				}
 
 
@@ -518,14 +517,16 @@ void UMyGameInstance::GetMatchInfoComplete(FHttpRequestPtr HttpRequest, FHttpRes
 
 				// set the number of kills required to end the game
 				// TODO change this to rounds needed to win - this could come out a tie
-				MinimumKillsBeforeResultsSubmit = static_cast<int>((float)(MatchInfo.players.Num()) * 1.5);
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetMatchInfo] MinimumKillsBeforeResultsSubmit: %d"), MinimumKillsBeforeResultsSubmit);
+				// DEPRECATED - This happens in gameMode now
+				//MinimumKillsBeforeResultsSubmit = static_cast<int>((float)(MatchInfo.players.Num()) * 1.5);
+				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetMatchInfo] MinimumKillsBeforeResultsSubmit: %d"), MinimumKillsBeforeResultsSubmit);
 
 
 				MatchTitle = JsonParsed->GetStringField("title");
 
-				//AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 				uetopiaGameState->MatchTitle = MatchTitle;
+				uetopiaGameState->bCombatEnabled = true;
+				combatEnabled = true;
 
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetMatchInfo] MatchTitle: %s"), *MatchTitle);
 
@@ -549,26 +550,9 @@ void  UMyGameInstance::GetServerLinks()
 			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
 			FString APIURI = "/api/v1/server/links";
 			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::GetServerLinksComplete, APIURI, OutputString, ""); // No AccessToken
-
 		}
-
 	}
 }
-
-/*
-bool UMyGameInstance::GetServerLinks()
-{
-
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] GetServerLinks"));
-FString nonceString = "10951350917635";
-FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
-FString APIURI = "/api/v1/server/links";
-bool requestSuccess = PerformHttpRequest(&UMyGameInstance::GetServerLinksComplete, APIURI, OutputString);
-return requestSuccess;
-}
-*/
-
 
 void UMyGameInstance::GetServerLinksComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
 {
@@ -619,7 +603,7 @@ void UMyGameInstance::GetServerLinksComplete(FHttpRequestPtr HttpRequest, FHttpR
 				// update the game state with the shard list
 				AMyGameState* const MyGameState = GetWorld() != NULL ? GetWorld()->GetGameState<AMyGameState>() : NULL;
 				MyGameState->ServerShards = ServerLinks.shards;
-				//MyGameState->SpawnServerPortals();
+
 
 			}
 			else
@@ -655,22 +639,82 @@ bool UMyGameInstance::ActivatePlayer(class AMyPlayerController* NewPlayerControl
 	// Reset the currency back to zero, in case it's not.
 	playerS->Currency = 0;
 
+	// And set combatEnabled
+	playerS->bCombatEnabled = combatEnabled;
+
 	// Start the custom texture loading asap.
-	NewPlayerController->customTexture = customTexture;
+	// Can't actually do this here because we are still in the lobby level and will travel to map level soon.
+	// trying to do it on player state instead
+	//playerS->customTextures = customTextures;
 
 	if (UEtopiaMode == "competitive") {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Mode set to competitive"));
 
 		// on competitive, if a connecting player is not in the matchInfo, just kick them.
+
+		FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(playerKeyId);
+
+		if (ActivePlayer)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Found ActivePlayer"));
+
+			ActivePlayer->PlayerController = NewPlayerController;
+			ActivePlayer->bIsConnected = true;
+			ActivePlayer->gamePlayerDataLoaded = false;
+
+			if (UEtopiaCharactersEnabled)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - UEtopiaCharactersEnabled"));
+
+				ActivePlayer->characterCustomized = false;
+			}
+			else
+			{
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - UEtopiaCharacters NOT Enabled "));
+				ActivePlayer->characterCustomized = true;
+			}
+
+			FString access_token = NewPlayerController->CurrentAccessTokenFromOSS;
+			FString nonceString = "10951350917635";
+			FString encryption = "off";  // Allowing unencrypted on sandbox for now.
+			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
+			FString APIURI = "/api/v1/match/player/" + playerKeyId + "/activate";;
+
+			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::ActivateMatchPlayerRequestComplete, APIURI, OutputString, access_token);
+
+			return requestSuccess;
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - playerKeyId NOT found in matchInfo- TODO kick"));
+		}
+
+		// old way
+		/*
 		for (int32 b = 0; b < MatchInfo.players.Num(); b++)
 		{
 
-			if (MatchInfo.players[b].userKeyId == playerKeyId) {
+			if (MatchInfo.players[b].playerKeyId == playerKeyId) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - FOUND MATCHING playerKeyId"));
 				playerKeyIdFound = true;
 				ActivePlayerIndex = b;
 
-				// TODO set team
+				MatchInfo.players[b].PlayerController = NewPlayerController;
+
+				if (UEtopiaCharactersEnabled)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - UEtopiaCharactersEnabled"));
+					MatchInfo.players[b].characterCustomized = false;
+					MatchInfo.players[b].gamePlayerDataLoaded = false;
+					MatchInfo.players[b].bIsConnected = true;
+				}
+				else
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - UEtopiaCharacters NOT Enabled "));
+					MatchInfo.players[b].characterCustomized = true;
+					MatchInfo.players[b].gamePlayerDataLoaded = false;
+					MatchInfo.players[b].bIsConnected = true;
+				}
 			}
 		}
 
@@ -691,103 +735,35 @@ bool UMyGameInstance::ActivatePlayer(class AMyPlayerController* NewPlayerControl
 			return requestSuccess;
 		}
 
-
-
+		*/
 
 	}
 	else {
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Mode set to continuous"));
-		for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+
+		// REDOING THIS
+		// FOR Continuous, there is no premade player list.
+		// we want to allow players, and authorize them.
+		// only using active players from now on.  Move the matchPlayers.
+
+		FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(playerKeyId);
+
+		if (ActivePlayer)
 		{
-			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [AuthorizePlayer] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
-			if (PlayerRecord.ActivePlayers[b].playerKeyId == playerKeyId) {
-				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - FOUND MATCHING playerKeyId"));
-				playerKeyIdFound = true;
-				ActivePlayerIndex = b;
-			}
-		}
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Found ActivePlayer"));
 
-
-
-		if (playerKeyIdFound == false) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - No existing playerKeyId found"));
-
-			if (isdigit(playerID)) {
-				//UE_LOG(LogTemp, Log, TEXT("playerID: %s"), playerID);
-			}
-			else {
-				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - THERE WAS NO playerID incoming"));
-				// This is sadly what we expect to see.
-			}
-
-			// add the player to the TArray as authorized=false
-			FMyActivePlayer activeplayer;
-			activeplayer.playerID = playerID; // UE internal player reference
-			activeplayer.playerKeyId = playerKeyId; // UEtopia player reference
-													//activeplayer.playerKeyId = nullptr;
-			activeplayer.playerTitle = nullptr;
-			activeplayer.authorized = false;
-			activeplayer.roundDeaths = 0;
-			activeplayer.roundKills = 0;
-			//activeplayer.killed = nullptr;
-			activeplayer.rank = 1600;
-			activeplayer.experience = 0;
-			activeplayer.score = 0;
-			activeplayer.currencyCurrent = 10;
-			activeplayer.gamePlayerKeyId = nullptr;
-			activeplayer.UniqueId = UniqueId;
-			activeplayer.PlayerController = NewPlayerController;
-
-			PlayerRecord.ActivePlayers.Add(activeplayer);
-
-			// We might need to find the GetPreferredUniqueNetId, which is part of a localplayer and is used for session travel.
-			//NewPlayerController->G
-
-
-
-
-
-			//UE_LOG(LogTemp, Log, TEXT("playerID: %s"), playerID);
-			//UE_LOG(LogTemp, Log, TEXT("playerKeyId: %s"), playerKeyId);
-			//UE_LOG(LogTemp, Log, TEXT("Object is: %s"), *GetName());
-
-			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Debug 2d"));
-
-			UE_LOG(LogTemp, Log, TEXT("CurrentAccessTokenFromOSS: %s"), *NewPlayerController->CurrentAccessTokenFromOSS);
-			FString access_token = NewPlayerController->CurrentAccessTokenFromOSS;
-
-			FString nonceString = "10951350917635";
-			FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-
-			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
-
-			//UE_LOG(LogTemp, Log, TEXT("ServerSessionHostAddress: %s"), *ServerSessionHostAddress);
-			//UE_LOG(LogTemp, Log, TEXT("ServerSessionID: %s"), *ServerSessionID);
-
-			if (ServerSessionHostAddress.Len() > 1) {
-				OutputString = OutputString + "&session_host_address=" + ServerSessionHostAddress + "&session_id=" + ServerSessionID;
-			}
-
-			FString APIURI = "/api/v1/server/player/" + playerKeyId + "/activate";;
-
-			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::ActivateRequestComplete, APIURI, OutputString, access_token);
-
-			return requestSuccess;
-		}
-		else {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - update existing record"));
-			PlayerRecord.ActivePlayers[ActivePlayerIndex].playerID = playerID;
-			PlayerRecord.ActivePlayers[ActivePlayerIndex].PlayerController = NewPlayerController;
+			ActivePlayer->playerID = playerID;
+			ActivePlayer->PlayerController = NewPlayerController;
+			ActivePlayer->bIsConnected = true;
 
 			// If it is already authorized, Don't resend the http request
-			if (PlayerRecord.ActivePlayers[ActivePlayerIndex].authorized)
+			if (ActivePlayer->authorized)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - update existing record - it is already authorized."));
 			}
 			else
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - update existing record - it is NOT already authorized."));
-
 				FString nonceString = "10951350917635";
 				FString encryption = "off";  // Allowing unencrypted on sandbox for now.
 				FString access_token = NewPlayerController->CurrentAccessTokenFromOSS;
@@ -807,8 +783,55 @@ bool UMyGameInstance::ActivatePlayer(class AMyPlayerController* NewPlayerControl
 
 				return requestSuccess;
 			}
+			return true;
+
 		}
-		return false;
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AuthorizePlayer - Did not find ActiveMatchPlayer"));
+
+			// Add a new one as authorized = false
+			FMyActivePlayer activeplayer;
+
+			activeplayer.playerID = playerID; // UE internal player reference
+			activeplayer.userKeyId = playerKeyId; // UEtopia player reference
+													//activeplayer.playerKeyId = nullptr;
+			activeplayer.playerTitle = nullptr;
+			activeplayer.authorized = false;
+			activeplayer.roundDeaths = 0;
+			activeplayer.roundKills = 0;
+			//activeplayer.killed = nullptr;
+			activeplayer.rank = 1600;
+			activeplayer.currencyCurrent = 10;
+			activeplayer.gamePlayerKeyId = nullptr;
+			activeplayer.UniqueId = UniqueId;
+			activeplayer.PlayerController = NewPlayerController;
+			activeplayer.bIsConnected = true;
+
+			MatchInfo.players.Add(activeplayer);
+
+			// Run the http request to authorize on the backend
+			UE_LOG(LogTemp, Log, TEXT("CurrentAccessTokenFromOSS: %s"), *NewPlayerController->CurrentAccessTokenFromOSS);
+			FString access_token = NewPlayerController->CurrentAccessTokenFromOSS;
+
+			FString nonceString = "10951350917635";
+			FString encryption = "off";  // Allowing unencrypted on sandbox for now.  
+
+			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
+
+			//UE_LOG(LogTemp, Log, TEXT("ServerSessionHostAddress: %s"), *ServerSessionHostAddress);
+			//UE_LOG(LogTemp, Log, TEXT("ServerSessionID: %s"), *ServerSessionID);
+
+			if (ServerSessionHostAddress.Len() > 1) {
+				OutputString = OutputString + "&session_host_address=" + ServerSessionHostAddress + "&session_id=" + ServerSessionID;
+			}
+
+			FString APIURI = "/api/v1/server/player/" + playerKeyId + "/activate";;
+
+			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::ActivateRequestComplete, APIURI, OutputString, access_token);
+
+			return requestSuccess;
+		}
 	}
 	return false;
 
@@ -829,7 +852,7 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 			*HttpResponse->GetContentAsString());
 
 		APlayerController* pc = NULL;
-		int32 playerstateID;
+		//int32 playerstateID;
 
 		FString JsonRaw = *HttpResponse->GetContentAsString();
 		TSharedPtr<FJsonObject> JsonParsed;
@@ -841,162 +864,77 @@ void UMyGameInstance::ActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 			if (Authorization)
 			{
 				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
+
+				// get the player record
+				FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(JsonParsed->GetStringField("player_userid"));
+
 				bool PlayerAuthorized = JsonParsed->GetBoolField("player_authorized");
 				if (PlayerAuthorized) {
 					UE_LOG(LogTemp, Log, TEXT("Player Authorized"));
 
 					int32 activeAuthorizedPlayers = 0;
-					int32 activePlayerIndex;
 
 
-
-					// TODO refactor this using our get_by_id function
-
-					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] ActivePlayers.Num() > 0"));
-					for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+					if (ActivePlayer)
 					{
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
-						if (PlayerRecord.ActivePlayers[b].playerKeyId == JsonParsed->GetStringField("player_userid")) {
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - FOUND MATCHING playerKeyId"));
-							activePlayerIndex = b;
-							PlayerRecord.ActivePlayers[b].authorized = true;
-							PlayerRecord.ActivePlayers[b].deactivateStarted = false;
-							PlayerRecord.ActivePlayers[b].playerTitle = JsonParsed->GetStringField("player_name");
-							PlayerRecord.ActivePlayers[b].playerKeyId = JsonParsed->GetStringField("user_key_id");
-							PlayerRecord.ActivePlayers[b].currencyCurrent = JsonParsed->GetIntegerField("player_currency");
-							PlayerRecord.ActivePlayers[b].rank = JsonParsed->GetIntegerField("player_rank");
-							PlayerRecord.ActivePlayers[b].gamePlayerKeyId = JsonParsed->GetStringField("game_player_key_id");
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] ActivateRequestComplete - Found ActiveMatchPlayer"));
+						ActivePlayer->authorized = true;
+						ActivePlayer->deactivateStarted = false;
+						ActivePlayer->playerTitle = JsonParsed->GetStringField("player_name");
+						ActivePlayer->userKeyId = JsonParsed->GetStringField("user_key_id");
+						ActivePlayer->currencyCurrent = JsonParsed->GetIntegerField("player_currency");
+						ActivePlayer->rank = JsonParsed->GetIntegerField("player_rank");
+						ActivePlayer->gamePlayerKeyId = JsonParsed->GetStringField("game_player_key_id");
 
-							// We need to go through the playercontrollerIterator to hunt for the playerKeyId
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - looking for a playerKeyId match"));
-							for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-							{
-								pc = Iterator->Get();
+						// We already have the playercontroller.
+						APlayerState* thisPlayerState = ActivePlayer->PlayerController->PlayerState;
+						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 
+						if (playerS)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] ActivateRequestComplete - Found PlayerState"));
 
-								AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
-								AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
-								APlayerState* thisPlayerState = pc->PlayerState;
-								AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-								AMyPlayerController* playerC = Cast<AMyPlayerController>(pc);
-
-								if (playerS->playerKeyId == JsonParsed->GetStringField("user_key_id"))
-								{
-									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - Found a playerState with matching playerKeyID"));
-									//UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
-									PlayerRecord.ActivePlayers[b].playerID = thisPlayerState->PlayerId;
-									playerS->Currency = JsonParsed->GetIntegerField("player_currency");
-									playerC->CurrencyAvailable = JsonParsed->GetIntegerField("player_currency");
-
-									// Also set the server sharded state here.  We need it for ui display.
-									if (bIsShardedServer)
-									{
-										UE_LOG(LogTemp, Log, TEXT("bIsShardedServer"));
-										playerC->bIsShardedServer = true;
-									}
-									else
-									{
-										UE_LOG(LogTemp, Log, TEXT("bIsShardedServer = false"));
-										playerC->bIsShardedServer = false;
-									}
-
-								}
-							}
-
-							// Since we have a match, we also want to get all of the game player data associated with this player.
-							// We need a delay on this because on server travel the previous server needs time to update the record
-
-							// Bind the timer delegate
-							PlayerRecord.ActivePlayers[b].GetPlayerInfoTimerDel.BindUFunction(this, FName("GetGamePlayer"), JsonParsed->GetStringField("player_userid"), true);
-							// Set the timer
-							GetWorld()->GetTimerManager().SetTimer(PlayerRecord.ActivePlayers[b].GetPlayerInfoDelayHandle, PlayerRecord.ActivePlayers[b].GetPlayerInfoTimerDel, 5.f, false);
-
-							//GetGamePlayer(JsonParsed->GetStringField("game_player_key_id"), true);
-
+							ActivePlayer->playerID = thisPlayerState->PlayerId;
+							playerS->Currency = JsonParsed->GetIntegerField("player_currency");
+							ActivePlayer->PlayerController->bIsShardedServer = bIsShardedServer;
+							// Also set loginflow completed to false
+							// we might need to move this to a different place, in case it's not called in time.
+							playerS->playerLoginFlowCompleted = false;
 						}
-						if (PlayerRecord.ActivePlayers[b].authorized) {
+
+						//get all of the game player data associated with this player.
+						// We need a delay on this because on server travel the previous server needs time to update the record
+
+						// Bind the timer delegate
+						ActivePlayer->GetPlayerInfoTimerDel.BindUFunction(this, FName("GetGamePlayer"), JsonParsed->GetStringField("player_userid"), true);
+						// Set the timer
+						GetWorld()->GetTimerManager().SetTimer(ActivePlayer->GetPlayerInfoDelayHandle, ActivePlayer->GetPlayerInfoTimerDel, 5.f, false);
+
+
+						if (ActivePlayer->authorized) {
 							activeAuthorizedPlayers++;
 						}
-
 					}
-
-
-					/*
-					if (activeAuthorizedPlayers >= MinimumPlayersNeededToStart)
-					{
-					matchStarted = true;
-					// travel to the third person map
-					FString UrlString = TEXT("/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap?listen");
-					GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
-					GetWorld()->ServerTravel(UrlString);
-					}
-					*/
-
 
 					// There is no lobby so we're going to set true when users successfully activate.
 					bRequestBeginPlayStarted = true;
-
-
 
 				}
 				else
 				{
 					UE_LOG(LogTemp, Log, TEXT("Player NOT Authorized"));
-
-					// First grab the active player data from our struct
-					int32 activePlayerIndex = 0;
-					bool playerKeyIdFound = false;
-					FString jsonplayerKeyId = JsonParsed->GetStringField("player_userid");
-
-					for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
-					{
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] jsonplayerKeyId: %s"), *jsonplayerKeyId);
-						if (PlayerRecord.ActivePlayers[b].playerKeyId == jsonplayerKeyId) {
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - Found active player record"));
-							playerKeyIdFound = true;
-							activePlayerIndex = b;
-						}
-					}
-
-
-
-
-					if (playerKeyIdFound)
-					{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - playerKeyId is found - moving to kick"));
-						for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-						{
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - Looking for player to kick"));
-							pc = Iterator->Get();
-
-							playerstateID = pc->PlayerState->PlayerId;
-							if (PlayerRecord.ActivePlayers[activePlayerIndex].playerID == playerstateID)
-							{
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - playerID match - kicking back to connect"));
-								FString UrlString = TEXT("/Game/Maps/EntryLevel");
-								//ETravelType seamlesstravel = TRAVEL_Absolute;
-								//thisPlayerController->ClientTravel(UrlString, seamlesstravel);
-								// trying a session kick instead.
-								// Get the Online Subsystem to work with
-								IOnlineSubsystem* const OnlineSub = IOnlineSubsystem::Get();
-								const FString kickReason = TEXT("Not Authorized");
-								const FText kickReasonText = FText::FromString(kickReason);
-								//AMyGameSession::KickPlayer(pc, kickReasonText);
-								this->GetGameSession()->KickPlayer(pc, kickReasonText);
-								//FString badUrl = "";
-								pc->ClientTravel(UrlString, ETravelType::TRAVEL_Absolute);
-
-							}
-
-						}
-					}
+					IOnlineSubsystem* const OnlineSub = IOnlineSubsystem::Get();
+					const FString kickReason = TEXT("Not Authorized");
+					const FText kickReasonText = FText::FromString(kickReason);
+					//AMyGameSession::KickPlayer(pc, kickReasonText);
+					this->GetGameSession()->KickPlayer(pc, kickReasonText);
+					FString badUrl = "";
+					ActivePlayer->PlayerController->ClientTravel(badUrl, ETravelType::TRAVEL_Absolute);
 				}
 			}
 		}
 	}
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] Done!"));
-
 }
 
 
@@ -1015,7 +953,7 @@ void UMyGameInstance::ActivateMatchPlayerRequestComplete(FHttpRequestPtr HttpReq
 			*HttpResponse->GetContentAsString());
 
 		APlayerController* pc = NULL;
-		int32 playerstateID;
+		//int32 playerstateID;
 
 		FString JsonRaw = *HttpResponse->GetContentAsString();
 		TSharedPtr<FJsonObject> JsonParsed;
@@ -1033,191 +971,77 @@ void UMyGameInstance::ActivateMatchPlayerRequestComplete(FHttpRequestPtr HttpReq
 
 					int32 activeJoinedPlayers = 0;
 					int32 totalExpectedPlayers = 0;
-					int32 activePlayerIndex;
+					//int32 activePlayerIndex;
 
+					// refactored using our get_by_id function
 
-
-					// TODO refactor this using our get_by_id function
-
-					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] ActivePlayers.Num() > 0"));
-					for (int32 b = 0; b < MatchInfo.players.Num(); b++)
+					// get the player record
+					FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(JsonParsed->GetStringField("player_userid"));
+					if (ActivePlayer)
 					{
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
-						if (MatchInfo.players[b].userKeyId == JsonParsed->GetStringField("player_userid")) {
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - FOUND MATCHING playerKeyId"));
-							activePlayerIndex = b;
+						ActivePlayer->joined = true;
+						ActivePlayer->currentRoundAlive = true;
+						ActivePlayer->bIsConnected = true;
 
-							// set status flags
-							MatchInfo.players[b].joined = true;
-							MatchInfo.players[b].currentRoundAlive = true;
+						APlayerState* thisPlayerState = ActivePlayer->PlayerController->PlayerState;
+						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-							for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-							{
-								pc = Iterator->Get();
+						if (playerS)
+						{
+							ActivePlayer->playerID = thisPlayerState->PlayerId;
+							ActivePlayer->gamePlayerKeyId = JsonParsed->GetStringField("game_player_key_id");
+							// Also set the team!
+							playerS->TeamId = JsonParsed->GetNumberField("team_id");
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - playerS->TeamId %d"), playerS->TeamId);
 
-								// go through the player states to find this player.
-								// we need to set the playerId in here.
+							playerS->TeamPlayerIndex = ActivePlayer->teamPlayerIndex;
+							playerS->SetPlayerName(ActivePlayer->playerTitle);
+							playerS->playerTitle = ActivePlayer->playerTitle;
 
-								APlayerState* thisPlayerState = pc->PlayerState;
-								AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
+							// Also set the character customization bool we got from match info
+							playerS->CharacterSetup = ActivePlayer->characterCustomized;
 
-								if (playerS->playerKeyId == JsonParsed->GetStringField("user_key_id"))
-								{
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
-									//UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
-									MatchInfo.players[b].playerID = thisPlayerState->PlayerId;
-
-									// Also set the team!
-									//ACharacter* thisCharacter = pc->GetCharacter();
-									//AUEtopiaCompetitiveCharacter* compCharacter = Cast<AUEtopiaCompetitiveCharacter>(thisCharacter);
-
-									playerS->TeamId = JsonParsed->GetNumberField("team_id");
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - playerS->TeamId %d"), playerS->TeamId);
-								}
-							}
-
+							// Bind the timer delegate
+							ActivePlayer->GetPlayerInfoTimerDel.BindUFunction(this, FName("GetGamePlayer"), JsonParsed->GetStringField("player_userid"), true);
+							// Set the timer
+							GetWorld()->GetTimerManager().SetTimer(ActivePlayer->GetPlayerInfoDelayHandle, ActivePlayer->GetPlayerInfoTimerDel, 1.f, false);
 						}
+
 						totalExpectedPlayers++;
 
-						if (MatchInfo.players[b].joined) {
+						if (ActivePlayer->joined) {
 							activeJoinedPlayers++;
 						}
 
-					}
+						// Put replicated data in game state
+						AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
+						AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
 
-					// Also set up the team list struct.
-					// This is mostly for convenience in displaying teams in-game.  The authority of data is the MatchInfo.
-
-					// Put replicated data in game state
-					AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
-					AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
-
-					// b is the team index
-					for (int32 b = 0; b < uetopiaGameState->TeamList.teams.Num(); b++)
-					{
-						// i is the player index for the team
-						for (int32 i = 0; i < uetopiaGameState->TeamList.teams[b].players.Num(); i++)
+						// b is the team index
+						for (int32 b = 0; b < uetopiaGameState->TeamList.teams.Num(); b++)
 						{
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
-							if (uetopiaGameState->TeamList.teams[b].players[i].userKeyId == JsonParsed->GetStringField("player_userid")) {
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - FOUND MATCHING playerKeyId in Game State.TeamList"));
-								//activePlayerIndex = b;
+							// i is the player index for the team
+							for (int32 i = 0; i < uetopiaGameState->TeamList.teams[b].players.Num(); i++)
+							{
+								//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
+								if (uetopiaGameState->TeamList.teams[b].players[i].userKeyId == JsonParsed->GetStringField("player_userid")) {
+									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - FOUND MATCHING playerKeyId in Game State.TeamList"));
 
-								// set status flags
-								uetopiaGameState->TeamList.teams[b].players[i].joined = true;
-
+									// set status flags
+									uetopiaGameState->TeamList.teams[b].players[i].joined = true;
+								}
 							}
 						}
-
 					}
-
-
-					// ALso set this player state playerName
-
-					for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-					{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - Looking for player to set name"));
-						pc = Iterator->Get();
-
-						/*
-						AMyPlayerController* thisPlayerController = Cast<AMyPlayerController>(pc);
-
-						if (thisPlayerController) {
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - Cast Controller success"));
-
-						if (matchStarted) {
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - Match in progress - setting spectator"));
-						thisPlayerController->PlayerState->bIsSpectator = true;
-						thisPlayerController->ChangeState(NAME_Spectating);
-						thisPlayerController->ClientGotoState(NAME_Spectating);
-						}
-
-
-						playerstateID = thisPlayerController->PlayerState->PlayerId;
-						if (PlayerRecord[activePlayerIndex].playerID == playerstateID)
-						{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - playerID match - setting name"));
-						thisPlayerController->PlayerState->SetPlayerName(JsonParsed->GetStringField("player_name"));
-						}
-						*/
-
-
-					}
-
-
-					if (MatchStarted == false)
-					{
-						if (activeJoinedPlayers >= totalExpectedPlayers)
-						{
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - activeJoinedPlayers >= totalExpectedPlayers - starting timer"));
-							//matchStarted = true;
-
-							// do it after a timer
-							GetWorld()->GetTimerManager().SetTimer(AttemptStartMatchTimerHandle, this, &UMyGameInstance::AttemptStartMatch, 10.0f, false);
-							// travel to the third person map
-							//FString UrlString = TEXT("/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap?listen");
-							//GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
-							//GetWorld()->ServerTravel(UrlString);
-						}
-					}
-
-
-
-
-
 				}
 				else
 				{
 					UE_LOG(LogTemp, Log, TEXT("Player NOT Authorized"));
 
-					// First grab the active player data from our struct
-					int32 activePlayerIndex = 0;
-					bool playerKeyIdFound = false;
-					FString jsonplayerKeyId = JsonParsed->GetStringField("player_userid");
+					// TODO - figure out a good way to deal with this.
 
-					for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
-					{
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] playerKeyId: %s"), *PlayerRecord.ActivePlayers[b].playerKeyId);
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] jsonplayerKeyId: %s"), *jsonplayerKeyId);
-						if (PlayerRecord.ActivePlayers[b].playerKeyId == jsonplayerKeyId) {
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateRequestComplete] - Found active player record"));
-							playerKeyIdFound = true;
-							activePlayerIndex = b;
-						}
-					}
+					// Send to spectator or something?
 
-
-
-
-					if (playerKeyIdFound)
-					{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - playerKeyId is found - moving to kick"));
-						for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-						{
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - Looking for player to kick"));
-							pc = Iterator->Get();
-
-							playerstateID = pc->PlayerState->PlayerId;
-							if (PlayerRecord.ActivePlayers[activePlayerIndex].playerID == playerstateID)
-							{
-								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ActivateMatchPlayerRequestComplete] - playerID match - kicking back to connect"));
-								//FString UrlString = TEXT("/Game/MyConnectLevel");
-								//ETravelType seamlesstravel = TRAVEL_Absolute;
-								//thisPlayerController->ClientTravel(UrlString, seamlesstravel);
-								// trying a session kick instead.
-								// Get the Online Subsystem to work with
-								IOnlineSubsystem* const OnlineSub = IOnlineSubsystem::Get();
-								const FString kickReason = TEXT("Not Authorized");
-								const FText kickReasonText = FText::FromString(kickReason);
-								//AMyGameSession::KickPlayer(pc, kickReasonText);
-								this->GetGameSession()->KickPlayer(pc, kickReasonText);
-								FString badUrl = TEXT("/Game/EntryLevel");
-								pc->ClientTravel(badUrl, ETravelType::TRAVEL_Absolute);
-
-							}
-
-						}
-					}
 				}
 			}
 		}
@@ -1226,33 +1050,33 @@ void UMyGameInstance::ActivateMatchPlayerRequestComplete(FHttpRequestPtr HttpReq
 
 }
 
+
 bool UMyGameInstance::GetGamePlayer(FString playerKeyId, bool bAttemptLock)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] GetGamePlayer"));
-	// this is a userKeyID
 
 	FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(playerKeyId);
 
 	if (ActivePlayer)
 	{
-		FString access_token = ActivePlayer->PlayerController->CurrentAccessTokenFromOSS;
+		if (!ActivePlayer->gamePlayerDataLoaded)
+		{
 
-		FString nonceString = "10951350917635";
-		FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-		FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
+			FString access_token = ActivePlayer->PlayerController->CurrentAccessTokenFromOSS;
 
-		if (bAttemptLock) {
-			OutputString = OutputString + "&lock=True";
+			FString nonceString = "10951350917635";
+			FString encryption = "off";  // Allowing unencrypted on sandbox for now.  
+			FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
+
+			if (bAttemptLock) {
+				OutputString = OutputString + "&lock=True";
+			}
+
+			FString APIURI = "/api/v1/game/player/" + ActivePlayer->gamePlayerKeyId;
+			bool requestSuccess = PerformHttpRequest(&UMyGameInstance::GetGamePlayerRequestComplete, APIURI, OutputString, access_token);
+			return requestSuccess;
 		}
-
-		FString APIURI = "/api/v1/game/player/" + ActivePlayer->gamePlayerKeyId;
-
-		bool requestSuccess = PerformHttpRequest(&UMyGameInstance::GetGamePlayerRequestComplete, APIURI, OutputString, access_token);
-
-		return requestSuccess;
-
 	}
-
 	return true;
 }
 
@@ -1286,312 +1110,281 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 				APlayerController* pc = NULL;
 				FString playerKeyId = JsonParsed->GetStringField("userKeyId");
 
+				// Keep track of the playerState and playerCharacter that is associated with this player
+				APlayerState* thisPlayerState;
+				AMyPlayerState* playerS = nullptr;
+				AUEtopiaPersistCharacter* playerChar = nullptr;
+				AMyPlayerController* PlayerController = nullptr;
+				FString playerArrayplayerKeyId;
+				
 				FMyActivePlayer* activePlayer = getPlayerByPlayerKey(JsonParsed->GetStringField("userKeyId"));
 
-				// TODO - refactor this to use get by key.
-
-				for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+				if (!activePlayer)
 				{
-					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - Looking for player Controller"));
-					pc = Iterator->Get();
-					APlayerState* thisPlayerState = pc->PlayerState;
-					AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-					AMyPlayerController* playerC = Cast<AMyPlayerController>(pc);
-					AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(playerC->GetPawn());
+					UE_LOG(LogTemp, Error, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - DID NOT FIND activePlayer"));
+					return;
+				}
 
-					FString playerstateplayerKeyId = playerS->playerKeyId;
-					//UE_LOG(LogTemp, Log, TEXT("playerstateplayerKeyId: %s"), *playerstateplayerKeyId);
-					FString playerArrayplayerKeyId = activePlayer->playerKeyId;
-					//UE_LOG(LogTemp, Log, TEXT("playerArrayplayerKeyId: %s"), *playerArrayplayerKeyId);
+				playerArrayplayerKeyId = activePlayer->userKeyId;
 
-					if (playerstateplayerKeyId == playerArrayplayerKeyId)
+				activePlayer->gamePlayerDataLoaded = true;
+
+				PlayerController = Cast<AMyPlayerController>(activePlayer->PlayerController);
+				if (PlayerController)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - Found PlayerController"));
+
+					playerChar = Cast<AUEtopiaPersistCharacter>(PlayerController->GetPawn());
+					if (playerChar)
 					{
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - playerKeyId match - Setting Game player state"));
-						double scoreTemp;
-						FString titleTemp = "None";
-						JsonParsed->TryGetNumberField("score", scoreTemp);
-						playerS->Score = scoreTemp;
-						JsonParsed->TryGetNumberField("coordLocationX", playerS->savedCoordLocationX);
-						JsonParsed->TryGetNumberField("coordLocationY", playerS->savedCoordLocationY);
-						JsonParsed->TryGetNumberField("coordLocationZ", playerS->savedCoordLocationZ);
-						JsonParsed->TryGetStringField("zoneName", playerS->savedZoneName);
-						JsonParsed->TryGetStringField("zoneKey", playerS->savedZoneKey);
-						JsonParsed->TryGetStringField("inventory", playerS->savedInventory);
-						JsonParsed->TryGetStringField("equipment", playerS->savedEquipment);
-						JsonParsed->TryGetStringField("abilities", playerS->savedAbilities);
-						JsonParsed->TryGetStringField("interface", playerS->savedInterface);
-						JsonParsed->TryGetStringField("character", playerS->savedCharacter);
-						JsonParsed->TryGetStringField("characterCustom", playerS->savedCharacterCustom);
-						JsonParsed->TryGetStringField("userTitle", titleTemp);
-						JsonParsed->TryGetNumberField("level", playerS->Level);
-						JsonParsed->TryGetNumberField("experience", playerC->Experience);
-						JsonParsed->TryGetNumberField("experienceThisLevel", playerC->ExperienceThisLevel);
-						JsonParsed->TryGetNumberField("rank", activePlayer->rank);
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - Found playerChar"));
+					}
+					thisPlayerState = PlayerController->PlayerState;
+					playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-						// Is this player is allowed to pickup and drop items on this server.
-						JsonParsed->TryGetBoolField("allowPickup", playerS->allowPickup);
-						JsonParsed->TryGetBoolField("allowDrop", playerS->allowDrop);
+				}
 
-						playerS->playerTitle = titleTemp;
-						playerS->serverTitle = ServerTitle;
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] playerS->playerTitle: %s"), *playerS->playerTitle);
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] playerS->ServerTitle: %s"), *playerS->serverTitle);
+					
+				
+				//APlayerState* thisPlayerState = pc->PlayerState;
+					//AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
+					//AMyPlayerController* playerC = Cast<AMyPlayerController>(pc);
+					//AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(playerC->GetPawn());
 
-						// TODO move player to the indicated position.
+				FString playerstateplayerKeyId = playerS->playerKeyId;
 
-						// Set up Active player variables
-						activePlayer->experience = playerC->Experience;
-						activePlayer->score = scoreTemp;
+				double scoreTemp;
+				FString titleTemp = "None";
+				JsonParsed->TryGetNumberField("score", scoreTemp);
+				playerS->Score = scoreTemp;
+				JsonParsed->TryGetNumberField("coordLocationX", playerS->savedCoordLocationX);
+				JsonParsed->TryGetNumberField("coordLocationY", playerS->savedCoordLocationY);
+				JsonParsed->TryGetNumberField("coordLocationZ", playerS->savedCoordLocationZ);
+				JsonParsed->TryGetStringField("zoneName", playerS->savedZoneName);
+				JsonParsed->TryGetStringField("zoneKey", playerS->savedZoneKey);
+				JsonParsed->TryGetStringField("inventory", playerS->savedInventory);
+				JsonParsed->TryGetStringField("equipment", playerS->savedEquipment);
+				JsonParsed->TryGetStringField("abilities", playerS->savedAbilities);
+				JsonParsed->TryGetStringField("interface", playerS->savedInterface);
 
-						// DO Character FIRST.  Equipment and inventory will be modifying these values so they need to be set asap.
-						// Character Customization
-						bool CharacterParseSuccess = false;
-						FString CharacterJsonRaw = playerS->savedCharacter;
-						TSharedPtr<FJsonObject> CharacterJsonParsed;
-						TSharedRef<TJsonReader<TCHAR>> CharacterJsonReader = TJsonReaderFactory<TCHAR>::Create(CharacterJsonRaw);
-						//const JsonValPtrArray *CharacterJson;
-						bool CharacterSetup = false;
+				JsonParsed->TryGetStringField("crafting", playerS->savedCraftingSlots);
+				JsonParsed->TryGetStringField("recipes", playerS->savedRecipes);
+				JsonParsed->TryGetStringField("character", playerS->savedCharacter);
+				JsonParsed->TryGetStringField("characterCustom", playerS->savedCharacterCustom);
+				JsonParsed->TryGetStringField("userTitle", titleTemp);
+				playerS->playerTitle = titleTemp;
+				playerS->serverTitle = ServerTitle;
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] playerS->playerTitle: %s"), *playerS->playerTitle);
 
-						if (FJsonSerializer::Deserialize(CharacterJsonReader, CharacterJsonParsed))
+				UE_LOG(LogTemp, Log, TEXT("Getting match player specific values"));
+				JsonParsed->TryGetNumberField("experience", activePlayer->experience);
+				JsonParsed->TryGetNumberField("experienceThisLevel", activePlayer->experienceThisLevel);
+				JsonParsed->TryGetNumberField("experience", playerS->Experience);
+				JsonParsed->TryGetNumberField("experienceThisLevel", playerS->ExperienceThisLevel);
+				JsonParsed->TryGetNumberField("level", activePlayer->level);
+				JsonParsed->TryGetNumberField("score", activePlayer->score);
+				JsonParsed->TryGetNumberField("rank", activePlayer->rank);
+
+				// Is this player is allowed to pickup and drop items on this server.
+				JsonParsed->TryGetBoolField("allowPickup", playerS->allowPickup);
+				JsonParsed->TryGetBoolField("allowDrop", playerS->allowDrop);
+
+
+				// TODO move player to the indicated position.
+
+				// DO Character FIRST.  Equipment and inventory will be modifying these values so they need to be set asap.
+				// Character Customization
+				bool CharacterParseSuccess = false;
+				FString CharacterJsonRaw = playerS->savedCharacter;
+				TSharedPtr<FJsonObject> CharacterJsonParsed;
+				TSharedRef<TJsonReader<TCHAR>> CharacterJsonReader = TJsonReaderFactory<TCHAR>::Create(CharacterJsonRaw);
+				//const JsonValPtrArray *CharacterJson;
+				bool CharacterSetup = false;
+
+				if (FJsonSerializer::Deserialize(CharacterJsonReader, CharacterJsonParsed))
+				{
+					UE_LOG(LogTemp, Log, TEXT("CharacterJsonParsed"));
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
+					CharacterParseSuccess = CharacterJsonParsed->TryGetBoolField("Setup", CharacterSetup);
+				}
+
+				if (CharacterParseSuccess)
+				{
+					UE_LOG(LogTemp, Log, TEXT("CharacterParseSuccess"));
+
+					// check if character customization is complete.
+					// then change client UI state
+
+					if (CharacterSetup)
+					{
+						int32 CharacterClass = 0;
+						CharacterJsonParsed->TryGetNumberField("characterClass", CharacterClass);
+						playerS->CharacterClass = CharacterClass;
+						playerS->CharacterSetup = true;
+
+						// Signal the UI to change to PLAY State
+						PlayerController->ClientChangeUIState(EConnectUIState::Play);
+
+						// Also set the playerLoginFlowCompleted so we don't get loading screen on respawn
+						playerS->playerLoginFlowCompleted = true;
+
+						// also set the characterCustomized flag in match players
+						activePlayer->characterCustomized = true;
+
+					}
+					else
+					{
+						UE_LOG(LogTemp, Log, TEXT("CharacterParsed, but was not set up."));
+						PlayerController->ClientChangeUIState(EConnectUIState::CharacterCustomize);
+					}
+				}
+				else
+				{
+					UE_LOG(LogTemp, Log, TEXT("CharacterParse FAIL"));
+
+					// On first connection after creating a new character, a player will not have anything inside the character field.
+					// We want to check to see if there is anything in the characterCustom field here.
+					// If there is, we want to validate it.  Users can easily forge these requests, so it is important to check it first.
+
+					// VALIDATE THE DATA BEFORE USING IT.
+
+					bool CharacterCustomParseSuccess = false;
+					FString CharacterCustomJsonRaw = playerS->savedCharacterCustom;
+					TSharedPtr<FJsonObject> CharacterCustomJsonParsed;
+					TSharedRef<TJsonReader<TCHAR>> CharacterCustomJsonReader = TJsonReaderFactory<TCHAR>::Create(CharacterCustomJsonRaw);
+
+					bool CharacterCustomSetup = false;
+
+					if (FJsonSerializer::Deserialize(CharacterCustomJsonReader, CharacterCustomJsonParsed))
+					{
+						UE_LOG(LogTemp, Log, TEXT("CharacterCustomJsonParsed"));
+
+						CharacterCustomParseSuccess = CharacterCustomJsonParsed->TryGetBoolField("Setup", CharacterCustomSetup);
+					}
+
+					if (CharacterCustomParseSuccess)
+					{
+						UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess"));
+
+						// check if character custom data is valid.
+						// If so, save it to the player state so it can be saved in character
+						// then change client UI state
+
+						// Do validations for all of your data here.
+						FString incomingClass = "";
+
+						CharacterCustomJsonParsed->TryGetStringField("Class", incomingClass);
+
+						if (incomingClass == "Tester" || incomingClass == "Developer")
 						{
-							UE_LOG(LogTemp, Log, TEXT("CharacterJsonParsed"));
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
+							UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess - Data is valid."));
 
-							//
-							CharacterParseSuccess = CharacterJsonParsed->TryGetBoolField("Setup", CharacterSetup);
-						}
-
-						if (CharacterParseSuccess)
-						{
-							UE_LOG(LogTemp, Log, TEXT("CharacterParseSuccess"));
-
-							// check if character customization is complete.
-							// then change client UI state
-
-							if (CharacterSetup)
+							// convert the strings to int32
+							if (incomingClass == "Developer")
 							{
-								int32 CharacterClass = 0;
-
-								CharacterJsonParsed->TryGetNumberField("characterClass", CharacterClass);
-
-								playerS->CharacterClass = CharacterClass;
-								playerS->CharacterSetup = true;
-
-								// Signal the UI to change to PLAY State
-								playerChar->ClientChangeUIState(EConnectUIState::Play);
-
-								// Also set the playerLoginFlowCompleted so we don't get loading screen on respawn
-								playerS->playerLoginFlowCompleted = true;
-								
+								playerS->CharacterClass = 0;
 							}
 							else
 							{
-								UE_LOG(LogTemp, Log, TEXT("CharacterParsed, but was not set up."));
-								playerChar->ClientChangeUIState(EConnectUIState::CharacterCustomize);
-							}
-						}
-						else
-						{
-							UE_LOG(LogTemp, Log, TEXT("CharacterParse FAIL"));
-
-							// On first connection after creating a new character, a player will not have anything inside the character field.
-							// We want to check to see if there is anything in the characterCustom field here.
-							// If there is, we want to validate it.  Users can easily forge these requests, so it is important to check it first.
-							
-							// VALIDATE THE DATA BEFORE USING IT.
-
-							bool CharacterCustomParseSuccess = false;
-							FString CharacterCustomJsonRaw = playerS->savedCharacterCustom;
-							TSharedPtr<FJsonObject> CharacterCustomJsonParsed;
-							TSharedRef<TJsonReader<TCHAR>> CharacterCustomJsonReader = TJsonReaderFactory<TCHAR>::Create(CharacterCustomJsonRaw);
-
-							bool CharacterCustomSetup = false;
-
-							if (FJsonSerializer::Deserialize(CharacterCustomJsonReader, CharacterCustomJsonParsed))
-							{
-								UE_LOG(LogTemp, Log, TEXT("CharacterCustomJsonParsed"));
-
-								CharacterCustomParseSuccess = CharacterCustomJsonParsed->TryGetBoolField("Setup", CharacterCustomSetup);
+								playerS->CharacterClass = 1;
 							}
 
-							if (CharacterCustomParseSuccess)
-							{
-								UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess"));
+							playerS->CharacterSetup = true;
 
-								// check if character custom data is valid.
-								// If so, save it to the player state so it can be saved in character
-								// then change client UI state
+							// Signal the UI to change to PLAY State
+							PlayerController->ClientChangeUIState(EConnectUIState::Play);
 
-								// Do validations for all of your data here.
-								FString incomingClass = "";
+							// Also set the playerLoginFlowCompleted so we don't get loading screen on respawn
+							playerS->playerLoginFlowCompleted = true;
 
-								CharacterCustomJsonParsed->TryGetStringField("Class", incomingClass);
-
-								if (incomingClass == "Tester" || incomingClass == "Developer")
-								{
-									UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess - Data is valid."));
-
-									// convert the strings to int32
-									if (incomingClass == "Developer")
-									{
-										playerS->CharacterClass = 0;
-									}
-									else
-									{
-										playerS->CharacterClass = 1;
-									}
-
-									playerS->CharacterSetup = true;
-
-									// Signal the UI to change to PLAY State
-									playerChar->ClientChangeUIState(EConnectUIState::Play);
-
-									// Also set the playerLoginFlowCompleted so we don't get loading screen on respawn
-									playerS->playerLoginFlowCompleted = true;
-
-								}
-								else
-								{
-									UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess - Data is NOT valid."));
-									playerChar->ClientChangeUIState(EConnectUIState::CharacterCustomize);
-								}
-							}
-
-							else
-							{
-								// Character Custom field did not parse.
-								// send the player UI to the character screen
-								UE_LOG(LogTemp, Log, TEXT("CharacterCustomParse FAIL"));
-
-								playerChar->ClientChangeUIState(EConnectUIState::CharacterCustomize);
-							}
-
-							
-						}
-
-
-						////////////////////////////////////////////////////////////////////
-						// Abilities
-						////////////////////////////////////////////////////////////////////
-
-						// First try to parse abilities as json
-						// If it fails or does not make sense, set it to a default value
-						bool AbilitiesParseSuccess = false;
-						FString AbilitiesJsonRaw = playerS->savedAbilities;
-						TSharedPtr<FJsonObject> AbilitiesJsonParsed;
-						TSharedRef<TJsonReader<TCHAR>> AbilitiesJsonReader = TJsonReaderFactory<TCHAR>::Create(AbilitiesJsonRaw);
-						const JsonValPtrArray *AbilitySlotsJson;
-
-						if (FJsonSerializer::Deserialize(AbilitiesJsonReader, AbilitiesJsonParsed))
-						{
-							UE_LOG(LogTemp, Log, TEXT("AbilitiesJsonParsed"));
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] AbilitiesJsonRaw: %s"), *AbilitiesJsonRaw);
-
-							AbilitiesParseSuccess = AbilitiesJsonParsed->TryGetArrayField("GrantedAbilities", AbilitySlotsJson);
-						}
-
-						// Keep a local copy of the array, so we only perform a single operation on the replicated array
-						TArray<FMyGrantedAbility> LocalGrantedAbilities;
-
-						if (AbilitiesParseSuccess)
-						{
-							UE_LOG(LogTemp, Log, TEXT("AbilitiesParseSuccess"));
-
-							// we already have this
-							// AbilitiesJsonParsed->TryGetArrayField("GrantedAbilities", AbilitySlotsJson);
-
-							UMyBaseGameplayAbility* LoadedObjectClass;
-							FMyGrantedAbility grantedAbility;
-							FGameplayAbilitySpecHandle AbilityHandle;
-
-							// fix for potentially ininitialized pointer.
-							AbilitiesJsonParsed->TryGetArrayField("GrantedAbilities", AbilitySlotsJson);
-
-							for (auto grantedAbilityJsonRaw : *AbilitySlotsJson) {
-								UE_LOG(LogTemp, Log, TEXT("Found ability "));
-								auto grantedAbilityObj = grantedAbilityJsonRaw->AsObject();
-								if (grantedAbilityObj.IsValid())
-								{
-									UClass* LoadedActorOwnerClass;
-									LoadedActorOwnerClass = LoadClassFromPath(grantedAbilityObj->GetStringField(FString("AbilityClass")));
-
-									if (LoadedActorOwnerClass)
-									{
-										UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
-
-										LoadedObjectClass = Cast<UMyBaseGameplayAbility>(LoadedActorOwnerClass->GetDefaultObject());
-
-										if (LoadedObjectClass)
-										{
-											UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
-
-											// There is a problem with giving the ability here.
-											// It works fine for initial play.
-											// but after a death/respawn abilities are missing.
-											// moved the give ability call into the refresh call
-
-											//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
-
-											//grantedAbility.AbilityHandle = AbilityHandle;
-											grantedAbility.classPath = grantedAbilityObj->GetStringField(FString("AbilityClass"));
-											grantedAbility.Icon = LoadedObjectClass->Icon;
-											grantedAbility.title = LoadedObjectClass->Title.ToString();
-											grantedAbility.description = LoadedObjectClass->Description.ToString();
-											//UGameplayAbility* AbilityClassRef = Cast<UGameplayAbility>(LoadedObjectClass);
-											grantedAbility.Ability = LoadedObjectClass->GetClass();
-
-											LocalGrantedAbilities.Add(grantedAbility);
-											//playerC->MyGrantedAbilities.Add(grantedAbility);
-										}
-									}
-
-									// trigger the delegate
-									// We don't want to do this anymore.
-									// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
-									//playerC->MyGrantedAbilities = LocalGrantedAbilities;
-									playerS->CachedAbilities = LocalGrantedAbilities;
-
-									// tell player controller to convert cached to granted
-									playerC->GrantCachedAbilities();
-
-									//playerS->GrantedAbilities = LocalGrantedAbilities;
-									//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
-								}
-							}
+							// also set the characterCustomized flag in match players
+							activePlayer->characterCustomized = true;
 
 						}
 						else
 						{
-							UE_LOG(LogTemp, Log, TEXT("AbilitiesParse FAIL - granting base abilities"));
+							UE_LOG(LogTemp, Log, TEXT("CharacterCustomParseSuccess - Data is NOT valid."));
+							PlayerController->ClientChangeUIState(EConnectUIState::CharacterCustomize);
+						}
+					}
 
-							//"Blueprint'/Game/Abilities/TestAbility.TestAbility'"
-							// Blueprint'/Game/Abilities/TestAbility2.TestAbility2'
-							//FString ActorClassFullPath = "/Game/Abilities/TestAbility.TestAbility_C";
-							//FString ActorClassFullPath = "/Game/Abilities/TestAbility2.TestAbility2_C";
-							// Blueprint'/Game/Abilities/TestAbility3.TestAbility3'
-							//Blueprint'/Game/Abilities/TestAbility4.TestAbility4'
-							TArray <FString> AbilityClassPaths = { "/Game/Abilities/TestAbility2.TestAbility2_C", "/Game/Abilities/TestAbility3.TestAbility3_C", "/Game/Abilities/TestAbility4.TestAbility4_C" };
+					else
+					{
+						// Character Custom field did not parse.
+						// send the player UI to the character screen
+						UE_LOG(LogTemp, Log, TEXT("CharacterCustomParse FAIL"));
 
+						PlayerController->ClientChangeUIState(EConnectUIState::CharacterCustomize);
+					}
+
+
+				}
+
+
+				////////////////////////////////////////////////////////////////////
+				// Abilities
+				////////////////////////////////////////////////////////////////////
+
+				// First try to parse abilities as json
+				// If it fails or does not make sense, set it to a default value
+				bool AbilitiesParseSuccess = false;
+				FString AbilitiesJsonRaw = playerS->savedAbilities;
+				TSharedPtr<FJsonObject> AbilitiesJsonParsed;
+				TSharedRef<TJsonReader<TCHAR>> AbilitiesJsonReader = TJsonReaderFactory<TCHAR>::Create(AbilitiesJsonRaw);
+				const JsonValPtrArray* AbilitySlotsJson;
+
+				if (FJsonSerializer::Deserialize(AbilitiesJsonReader, AbilitiesJsonParsed))
+				{
+					UE_LOG(LogTemp, Log, TEXT("AbilitiesJsonParsed"));
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] AbilitiesJsonRaw: %s"), *AbilitiesJsonRaw);
+
+					AbilitiesParseSuccess = AbilitiesJsonParsed->TryGetArrayField("GrantedAbilities", AbilitySlotsJson);
+				}
+
+				// Keep a local copy of the array, so we only perform a single operation on the replicated array
+				TArray<FMyGrantedAbility> LocalGrantedAbilities;
+
+				if (AbilitiesParseSuccess)
+				{
+					UE_LOG(LogTemp, Log, TEXT("AbilitiesParseSuccess"));
+
+					// we already have this
+					// AbilitiesJsonParsed->TryGetArrayField("GrantedAbilities", AbilitySlotsJson);
+
+					UMyBaseGameplayAbility* LoadedObjectClass;
+					FMyGrantedAbility grantedAbility;
+					FGameplayAbilitySpecHandle AbilityHandle;
+
+					// fix for potentially ininitialized pointer.
+					AbilitiesJsonParsed->TryGetArrayField("GrantedAbilities", AbilitySlotsJson);
+
+					for (auto grantedAbilityJsonRaw : *AbilitySlotsJson) {
+						UE_LOG(LogTemp, Log, TEXT("Found ability "));
+						auto grantedAbilityObj = grantedAbilityJsonRaw->AsObject();
+						if (grantedAbilityObj.IsValid())
+						{
 							UClass* LoadedActorOwnerClass;
-							UMyBaseGameplayAbility* LoadedObjectClass;
-							FMyGrantedAbility grantedAbility;
-							FGameplayAbilitySpecHandle AbilityHandle;
+							LoadedActorOwnerClass = LoadClassFromPath(grantedAbilityObj->GetStringField(FString("AbilityClass")));
 
-							for (int32 AbilityIndex = 0; AbilityIndex < AbilityClassPaths.Num(); AbilityIndex++)
+							if (LoadedActorOwnerClass)
 							{
-								UE_LOG(LogTemp, Log, TEXT("Found default ability"));
+								UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
 
-								LoadedActorOwnerClass = LoadClassFromPath(AbilityClassPaths[AbilityIndex]);
 								LoadedObjectClass = Cast<UMyBaseGameplayAbility>(LoadedActorOwnerClass->GetDefaultObject());
 
 								if (LoadedObjectClass)
 								{
 									UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
 
+									// There is a problem with giving the ability here.
+									// It works fine for initial play.
+									// but after a death/respawn abilities are missing.
+									// moved the give ability call into the refresh call
+
 									//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
 
 									//grantedAbility.AbilityHandle = AbilityHandle;
-									grantedAbility.classPath = AbilityClassPaths[AbilityIndex];
+									grantedAbility.classPath = grantedAbilityObj->GetStringField(FString("AbilityClass"));
 									grantedAbility.Icon = LoadedObjectClass->Icon;
 									grantedAbility.title = LoadedObjectClass->Title.ToString();
 									grantedAbility.description = LoadedObjectClass->Description.ToString();
@@ -1599,502 +1392,593 @@ void UMyGameInstance::GetGamePlayerRequestComplete(FHttpRequestPtr HttpRequest, 
 									grantedAbility.Ability = LoadedObjectClass->GetClass();
 
 									LocalGrantedAbilities.Add(grantedAbility);
+									//playerC->MyGrantedAbilities.Add(grantedAbility);
 								}
 							}
 
 							// trigger the delegate
 							// We don't want to do this anymore.
 							// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
-							// playerC->MyGrantedAbilities = LocalGrantedAbilities;
-							//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
-
+							//playerC->MyGrantedAbilities = LocalGrantedAbilities;
 							playerS->CachedAbilities = LocalGrantedAbilities;
 
 							// tell player controller to convert cached to granted
-							playerC->GrantCachedAbilities();
+							PlayerController->GrantCachedAbilities();
 
+							//playerS->GrantedAbilities = LocalGrantedAbilities;
+							//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
 						}
+					}
 
-						////////////////////////////////////////////////////////////////////
-						// Interface
-						////////////////////////////////////////////////////////////////////
+				}
+				else
+				{
+					UE_LOG(LogTemp, Log, TEXT("AbilitiesParse FAIL - granting base abilities"));
 
+					//"Blueprint'/Game/Abilities/TestAbility.TestAbility'"
+					// Blueprint'/Game/Abilities/TestAbility2.TestAbility2'
+					//FString ActorClassFullPath = "/Game/Abilities/TestAbility.TestAbility_C";
+					//FString ActorClassFullPath = "/Game/Abilities/TestAbility2.TestAbility2_C";
+					// Blueprint'/Game/Abilities/TestAbility3.TestAbility3'
+					//Blueprint'/Game/Abilities/TestAbility4.TestAbility4'
+					TArray <FString> AbilityClassPaths = { "/Game/Abilities/TestAbility2.TestAbility2_C", "/Game/Abilities/TestAbility3.TestAbility3_C", "/Game/Abilities/TestAbility4.TestAbility4_C" };
 
+					UClass* LoadedActorOwnerClass;
+					UMyBaseGameplayAbility* LoadedObjectClass;
+					FMyGrantedAbility grantedAbility;
+					FGameplayAbilitySpecHandle AbilityHandle;
 
-						// First try to parse interface ability bar as json
-						// If it fails or does not make sense, set it to a default value
-						bool InterfaceParseSuccess = false;
-						FString InterfaceJsonRaw = playerS->savedInterface;
-						TSharedPtr<FJsonObject> InterfaceJsonParsed;
-						TSharedRef<TJsonReader<TCHAR>> InterfaceJsonReader = TJsonReaderFactory<TCHAR>::Create(InterfaceJsonRaw);
-						const JsonValPtrArray *InterfaceAbilitySlotsJson;
+					for (int32 AbilityIndex = 0; AbilityIndex < AbilityClassPaths.Num(); AbilityIndex++)
+					{
+						UE_LOG(LogTemp, Log, TEXT("Found default ability"));
 
-						int32 AbilityCapacity = 4;
-						int32 AbilitySlotsPerRow = 6;
+						LoadedActorOwnerClass = LoadClassFromPath(AbilityClassPaths[AbilityIndex]);
+						LoadedObjectClass = Cast<UMyBaseGameplayAbility>(LoadedActorOwnerClass->GetDefaultObject());
 
-						if (FJsonSerializer::Deserialize(InterfaceJsonReader, InterfaceJsonParsed))
+						if (LoadedObjectClass)
 						{
-							UE_LOG(LogTemp, Log, TEXT("InterfaceJsonParsed"));
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InterfaceJsonRaw: %s"), *InterfaceJsonRaw);
+							UE_LOG(LogTemp, Log, TEXT("Found LoadedObjectClass"));
 
-							InterfaceJsonParsed->TryGetNumberField("AbilityCapacity", AbilityCapacity);
-							InterfaceJsonParsed->TryGetNumberField("AbilitySlotsPerRow", AbilitySlotsPerRow);
+							//AbilityHandle = playerChar->AttemptGiveAbility(LoadedObjectClass);
 
-							InterfaceParseSuccess = InterfaceJsonParsed->TryGetArrayField("AbilitySlots", InterfaceAbilitySlotsJson);
+							//grantedAbility.AbilityHandle = AbilityHandle;
+							grantedAbility.classPath = AbilityClassPaths[AbilityIndex];
+							grantedAbility.Icon = LoadedObjectClass->Icon;
+							grantedAbility.title = LoadedObjectClass->Title.ToString();
+							grantedAbility.description = LoadedObjectClass->Description.ToString();
+							//UGameplayAbility* AbilityClassRef = Cast<UGameplayAbility>(LoadedObjectClass);
+							grantedAbility.Ability = LoadedObjectClass->GetClass();
+
+							LocalGrantedAbilities.Add(grantedAbility);
 						}
+					}
 
-						// get key mappings from config
+					// trigger the delegate
+					// We don't want to do this anymore.
+					// The delegate needs to be triggered later, in order to facilitate giving abilities again after respawn
+					// playerC->MyGrantedAbilities = LocalGrantedAbilities;
+					//playerC->DoRep_AbilitiesChanged = !playerC->DoRep_AbilitiesChanged;
 
-						const UInputSettings* Settings = GetDefault<UInputSettings>();
-						if (!Settings) return;
+					playerS->CachedAbilities = LocalGrantedAbilities;
 
-						const TArray<FInputActionKeyMapping>& KeyBindingsFromConfig = Settings->ActionMappings;
+					// tell player controller to convert cached to granted
+					PlayerController->GrantCachedAbilities();
 
-						//TArray<FVictoryInput> KeyBindingsFromConfig; // remapped keybindings are stored in ini files as well.
-						//playerC->VictoryGetAllActionKeyBindings(KeyBindingsFromConfig);
+				}
 
-						TArray<FInputActionKeyMapping> KeyBindingsForAbilities; // Only keeping bindings that are used for abilities.  They look like:  "UseAbility1"
+				////////////////////////////////////////////////////////////////////
+				// Interface
+				////////////////////////////////////////////////////////////////////
 
-						FString ActionNameBase = "UseAbility";
-						FString ActionNameTarget;
-						//int32 ActionBindingIndex = 0;
 
-						// Go through all of the key bindings.  Find the ones that match our naming convention, and put them in order.
-						for (int32 ActionBindingIndex = 1; ActionBindingIndex <= AbilityCapacity; ActionBindingIndex++)
+
+				// First try to parse interface ability bar as json
+				// If it fails or does not make sense, set it to a default value
+				bool InterfaceParseSuccess = false;
+				FString InterfaceJsonRaw = playerS->savedInterface;
+				TSharedPtr<FJsonObject> InterfaceJsonParsed;
+				TSharedRef<TJsonReader<TCHAR>> InterfaceJsonReader = TJsonReaderFactory<TCHAR>::Create(InterfaceJsonRaw);
+				const JsonValPtrArray* InterfaceAbilitySlotsJson;
+
+				int32 AbilityCapacity = 4;
+				int32 AbilitySlotsPerRow = 6;
+
+				if (FJsonSerializer::Deserialize(InterfaceJsonReader, InterfaceJsonParsed))
+				{
+					UE_LOG(LogTemp, Log, TEXT("InterfaceJsonParsed"));
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InterfaceJsonRaw: %s"), *InterfaceJsonRaw);
+
+					InterfaceJsonParsed->TryGetNumberField("AbilityCapacity", AbilityCapacity);
+					InterfaceJsonParsed->TryGetNumberField("AbilitySlotsPerRow", AbilitySlotsPerRow);
+
+					InterfaceParseSuccess = InterfaceJsonParsed->TryGetArrayField("AbilitySlots", InterfaceAbilitySlotsJson);
+				}
+
+				// get key mappings from config
+
+				const UInputSettings* Settings = GetDefault<UInputSettings>();
+				if (!Settings) return;
+
+				const TArray<FInputActionKeyMapping>& KeyBindingsFromConfig = Settings->ActionMappings;
+
+				//TArray<FVictoryInput> KeyBindingsFromConfig; // remapped keybindings are stored in ini files as well.
+				//playerC->VictoryGetAllActionKeyBindings(KeyBindingsFromConfig);
+
+				TArray<FInputActionKeyMapping> KeyBindingsForAbilities; // Only keeping bindings that are used for abilities.  They look like:  "UseAbility1"
+
+				FString ActionNameBase = "UseAbility";
+				FString ActionNameTarget;
+				//int32 ActionBindingIndex = 0;
+
+				// Go through all of the key bindings.  Find the ones that match our naming convention, and put them in order.
+				for (int32 ActionBindingIndex = 1; ActionBindingIndex <= AbilityCapacity; ActionBindingIndex++)
+				{
+					ActionNameTarget = ActionNameBase + FString::FromInt(ActionBindingIndex);
+					for (int32 keyBindIndex = 0; keyBindIndex < KeyBindingsFromConfig.Num(); keyBindIndex++)
+					{
+
+						if (ActionNameTarget == KeyBindingsFromConfig[keyBindIndex].ActionName.ToString())
 						{
-							ActionNameTarget = ActionNameBase + FString::FromInt(ActionBindingIndex);
-							for (int32 keyBindIndex = 0; keyBindIndex < KeyBindingsFromConfig.Num(); keyBindIndex++)
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] KeyBindingFromConfig.ActionName: %s"), *KeyBindingsFromConfig[keyBindIndex].ActionName.ToString());
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] KeyBindingFromConfig.KeyAsString: %s"), *KeyBindingsFromConfig[keyBindIndex].Key.ToString());
+							KeyBindingsForAbilities.Add(KeyBindingsFromConfig[keyBindIndex]);
+						}
+					}
+				}
+
+
+				// Make sure there are enough bound keys!
+				if (KeyBindingsForAbilities.Num() >= AbilityCapacity)
+				{
+					UE_LOG(LogTemp, Log, TEXT("KeyBindingsForAbilities.Num() >= AbilityCapacity"));
+
+					// Keep a local copy of the array, so we only perform a single operation on the replicated array
+					TArray<FMyAbilitySlot> LocalAbilitySlots;
+
+					if (InterfaceParseSuccess)
+					{
+						UE_LOG(LogTemp, Log, TEXT("InterfaceParseSuccess"));
+
+						PlayerController->AbilityCapacity = AbilityCapacity;
+						PlayerController->AbilitySlotsPerRow = AbilitySlotsPerRow;
+
+						// Keep track of slots that were successfully filled
+						int32 abilitySlotsFilledSuccessfully = 0;
+						int32 currentSlotIndex = 0;
+
+						// doing this differently...  WE need to fill them in order, and skip any that are not mapped.
+						// RIght now, XX-X is saved and relaoaded as XXX-
+
+
+						// Fill slots from interface json first
+						InterfaceJsonParsed->TryGetArrayField("AbilitySlots", InterfaceAbilitySlotsJson);
+
+
+						for (auto interfaceAbilitySlot : *InterfaceAbilitySlotsJson) {
+							UE_LOG(LogTemp, Log, TEXT("Found Interface Ability slot"));
+							FMyAbilitySlot interfaceASlot;
+							auto interfaceAbilitySlotObj = interfaceAbilitySlot->AsObject();
+							if (interfaceAbilitySlotObj.IsValid())
 							{
+								FString AbilityClassPath = "";
+								interfaceAbilitySlotObj->TryGetStringField("AbilityClass", AbilityClassPath);
 
-								if (ActionNameTarget == KeyBindingsFromConfig[keyBindIndex].ActionName.ToString())
+								int32 matchingGrantedAbilityIndex = -1;
+
+								// go though granted abilities and find by Class
+								for (int32 grantedAIndex = 0; grantedAIndex < PlayerController->MyGrantedAbilities.Num(); grantedAIndex++)
 								{
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] KeyBindingFromConfig.ActionName: %s"), *KeyBindingsFromConfig[keyBindIndex].ActionName.ToString());
-									UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] KeyBindingFromConfig.KeyAsString: %s"), *KeyBindingsFromConfig[keyBindIndex].Key.ToString());
-									KeyBindingsForAbilities.Add(KeyBindingsFromConfig[keyBindIndex]);
-								}
-							}
-						}
-
-
-						// Make sure there are enough bound keys!
-						if (KeyBindingsForAbilities.Num() >= AbilityCapacity)
-						{
-							UE_LOG(LogTemp, Log, TEXT("KeyBindingsForAbilities.Num() >= AbilityCapacity"));
-
-							// Keep a local copy of the array, so we only perform a single operation on the replicated array
-							TArray<FMyAbilitySlot> LocalAbilitySlots;
-
-							if (InterfaceParseSuccess)
-							{
-								UE_LOG(LogTemp, Log, TEXT("InterfaceParseSuccess"));
-
-								playerC->AbilityCapacity = AbilityCapacity;
-								playerC->AbilitySlotsPerRow = AbilitySlotsPerRow;
-
-								// Keep track of slots that were successfully filled
-								int32 abilitySlotsFilledSuccessfully = 0;
-								int32 currentSlotIndex = 0;
-
-								// doing this differently...  WE need to fill them in order, and skip any that are not mapped.
-								// RIght now, XX-X is saved and relaoaded as XXX-
-
-
-								// Fill slots from interface json first
-								InterfaceJsonParsed->TryGetArrayField("AbilitySlots", InterfaceAbilitySlotsJson);
-
-
-								for (auto interfaceAbilitySlot : *InterfaceAbilitySlotsJson) {
-									UE_LOG(LogTemp, Log, TEXT("Found Interface Ability slot"));
-									FMyAbilitySlot interfaceASlot;
-									auto interfaceAbilitySlotObj = interfaceAbilitySlot->AsObject();
-									if (interfaceAbilitySlotObj.IsValid())
+									if (AbilityClassPath == PlayerController->MyGrantedAbilities[grantedAIndex].classPath)
 									{
-										FString AbilityClassPath = "";
-										interfaceAbilitySlotObj->TryGetStringField("AbilityClass", AbilityClassPath);
-
-										int32 matchingGrantedAbilityIndex = -1;
-
-										// go though granted abilities and find by Class
-										for (int32 grantedAIndex = 0; grantedAIndex < playerC->MyGrantedAbilities.Num(); grantedAIndex++)
-										{
-											if (AbilityClassPath == playerC->MyGrantedAbilities[grantedAIndex].classPath)
-											{
-												UE_LOG(LogTemp, Log, TEXT("Found matching granted ability"));
-												matchingGrantedAbilityIndex = grantedAIndex;
-												break;
-											}
-										}
-
-										// If a match was found, add it.  Otherwise, add empty.
-										if (matchingGrantedAbilityIndex >= 0)
-										{
-											UE_LOG(LogTemp, Log, TEXT("Adding found ability to ability slots"));
-
-											FMyAbilitySlot AbilityTemp;
-
-											AbilityTemp.Key = KeyBindingsForAbilities[currentSlotIndex].Key;
-											AbilityTemp.GrantedAbility = playerC->MyGrantedAbilities[matchingGrantedAbilityIndex];
-											AbilityTemp.bIsValid = true;
-											AbilityTemp.title = playerC->MyGrantedAbilities[matchingGrantedAbilityIndex].title;
-											AbilityTemp.description = playerC->MyGrantedAbilities[matchingGrantedAbilityIndex].description;
-											AbilityTemp.Icon = playerC->MyGrantedAbilities[matchingGrantedAbilityIndex].Icon;
-											AbilityTemp.classPath = playerC->MyGrantedAbilities[matchingGrantedAbilityIndex].classPath;
-											LocalAbilitySlots.Add(AbilityTemp);
-
-											abilitySlotsFilledSuccessfully++;
-										}
-										else
-										{
-											UE_LOG(LogTemp, Log, TEXT("No matching Granted ability found - adding empty"));
-
-											FMyAbilitySlot AbilityTemp;
-
-											FMyGrantedAbility grantedAbility;
-											grantedAbility.Icon = nullptr;
-
-											AbilityTemp.GrantedAbility = grantedAbility;
-
-											AbilityTemp.Key = KeyBindingsForAbilities[currentSlotIndex].Key;
-											AbilityTemp.bIsValid = false;
-											AbilityTemp.Icon = nullptr;
-											AbilityTemp.classPath = "";
-											LocalAbilitySlots.Add(AbilityTemp);
-
-											abilitySlotsFilledSuccessfully++;
-										}
-
+										UE_LOG(LogTemp, Log, TEXT("Found matching granted ability"));
+										matchingGrantedAbilityIndex = grantedAIndex;
+										break;
 									}
-									currentSlotIndex++;
 								}
 
-								// TODO fill any slots that did not get populated successfully with empty
-								if (abilitySlotsFilledSuccessfully < AbilityCapacity)
+								// If a match was found, add it.  Otherwise, add empty.
+								if (matchingGrantedAbilityIndex >= 0)
 								{
-									UE_LOG(LogTemp, Log, TEXT("found unfilled ability slots - filling with empty"));
+									UE_LOG(LogTemp, Log, TEXT("Adding found ability to ability slots"));
 
-									FMyAbilitySlot BlankAbility;
-									BlankAbility.Icon = nullptr;
-									BlankAbility.title = "Empty";
+									FMyAbilitySlot AbilityTemp;
 
+									AbilityTemp.Key = KeyBindingsForAbilities[currentSlotIndex].Key;
+									AbilityTemp.GrantedAbility = PlayerController->MyGrantedAbilities[matchingGrantedAbilityIndex];
+									AbilityTemp.bIsValid = true;
+									AbilityTemp.title = PlayerController->MyGrantedAbilities[matchingGrantedAbilityIndex].title;
+									AbilityTemp.description = PlayerController->MyGrantedAbilities[matchingGrantedAbilityIndex].description;
+									AbilityTemp.Icon = PlayerController->MyGrantedAbilities[matchingGrantedAbilityIndex].Icon;
+									AbilityTemp.classPath = PlayerController->MyGrantedAbilities[matchingGrantedAbilityIndex].classPath;
+									LocalAbilitySlots.Add(AbilityTemp);
 
-									for (int32 abilitySlotIndex = 0; abilitySlotIndex < AbilityCapacity - abilitySlotsFilledSuccessfully; abilitySlotIndex++)
-									{
-										UE_LOG(LogTemp, Log, TEXT("Adding blank ability to ability slots"));
-										FMyGrantedAbility grantedAbility;
-										grantedAbility.Icon = nullptr;
-
-
-										BlankAbility.Key = KeyBindingsForAbilities[abilitySlotIndex + abilitySlotsFilledSuccessfully].Key;
-										BlankAbility.GrantedAbility = grantedAbility;
-										BlankAbility.bIsValid = false;
-										//playerC->MyAbilitySlots.Add(BlankAbility);
-										LocalAbilitySlots.Add(BlankAbility);
-									}
-
+									abilitySlotsFilledSuccessfully++;
 								}
-
-								// trigger the delegate so we can build the UI
-								playerC->AbilityCapacity = AbilityCapacity;
-								playerC->AbilitySlotsPerRow = AbilitySlotsPerRow;
-								playerC->MyAbilitySlots = LocalAbilitySlots;
-								//playerC->DoRep_AbilityInterfaceChanged = !playerC->DoRep_AbilityInterfaceChanged;
-
-							}
-							else
-							{
-								UE_LOG(LogTemp, Log, TEXT("InterfaceParse FAIL"));
-
-								// WE don't have Interface json to work with, so we're just going to build up a blank action bar that is empty.
-								FMyAbilitySlot BlankAbility;
-								BlankAbility.Icon = nullptr;
-								BlankAbility.title = "Empty";
-
-
-								for (int32 abilitySlotIndex = 0; abilitySlotIndex < AbilityCapacity; abilitySlotIndex++)
+								else
 								{
-									UE_LOG(LogTemp, Log, TEXT("Adding blank ability to ability slots"));
+									UE_LOG(LogTemp, Log, TEXT("No matching Granted ability found - adding empty"));
+
+									FMyAbilitySlot AbilityTemp;
+
 									FMyGrantedAbility grantedAbility;
 									grantedAbility.Icon = nullptr;
 
-									BlankAbility.Key = KeyBindingsForAbilities[abilitySlotIndex].Key;
-									BlankAbility.GrantedAbility = grantedAbility;
-									BlankAbility.bIsValid = false;
-									LocalAbilitySlots.Add(BlankAbility);
+									AbilityTemp.GrantedAbility = grantedAbility;
 
-								}
+									AbilityTemp.Key = KeyBindingsForAbilities[currentSlotIndex].Key;
+									AbilityTemp.bIsValid = false;
+									AbilityTemp.Icon = nullptr;
+									AbilityTemp.classPath = "";
+									LocalAbilitySlots.Add(AbilityTemp);
 
-								// trigger the delegate so we can build the UI
-								playerC->AbilityCapacity = AbilityCapacity;
-								playerC->AbilitySlotsPerRow = AbilitySlotsPerRow;
-								playerC->MyAbilitySlots = LocalAbilitySlots;
-								//playerC->DoRep_AbilityInterfaceChanged = !playerC->DoRep_AbilityInterfaceChanged;
-
-
-
-
-
-							}
-						}
-						else
-						{
-							UE_LOG(LogTemp, Error, TEXT("ERROR.  INSUFFICIENT ABILITY BINDINGS.  CANNOT SET UP ACTION BAR.  "));
-						}
-
-						////////////////////////////////////////////////////////////////////
-						// Inventory
-						////////////////////////////////////////////////////////////////////
-
-						// First try to parse the inventory as json.
-						// If it fails or does not make sense, set it to a default value.
-						bool InventoryParseSuccess = false;
-						FString InventoryJsonRaw = playerS->savedInventory;
-						TSharedPtr<FJsonObject> InventoryJsonParsed;
-						TSharedRef<TJsonReader<TCHAR>> InventoryJsonReader = TJsonReaderFactory<TCHAR>::Create(InventoryJsonRaw);
-						const JsonValPtrArray *InventorySlotsJson;
-						int32 InventoryCapacity = 16;
-
-						if (FJsonSerializer::Deserialize(InventoryJsonReader, InventoryJsonParsed))
-						{
-							UE_LOG(LogTemp, Log, TEXT("InventoryJsonParsed"));
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
-
-							InventoryJsonParsed->TryGetNumberField("InventoryCapacity", InventoryCapacity);
-							InventoryParseSuccess = InventoryJsonParsed->TryGetArrayField("InventorySlots", InventorySlotsJson);
-						}
-
-						// Keep a local copy of the array, so we only perform a single operation on the replicated array
-						TArray<FMyInventorySlot> LocalInventorySlots;
-
-						if (InventoryParseSuccess)
-						{
-							UE_LOG(LogTemp, Log, TEXT("InventoryParseSuccess"));
-
-
-
-							// TODO - set up player controller inventory.
-							playerC->InventoryCapacity = InventoryCapacity;
-
-							// Keep track of slots that were successfully filled
-							int32 slotsFilledSuccessfully = 0;
-
-							// Fill slots from inventory json first
-							InventoryJsonParsed->TryGetArrayField("InventorySlots", InventorySlotsJson);
-
-							for (auto inventorySlot : *InventorySlotsJson) {
-								//UE_LOG(LogTemp, Log, TEXT("Found Inventory slot"));
-								FMyInventorySlot itemSlot;
-								auto inventorySlotObj = inventorySlot->AsObject();
-								if (inventorySlotObj.IsValid())
-								{
-									UClass* LoadedActorOwnerClass;
-									LoadedActorOwnerClass = LoadClassFromPath(inventorySlotObj->GetStringField(FString("ItemClass")));
-
-									if (LoadedActorOwnerClass)
-									{
-										//UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
-
-										AMyBasePickup* basePickupBP = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
-										if (basePickupBP) {
-											//UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
-
-											itemSlot.itemClassTitle = basePickupBP->GetName();  // FFS - we can't use the name because it's not consistent
-											// [2017.11.21-04.31.36:264][655]LogTemp: InventorySlots[i].itemClassTitle: Default__ItemHealthPotion_C
-											// [2017.11.21 - 04.31.36:264][655]LogTemp: ClassTypeIn->GetName() : ItemHealthPotion2_2
-
-											FString savedAttributes;
-
-											itemSlot.itemTitle = basePickupBP->Title.ToString();
-											itemSlot.itemClassPath = inventorySlotObj->GetStringField(FString("ItemClass"));
-											itemSlot.Icon = basePickupBP->Icon;
-
-											inventorySlotObj->TryGetNumberField("Quantity", itemSlot.quantity);
-											inventorySlotObj->TryGetStringField("ItemId", itemSlot.itemId);
-											inventorySlotObj->TryGetStringField("ItemTitle", itemSlot.itemTitle);
-
-											// For inventory we just use a plain array field, becuase inventory already is a json encoded test string.  We don't need to do it again.
-
-											//bool AttributeParseSuccess;
-											//const TArray <TSharedPtr<FJsonValue>> *AttributesJson;
-											const JsonValPtrArray *AttributesJson;
-											inventorySlotObj->TryGetArrayField("attributes", AttributesJson);
-
-											int32 currentIndex = 0;
-											int32 referenceIndex = 0;
-											FString JsonIndexName = "0";
-											double JsonValue = 0.0f;
-
-											// TODO rework this - it's possible that somewhow the attributes get messed up and out of sequence
-											// like if it is saved, and an index is skipped.
-											for (auto attributeJsonRaw : *AttributesJson) {
-												UE_LOG(LogTemp, Log, TEXT("Found attribute "));
-												JsonValue = 0.0f;
-												auto attributeObj = attributeJsonRaw->AsObject();
-												if (attributeObj.IsValid())
-												{
-													JsonIndexName = FString::FromInt(currentIndex);
-
-													attributeObj->TryGetNumberField(JsonIndexName, JsonValue);
-
-													itemSlot.Attributes.Add(JsonValue);
-												}
-												currentIndex++;
-											}
-
-
-											/*
-											//TArray<TSharedPtr<FJsonValue> > JsonFriends = JsonObject->GetArrayField(TEXT("data"));
-
-											inventorySlotObj->TryGetStringField("attributes", savedAttributes);
-
-											TSharedPtr<FJsonObject> AttributesJsonParsed;
-											TSharedRef<TJsonReader<TCHAR>> AttributesJsonReader = TJsonReaderFactory<TCHAR>::Create(savedAttributes);
-
-
-
-											if (FJsonSerializer::Deserialize(AttributesJsonReader, AttributesJsonParsed))
-											{
-											UE_LOG(LogTemp, Log, TEXT("AttributesJsonParsed"));
-											//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
-
-											for (auto currObject = AttributesJsonParsed->Values.CreateConstIterator(); currObject; ++currObject)
-											{
-											UE_LOG(LogTemp, Log, TEXT("Found Attribute: %s"), *currObject->Key);
-											currObject->Key;
-											if (currObject->Value->AsNumber())
-											{
-											itemSlot.Attributes.Add(currObject->Value->AsNumber());
-											}
-
-											}
-
-											}
-											*/
-
-
-
-											itemSlot.bCanBeUsed = basePickupBP->bCanBeUsed;
-											itemSlot.UseText = basePickupBP->UseText;
-											itemSlot.bCanBeStacked = basePickupBP->bCanBeStacked;
-											itemSlot.MaxStackSize = basePickupBP->MaxStackSize;
-
-											//playerC->InventorySlots.Add(itemSlot);
-											LocalInventorySlots.Add(itemSlot);
-
-											slotsFilledSuccessfully++;
-										}
-
-									}
-									else {
-										UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
-									}
-								}
-							}
-
-							// Fill remainder slots with empty
-
-							int32 remainingSlotsToFill = InventoryCapacity - slotsFilledSuccessfully;
-							FMyInventorySlot emptySlot;
-							FString ActorClassFullPath = "/Game/UI/Inventory/Blueprints/ItemClasses/ItemHealthPotion.ItemHealthPotion_C";
-							UClass* LoadedActorOwnerClass;
-
-							LoadedActorOwnerClass = LoadClassFromPath(ActorClassFullPath);
-
-							if (LoadedActorOwnerClass)
-							{
-								UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
-
-								AMyBasePickup* basePickupBP = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
-								if (basePickupBP) {
-									UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
-									//emptySlot.itemClass = basePickupBP->GetClass();
-									//emptySlot.itemClass = basePickupBP;
-									emptySlot.itemClassTitle = basePickupBP->GetName();
-									emptySlot.itemClassPath = ActorClassFullPath;
-									emptySlot.Icon = basePickupBP->Icon;
-									emptySlot.itemTitle = basePickupBP->Title.ToString();
+									abilitySlotsFilledSuccessfully++;
 								}
 
 							}
-							else {
-								UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
-							}
-
-							emptySlot.itemId = 0;
-
-							emptySlot.quantity = 0;
-
-							for (int32 inventoryIndex = 0; inventoryIndex < remainingSlotsToFill; inventoryIndex++)
-							{
-								//playerC->InventorySlots.Add(emptySlot);
-								LocalInventorySlots.Add(emptySlot);
-							}
-
-							// Trigger the inventory changed delegate
-							playerC->InventorySlots = LocalInventorySlots;
-							//playerC->DoRep_InventoryChanged = !playerC->DoRep_InventoryChanged;
-
+							currentSlotIndex++;
 						}
-						else
+
+						// TODO fill any slots that did not get populated successfully with empty
+						if (abilitySlotsFilledSuccessfully < AbilityCapacity)
 						{
-							UE_LOG(LogTemp, Log, TEXT("InventoryJson Parse FAIL"));
+							UE_LOG(LogTemp, Log, TEXT("found unfilled ability slots - filling with empty"));
 
-							playerC->InventoryCapacity = InventoryCapacity;
+							FMyAbilitySlot BlankAbility;
+							BlankAbility.Icon = nullptr;
+							BlankAbility.title = "Empty";
 
-							FMyInventorySlot emptySlot;
 
-							// loop over the InventoryBlueprintClasses array and grab the match
-							// Rama to the rescue:  https://answers.unrealengine.com/questions/330309/an-issue-with-runtime-savingloading-of-blueprint-c.html
-
-							FString ActorClassFullPath = "/Game/UI/Inventory/Blueprints/ItemClasses/ItemHealthPotion.ItemHealthPotion_C";
-							UClass* LoadedActorOwnerClass;
-
-							LoadedActorOwnerClass = LoadClassFromPath(ActorClassFullPath);
-
-							if (LoadedActorOwnerClass)
+							for (int32 abilitySlotIndex = 0; abilitySlotIndex < AbilityCapacity - abilitySlotsFilledSuccessfully; abilitySlotIndex++)
 							{
-								UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
+								UE_LOG(LogTemp, Log, TEXT("Adding blank ability to ability slots"));
+								FMyGrantedAbility grantedAbility;
+								grantedAbility.Icon = nullptr;
 
-								AMyBasePickup* basePickupBP = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
-								if (basePickupBP) {
-									UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
-									//emptySlot.itemClass = basePickupBP->GetClass();
-									//emptySlot.itemClass = basePickupBP;
-									emptySlot.itemClassTitle = basePickupBP->GetName();
-									emptySlot.itemClassPath = ActorClassFullPath;
-									emptySlot.Icon = basePickupBP->Icon;
-									emptySlot.itemTitle = basePickupBP->Title.ToString();
-								}
 
-							}
-							else {
-								UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
-								emptySlot.itemTitle = "Empty";
+								BlankAbility.Key = KeyBindingsForAbilities[abilitySlotIndex + abilitySlotsFilledSuccessfully].Key;
+								BlankAbility.GrantedAbility = grantedAbility;
+								BlankAbility.bIsValid = false;
+								//playerC->MyAbilitySlots.Add(BlankAbility);
+								LocalAbilitySlots.Add(BlankAbility);
 							}
 
-							emptySlot.itemId = 0;
-							emptySlot.quantity = 0;
-
-
-							for (int32 inventoryIndex = 0; inventoryIndex < 16; inventoryIndex++)
-							{
-								LocalInventorySlots.Add(emptySlot);
-								//playerC->InventorySlots.Add(emptySlot);
-							}
-
-							// Trigger the inventory changed delegate
-							playerC->InventorySlots = LocalInventorySlots;
-							//playerC->DoRep_InventoryChanged = !playerC->DoRep_InventoryChanged;
 						}
 
-						// set loaded state
-						playerC->PlayerDataLoaded = true;
+						// trigger the delegate so we can build the UI
+						PlayerController->AbilityCapacity = AbilityCapacity;
+						PlayerController->AbilitySlotsPerRow = AbilitySlotsPerRow;
+						PlayerController->MyAbilitySlots = LocalAbilitySlots;
+						//playerC->DoRep_AbilityInterfaceChanged = !playerC->DoRep_AbilityInterfaceChanged;
 
-						// trigger party and chat changed delegates
-						//const FUniqueNetId netID = FUniqueNetId(activePlayer->UniqueId->ToString())
-						//playerC->RefreshChatChannelList(netID)
-						//playerC->OnChatChannelsChangedUETopia.Broadcast();
+					}
+					else
+					{
+						UE_LOG(LogTemp, Log, TEXT("InterfaceParse FAIL"));
+
+						// WE don't have Interface json to work with, so we're just going to build up a blank action bar that is empty.
+						FMyAbilitySlot BlankAbility;
+						BlankAbility.Icon = nullptr;
+						BlankAbility.title = "Empty";
+
+
+						for (int32 abilitySlotIndex = 0; abilitySlotIndex < AbilityCapacity; abilitySlotIndex++)
+						{
+							UE_LOG(LogTemp, Log, TEXT("Adding blank ability to ability slots"));
+							FMyGrantedAbility grantedAbility;
+							grantedAbility.Icon = nullptr;
+
+							BlankAbility.Key = KeyBindingsForAbilities[abilitySlotIndex].Key;
+							BlankAbility.GrantedAbility = grantedAbility;
+							BlankAbility.bIsValid = false;
+							LocalAbilitySlots.Add(BlankAbility);
+
+						}
+
+						// trigger the delegate so we can build the UI
+						PlayerController->AbilityCapacity = AbilityCapacity;
+						PlayerController->AbilitySlotsPerRow = AbilitySlotsPerRow;
+						PlayerController->MyAbilitySlots = LocalAbilitySlots;
+						//playerC->DoRep_AbilityInterfaceChanged = !playerC->DoRep_AbilityInterfaceChanged;
+
+
+
+
+
 					}
 				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("ERROR.  INSUFFICIENT ABILITY BINDINGS.  CANNOT SET UP ACTION BAR.  "));
+				}
+
+				////////////////////////////////////////////////////////////////////
+				// Inventory
+				////////////////////////////////////////////////////////////////////
+
+				// First try to parse the inventory as json.
+				// If it fails or does not make sense, set it to a default value.
+				bool InventoryParseSuccess = false;
+				FString InventoryJsonRaw = playerS->savedInventory;
+				TSharedPtr<FJsonObject> InventoryJsonParsed;
+				TSharedRef<TJsonReader<TCHAR>> InventoryJsonReader = TJsonReaderFactory<TCHAR>::Create(InventoryJsonRaw);
+				const JsonValPtrArray* InventorySlotsJson;
+				int32 InventoryCapacity = 16;
+
+				if (FJsonSerializer::Deserialize(InventoryJsonReader, InventoryJsonParsed))
+				{
+					UE_LOG(LogTemp, Log, TEXT("InventoryJsonParsed"));
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
+
+					InventoryJsonParsed->TryGetNumberField("InventoryCapacity", InventoryCapacity);
+					InventoryParseSuccess = InventoryJsonParsed->TryGetArrayField("InventorySlots", InventorySlotsJson);
+				}
+
+				// Keep a local copy of the array, so we only perform a single operation on the replicated array
+				TArray<FMyInventorySlot> LocalInventorySlots;
+
+				if (InventoryParseSuccess)
+				{
+					UE_LOG(LogTemp, Log, TEXT("InventoryParseSuccess"));
+
+
+
+					// TODO - set up player controller inventory.
+					playerS->InventoryCapacity = InventoryCapacity;
+
+					// Keep track of slots that were successfully filled
+					int32 slotsFilledSuccessfully = 0;
+
+					// Fill slots from inventory json first
+					InventoryJsonParsed->TryGetArrayField("InventorySlots", InventorySlotsJson);
+
+					for (auto inventorySlot : *InventorySlotsJson) {
+						//UE_LOG(LogTemp, Log, TEXT("Found Inventory slot"));
+						FMyInventorySlot itemSlot;
+						auto inventorySlotObj = inventorySlot->AsObject();
+						if (inventorySlotObj.IsValid())
+						{
+							UClass* LoadedActorOwnerClass;
+							LoadedActorOwnerClass = LoadClassFromPath(inventorySlotObj->GetStringField(FString("ItemClass")));
+
+							if (LoadedActorOwnerClass)
+							{
+								//UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
+
+								AMyBasePickup* basePickupBP = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
+								if (basePickupBP) {
+									//UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
+
+									itemSlot.itemClassTitle = basePickupBP->GetName();  // FFS - we can't use the name because it's not consistent
+									// [2017.11.21-04.31.36:264][655]LogTemp: InventorySlots[i].itemClassTitle: Default__ItemHealthPotion_C
+									// [2017.11.21 - 04.31.36:264][655]LogTemp: ClassTypeIn->GetName() : ItemHealthPotion2_2
+
+									FString savedAttributes;
+
+									itemSlot.itemTitle = basePickupBP->Title.ToString();
+									itemSlot.itemClassPath = inventorySlotObj->GetStringField(FString("ItemClass"));
+									itemSlot.Icon = basePickupBP->Icon;
+
+									inventorySlotObj->TryGetNumberField("Quantity", itemSlot.quantity);
+									inventorySlotObj->TryGetStringField("ItemId", itemSlot.itemId);
+									inventorySlotObj->TryGetStringField("ItemTitle", itemSlot.itemTitle);
+
+									// For inventory we just use a plain array field, becuase inventory already is a json encoded test string.  We don't need to do it again.
+
+									//bool AttributeParseSuccess;
+									//const TArray <TSharedPtr<FJsonValue>> *AttributesJson;
+									const JsonValPtrArray* AttributesJson;
+									inventorySlotObj->TryGetArrayField("attributes", AttributesJson);
+
+									int32 currentIndex = 0;
+									int32 referenceIndex = 0;
+									FString JsonIndexName = "0";
+									double JsonValue = 0.0f;
+
+									// TODO rework this - it's possible that somewhow the attributes get messed up and out of sequence
+									// like if it is saved, and an index is skipped.
+									for (auto attributeJsonRaw : *AttributesJson) {
+										UE_LOG(LogTemp, Log, TEXT("Found attribute "));
+										JsonValue = 0.0f;
+										auto attributeObj = attributeJsonRaw->AsObject();
+										if (attributeObj.IsValid())
+										{
+											JsonIndexName = FString::FromInt(currentIndex);
+
+											attributeObj->TryGetNumberField(JsonIndexName, JsonValue);
+
+											itemSlot.Attributes.Add(JsonValue);
+										}
+										currentIndex++;
+									}
+
+
+									/*
+									//TArray<TSharedPtr<FJsonValue> > JsonFriends = JsonObject->GetArrayField(TEXT("data"));
+
+									inventorySlotObj->TryGetStringField("attributes", savedAttributes);
+
+									TSharedPtr<FJsonObject> AttributesJsonParsed;
+									TSharedRef<TJsonReader<TCHAR>> AttributesJsonReader = TJsonReaderFactory<TCHAR>::Create(savedAttributes);
+
+
+
+									if (FJsonSerializer::Deserialize(AttributesJsonReader, AttributesJsonParsed))
+									{
+									UE_LOG(LogTemp, Log, TEXT("AttributesJsonParsed"));
+									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] InventoryJsonRaw: %s"), *InventoryJsonRaw);
+
+									for (auto currObject = AttributesJsonParsed->Values.CreateConstIterator(); currObject; ++currObject)
+									{
+									UE_LOG(LogTemp, Log, TEXT("Found Attribute: %s"), *currObject->Key);
+									currObject->Key;
+									if (currObject->Value->AsNumber())
+									{
+									itemSlot.Attributes.Add(currObject->Value->AsNumber());
+									}
+
+									}
+
+									}
+									*/
+
+
+
+									itemSlot.bCanBeUsed = basePickupBP->bCanBeUsed;
+									itemSlot.UseText = basePickupBP->UseText;
+									itemSlot.bCanBeStacked = basePickupBP->bCanBeStacked;
+									itemSlot.MaxStackSize = basePickupBP->MaxStackSize;
+
+									//playerC->InventorySlots.Add(itemSlot);
+									LocalInventorySlots.Add(itemSlot);
+
+									slotsFilledSuccessfully++;
+								}
+
+							}
+							else {
+								UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
+							}
+						}
+					}
+
+					// Fill remainder slots with empty
+
+					int32 remainingSlotsToFill = InventoryCapacity - slotsFilledSuccessfully;
+					FMyInventorySlot emptySlot;
+					FString ActorClassFullPath = "/Game/UI/Inventory/Blueprints/ItemClasses/ItemHealthPotion.ItemHealthPotion_C";
+					UClass* LoadedActorOwnerClass;
+
+					LoadedActorOwnerClass = LoadClassFromPath(ActorClassFullPath);
+
+					if (LoadedActorOwnerClass)
+					{
+						UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
+
+						AMyBasePickup* basePickupBP = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
+						if (basePickupBP) {
+							UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
+							//emptySlot.itemClass = basePickupBP->GetClass();
+							//emptySlot.itemClass = basePickupBP;
+							emptySlot.itemClassTitle = basePickupBP->GetName();
+							emptySlot.itemClassPath = ActorClassFullPath;
+							emptySlot.Icon = basePickupBP->Icon;
+							emptySlot.itemTitle = basePickupBP->Title.ToString();
+						}
+
+					}
+					else {
+						UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
+					}
+
+					emptySlot.itemId = 0;
+
+					emptySlot.quantity = 0;
+
+					for (int32 inventoryIndex = 0; inventoryIndex < remainingSlotsToFill; inventoryIndex++)
+					{
+						//playerC->InventorySlots.Add(emptySlot);
+						LocalInventorySlots.Add(emptySlot);
+					}
+
+					// Trigger the inventory changed delegate
+					playerS->InventorySlots = LocalInventorySlots;
+					//playerC->DoRep_InventoryChanged = !playerC->DoRep_InventoryChanged;
+
+				}
+				else
+				{
+					UE_LOG(LogTemp, Log, TEXT("InventoryJson Parse FAIL"));
+
+					playerS->InventoryCapacity = InventoryCapacity;
+
+					FMyInventorySlot emptySlot;
+
+					// loop over the InventoryBlueprintClasses array and grab the match
+					// Rama to the rescue:  https://answers.unrealengine.com/questions/330309/an-issue-with-runtime-savingloading-of-blueprint-c.html
+
+					FString ActorClassFullPath = "/Game/UI/Inventory/Blueprints/ItemClasses/ItemHealthPotion.ItemHealthPotion_C";
+					UClass* LoadedActorOwnerClass;
+
+					LoadedActorOwnerClass = LoadClassFromPath(ActorClassFullPath);
+
+					if (LoadedActorOwnerClass)
+					{
+						UE_LOG(LogTemp, Log, TEXT("Found LoadedActorOwnerClass"));
+
+						AMyBasePickup* basePickupBP = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
+						if (basePickupBP) {
+							UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
+							//emptySlot.itemClass = basePickupBP->GetClass();
+							//emptySlot.itemClass = basePickupBP;
+							emptySlot.itemClassTitle = basePickupBP->GetName();
+							emptySlot.itemClassPath = ActorClassFullPath;
+							emptySlot.Icon = basePickupBP->Icon;
+							emptySlot.itemTitle = basePickupBP->Title.ToString();
+						}
+
+					}
+					else {
+						UE_LOG(LogTemp, Log, TEXT("Did not find LoadedActorOwnerClass"));
+						emptySlot.itemTitle = "Empty";
+					}
+
+					emptySlot.itemId = 0;
+					emptySlot.quantity = 0;
+
+
+					for (int32 inventoryIndex = 0; inventoryIndex < 16; inventoryIndex++)
+					{
+						LocalInventorySlots.Add(emptySlot);
+						//playerC->InventorySlots.Add(emptySlot);
+					}
+
+					// Trigger the inventory changed delegate
+					playerS->InventorySlots = LocalInventorySlots;
+				}
+
+				// set loaded state
+				PlayerController->PlayerDataLoaded = true;
+
+				// Only do this if competitive
+				if (UEtopiaMode == "competitive")
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - competitive"));
+					// check to see if all players have connected
+					// And if they have completed character customize
+					// It is possible that they haven't so we'll need to attempt start match timer from 
+					// SaveCharacterCustomization
+					bool allPlayersJoined = true;
+					bool allPlayersCharCustComplete = true;
+					for (int32 b = 0; b < MatchInfo.players.Num(); b++)
+					{
+						if (!MatchInfo.players[b].joined) {
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - allPlayersJoined = false"));
+							allPlayersJoined = false;
+						}
+						if (!MatchInfo.players[b].characterCustomized) {
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - allPlayersCharCustComplete = false"));
+							allPlayersCharCustComplete = false;
+						}
+					}
+
+					if (MatchStarted == false)
+					{
+						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - MatchStarted == false"));
+						if (allPlayersJoined && allPlayersCharCustComplete)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - allPlayersJoined && allPlayersCharCustComplete - starting timer"));
+							// do it after a timer
+							GetWorld()->GetTimerManager().SetTimer(AttemptStartMatchTimerHandle, this, &UMyGameInstance::AttemptStartMatch, 10.0f, false);
+						}
+					}
+				}
+				else
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [GetGamePlayerRequestComplete] - continuous"));
+
+					PlayerController->ClientChangeUIState(EConnectUIState::Play);
+				}
+
 			}
 		}
 	}
@@ -2110,194 +1994,438 @@ bool UMyGameInstance::SaveGamePlayer(FString playerKeyId, bool bAttemptUnLock)
 
 	APlayerController* pc = NULL;
 
-	FMyActivePlayer* activePlayer = getPlayerByPlayerKey(playerKeyId);
+	// Keep track of the playerState and playerCharacter that is associated with this player
+	APlayerState* thisPlayerState = nullptr;
+	AMyPlayerState* playerS = nullptr;
+	AUEtopiaPersistCharacter* playerChar = nullptr;
+	AMyPlayerController* PlayerController = nullptr;
+	FString gamePlayerKeyId;
+
+	// And grab our scores out of the array while we're at it.
+	int32 Rank = 1600;
+	int32 Score = 0;
+	int32 Level = 0;
+	int32 Experience = 0;
+	int32 ExperienceThisLevel = 0;
 
 	FString InventoryOutputString;
 	FString AbilitiesOutputString;
 	FString InterfaceOutputString;
 	FString CharacterOutputString;
+	FString EquipmentOutputString;
 
-	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	FMyActivePlayer* activePlayer = getPlayerByPlayerKey(playerKeyId);
+	if (activePlayer)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Looking for player Controller"));
-		pc = Iterator->Get();
-		APlayerState* thisPlayerState = pc->PlayerState;
-		AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-		AMyPlayerController* playerC = Cast<AMyPlayerController>(pc);
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found activePlayer"));
 
-		FString playerstateplayerKeyId = playerS->playerKeyId;
-		//UE_LOG(LogTemp, Log, TEXT("playerstateplayerKeyId: %s"), *playerstateplayerKeyId);
-		//UE_LOG(LogTemp, Log, TEXT("playerKeyId: %s"), *playerKeyId);
+		gamePlayerKeyId = activePlayer->gamePlayerKeyId;
+		Rank = activePlayer->rank;
+		Score = activePlayer->score;
+		Level = activePlayer->level;
+		Experience = activePlayer->experience;
+		ExperienceThisLevel = activePlayer->experienceThisLevel;
 
-		if (playerstateplayerKeyId == playerKeyId) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found match"));
+		if (activePlayer->bIsConnected)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - activePlayer->bIsConnected "));
 
-			if (playerC->PlayerDataLoaded)
+			// Setting bisconnected to false so that the active player count will not find this record
+			activePlayer->bIsConnected = false;
+
+			// get our player state so we can access all of the saved data
+			pc = activePlayer->PlayerController;
+			PlayerController = Cast<AMyPlayerController>(pc);
+
+			if (PlayerController)
 			{
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Player Data Loaded"));
-
-
-				//////////////////////////////////////////////////////////////
-				// Convert player granted ability slots to json friendly array
-				TSharedPtr<FJsonObject> AbilitiesJsonObject = MakeShareable(new FJsonObject);
-				TArray< TSharedPtr<FJsonValue> > GrantedAbilityArray;
-				for (int32 GrantedAbilityIndex = 0; GrantedAbilityIndex < playerC->MyGrantedAbilities.Num(); GrantedAbilityIndex++)
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - found PlayerController"));
+				// Only continue if player data has been loaded.  If a player disconnects before getGamePlayer can finish,
+				// this could be empty.
+				if (PlayerController->PlayerDataLoaded)
 				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found GrantedAbilityIndex"));
-					// all of them should be valid.
-					TSharedPtr< FJsonObject > AbilityObj = MakeShareable(new FJsonObject);
-					AbilityObj->SetStringField("AbilityClass", playerC->MyGrantedAbilities[GrantedAbilityIndex].classPath);
-					TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AbilityObj));
-					GrantedAbilityArray.Add(JsonValue);
-				}
-				AbilitiesJsonObject->SetArrayField("GrantedAbilities", GrantedAbilityArray);
-				TSharedRef< TJsonWriter<> > AbilityWriter = TJsonWriterFactory<>::Create(&AbilitiesOutputString);
-				FJsonSerializer::Serialize(AbilitiesJsonObject.ToSharedRef(), AbilityWriter);
-				UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] AbilitiesOutputString: %s"), *AbilitiesOutputString);
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - PlayerController->PlayerDataLoaded"));
 
-				///////////////////////////////////////////////////////////
-				// Convert player Interface settings to json friendly array
-				TSharedPtr<FJsonObject> InterfaceJsonObject = MakeShareable(new FJsonObject);
-				InterfaceJsonObject->SetNumberField("AbilityCapacity", playerC->AbilityCapacity);
-				InterfaceJsonObject->SetNumberField("AbilitySlotsPerRow", playerC->AbilitySlotsPerRow);
-				TArray< TSharedPtr<FJsonValue> > AbilitySlotsArray;
-				for (int32 AbilitySlotIndex = 0; AbilitySlotIndex < playerC->MyAbilitySlots.Num(); AbilitySlotIndex++)
-				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found AbilitySlotIndex"));
-					// just adding them all for now.  TODO - maybe optimize this?
-					TSharedPtr< FJsonObject > AbilitySlotObj = MakeShareable(new FJsonObject);
-					AbilitySlotObj->SetStringField("AbilityClass", playerC->MyAbilitySlots[AbilitySlotIndex].classPath);
-					TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AbilitySlotObj));
-					AbilitySlotsArray.Add(JsonValue);
-				}
-				InterfaceJsonObject->SetArrayField("AbilitySlots", AbilitySlotsArray);
-				TSharedRef< TJsonWriter<> > InterfaceWriter = TJsonWriterFactory<>::Create(&InterfaceOutputString);
-				FJsonSerializer::Serialize(InterfaceJsonObject.ToSharedRef(), InterfaceWriter);
-				UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] InterfaceOutputString: %s"), *InterfaceOutputString);
+					playerChar = Cast<AUEtopiaPersistCharacter>(pc->GetPawn());
+					thisPlayerState = pc->PlayerState;
+					playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-				///////////////////////////////////////////////////////
-				// Convert player inventory slots to json friendly array
-				TSharedPtr<FJsonObject> InventoryJsonObject = MakeShareable(new FJsonObject);
-				InventoryJsonObject->SetNumberField("InventoryCapacity", playerC->InventoryCapacity);
-				TArray< TSharedPtr<FJsonValue> > InventorySlotArray;
-
-				for (int32 InventorySlotIndex = 0; InventorySlotIndex < playerC->InventorySlots.Num(); InventorySlotIndex++)
-				{
-					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found InventorySlotIndex"));
-					// only add valid slots
-					if (playerC->InventorySlots[InventorySlotIndex].itemClassTitle != "empty")
+					if (playerS)
 					{
-						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - InventorySlots[InventorySlotIndex].itemClass IsValid "));
-						TSharedPtr< FJsonObject > SlotObj = MakeShareable(new FJsonObject);
-						SlotObj->SetStringField("ItemId", playerC->InventorySlots[InventorySlotIndex].itemId);
-						SlotObj->SetStringField("ItemTitle", playerC->InventorySlots[InventorySlotIndex].itemTitle);
-						SlotObj->SetStringField("ItemDescription", playerC->InventorySlots[InventorySlotIndex].itemDescription);
-						SlotObj->SetNumberField("Quantity", playerC->InventorySlots[InventorySlotIndex].quantity);
-						SlotObj->SetStringField("ItemClass", playerC->InventorySlots[InventorySlotIndex].itemClassPath);
 
-						// Deal with attributes
-						FString AttributesOutputString;
-						// Convert to json friendly array
-						TSharedPtr<FJsonObject> AttributesJsonObject = MakeShareable(new FJsonObject);
-						TArray< TSharedPtr<FJsonValue> > AttributesArray;
-
-						for (int attributeIndex = 0; attributeIndex < playerC->InventorySlots[InventorySlotIndex].Attributes.Num(); attributeIndex++)
+						//////////////////////////////////////////////////////////////
+						// Convert player granted ability slots to json friendly array
+						TSharedPtr<FJsonObject> AbilitiesJsonObject = MakeShareable(new FJsonObject);
+						TArray< TSharedPtr<FJsonValue> > GrantedAbilityArray;
+						for (int32 GrantedAbilityIndex = 0; GrantedAbilityIndex < PlayerController->MyGrantedAbilities.Num(); GrantedAbilityIndex++)
 						{
-							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] Found attribute"));
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found GrantedAbilityIndex"));
+							// all of them should be valid.
+							TSharedPtr< FJsonObject > AbilityObj = MakeShareable(new FJsonObject);
+							AbilityObj->SetStringField("AbilityClass", PlayerController->MyGrantedAbilities[GrantedAbilityIndex].classPath);
+							TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AbilityObj));
+							GrantedAbilityArray.Add(JsonValue);
+						}
+						AbilitiesJsonObject->SetArrayField("GrantedAbilities", GrantedAbilityArray);
+						TSharedRef< TJsonWriter<> > AbilityWriter = TJsonWriterFactory<>::Create(&AbilitiesOutputString);
+						FJsonSerializer::Serialize(AbilitiesJsonObject.ToSharedRef(), AbilityWriter);
+						UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] AbilitiesOutputString: %s"), *AbilitiesOutputString);
 
-							TSharedPtr< FJsonObject > AttributeObj = MakeShareable(new FJsonObject);
-							AttributeObj->SetNumberField(FString::FromInt(attributeIndex), playerC->InventorySlots[InventorySlotIndex].Attributes[attributeIndex]);
-							TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AttributeObj));
-							AttributesArray.Add(JsonValue);
+						///////////////////////////////////////////////////////////
+						// Convert player Interface settings to json friendly array
+						TSharedPtr<FJsonObject> InterfaceJsonObject = MakeShareable(new FJsonObject);
+						InterfaceJsonObject->SetNumberField("AbilityCapacity", PlayerController->AbilityCapacity);
+						InterfaceJsonObject->SetNumberField("AbilitySlotsPerRow", PlayerController->AbilitySlotsPerRow);
+						TArray< TSharedPtr<FJsonValue> > AbilitySlotsArray;
+						for (int32 AbilitySlotIndex = 0; AbilitySlotIndex < PlayerController->MyAbilitySlots.Num(); AbilitySlotIndex++)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found AbilitySlotIndex"));
+							// just adding them all for now.  TODO - maybe optimize this?
+							TSharedPtr< FJsonObject > AbilitySlotObj = MakeShareable(new FJsonObject);
+							AbilitySlotObj->SetStringField("AbilityClass", PlayerController->MyAbilitySlots[AbilitySlotIndex].classPath);
+							TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AbilitySlotObj));
+							AbilitySlotsArray.Add(JsonValue);
+						}
+						InterfaceJsonObject->SetArrayField("AbilitySlots", AbilitySlotsArray);
+						TSharedRef< TJsonWriter<> > InterfaceWriter = TJsonWriterFactory<>::Create(&InterfaceOutputString);
+						FJsonSerializer::Serialize(InterfaceJsonObject.ToSharedRef(), InterfaceWriter);
+						UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] InterfaceOutputString: %s"), *InterfaceOutputString);
+
+						///////////////////////////////////////////////////////
+						// Convert player inventory slots to json friendly array
+						TSharedPtr<FJsonObject> InventoryJsonObject = MakeShareable(new FJsonObject);
+						InventoryJsonObject->SetNumberField("InventoryCapacity", playerS->InventoryCapacity);
+						TArray< TSharedPtr<FJsonValue> > InventorySlotArray;
+
+						for (int32 InventorySlotIndex = 0; InventorySlotIndex < playerS->InventorySlots.Num(); InventorySlotIndex++)
+						{
+							//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found InventorySlotIndex"));
+							// only add valid slots
+							if (playerS->InventorySlots[InventorySlotIndex].itemClassTitle != "empty")
+							{
+								//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - InventorySlots[InventorySlotIndex].itemClass IsValid "));
+								TSharedPtr< FJsonObject > SlotObj = MakeShareable(new FJsonObject);
+								SlotObj->SetStringField("ItemId", playerS->InventorySlots[InventorySlotIndex].itemId);
+								SlotObj->SetStringField("ItemTitle", playerS->InventorySlots[InventorySlotIndex].itemTitle);
+								SlotObj->SetStringField("ItemDescription", playerS->InventorySlots[InventorySlotIndex].itemDescription);
+								SlotObj->SetNumberField("Quantity", playerS->InventorySlots[InventorySlotIndex].quantity);
+								SlotObj->SetStringField("ItemClass", playerS->InventorySlots[InventorySlotIndex].itemClassPath);
+
+								// Deal with attributes
+								FString AttributesOutputString;
+								// Convert to json friendly array
+								TSharedPtr<FJsonObject> AttributesJsonObject = MakeShareable(new FJsonObject);
+								TArray< TSharedPtr<FJsonValue> > AttributesArray;
+
+								for (int attributeIndex = 0; attributeIndex < playerS->InventorySlots[InventorySlotIndex].Attributes.Num(); attributeIndex++)
+								{
+									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] Found attribute"));
+
+									TSharedPtr< FJsonObject > AttributeObj = MakeShareable(new FJsonObject);
+									AttributeObj->SetNumberField(FString::FromInt(attributeIndex), playerS->InventorySlots[InventorySlotIndex].Attributes[attributeIndex]);
+									TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AttributeObj));
+									AttributesArray.Add(JsonValue);
+								}
+
+								// For Inventory, we already have a json serialized text area, so we don't need to do it again.
+								// Just create a plain array field
+								SlotObj->SetArrayField("attributes", AttributesArray);
+								TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(SlotObj));
+								InventorySlotArray.Add(JsonValue);
+							}
+
 						}
 
-						// For Inventory, we already have a json serialized text area, so we don't need to do it again.
-						// Just create a plain array field
-						SlotObj->SetArrayField("attributes", AttributesArray);
-						//TSharedRef< TJsonWriter<> > AttrbutesWriter = TJsonWriterFactory<>::Create(&AttributesOutputString);
-						//FJsonSerializer::Serialize(AttributesJsonObject.ToSharedRef(), AttrbutesWriter);
-						//UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] AttributesOutputString: %s"), *AttributesOutputString);
+						InventoryJsonObject->SetArrayField("InventorySlots", InventorySlotArray);
 
-						//SlotObj->SetStringField("attributes", AttributesOutputString);
+						TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&InventoryOutputString);
+						FJsonSerializer::Serialize(InventoryJsonObject.ToSharedRef(), Writer);
+						//UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] InventoryOutputString: %s"), *InventoryOutputString);
 
-						TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(SlotObj));
-						InventorySlotArray.Add(JsonValue);
+						// Convert Character Customization data into json friendly 
+						// At this stage our character class data has been validated by the server and is safe to store on the backend.
+						TSharedPtr<FJsonObject> CharacterJsonObject = MakeShareable(new FJsonObject);
+						CharacterJsonObject->SetBoolField("Setup", playerS->CharacterSetup);
+						CharacterJsonObject->SetNumberField("characterClass", playerS->CharacterClass);
+
+						TSharedRef< TJsonWriter<> > CharactertWriter = TJsonWriterFactory<>::Create(&CharacterOutputString);
+						FJsonSerializer::Serialize(CharacterJsonObject.ToSharedRef(), CharactertWriter);
+
+						activePlayer->currencyCurrent = 0;
+						FString nonceString = "10951350917635";
+						FString encryption = "off";  // Allowing unencrypted on sandbox for now.
+
+						TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+						PlayerJsonObj->SetStringField("nonce", "nonceString");
+						PlayerJsonObj->SetStringField("encryption", encryption);
+						PlayerJsonObj->SetStringField("inventory", InventoryOutputString);
+						PlayerJsonObj->SetStringField("equipment", "hardcoded test");
+						PlayerJsonObj->SetStringField("abilities", AbilitiesOutputString);
+						PlayerJsonObj->SetStringField("interface", InterfaceOutputString);
+						PlayerJsonObj->SetStringField("character", CharacterOutputString);
+						PlayerJsonObj->SetNumberField("rank", activePlayer->rank);
+						PlayerJsonObj->SetNumberField("score", activePlayer->score);
+						PlayerJsonObj->SetNumberField("level", 1);  // TODO set this up in the struct
+						PlayerJsonObj->SetNumberField("experience", activePlayer->experience);
+						PlayerJsonObj->SetNumberField("experienceThisLevel", 1);
+						PlayerJsonObj->SetNumberField("coordLocationX", 1);
+						PlayerJsonObj->SetNumberField("coordLocationY", 1);
+						PlayerJsonObj->SetNumberField("coordLocationZ", 1);
+						PlayerJsonObj->SetStringField("zoneName", "hardcoded test");
+						PlayerJsonObj->SetStringField("zoneKey", "hardcoded test");
+
+						FString JsonOutputString;
+						TSharedRef< TJsonWriter<> > FinalWriter = TJsonWriterFactory<>::Create(&JsonOutputString);
+						FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), FinalWriter);
+
+						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SaveGamePlayer - setup output string"));
+
+						if (bAttemptUnLock) {
+							PlayerJsonObj->SetBoolField("unlock", true);
+						}
+
+						// Only do this if we actually have a gamePlayerKeyId
+						// We might not...  If a user was not authorized for example.
+
+						// Check to see if there are any more players, if not...  Save and prepare for server shutdown
+						// Only if continuous
+						if (UEtopiaMode == "continuous")
+						{
+							int32 authorizedPlayerCount = getActivePlayerCount();
+							if (authorizedPlayerCount > 0)
+							{
+								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeActivatePlayer - There are still players authorized on this server."));
+							}
+							else {
+								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeActivatePlayer - No Authorized players found - moving to save."));
+
+								/*
+								bool FileIOSuccess;
+								bool allComponentsSaved;
+								FString FileName = "serversavedata.dat";
+								URamaSaveLibrary::RamaSave_SaveToFile(GetWorld(), FileName, FileIOSuccess, allComponentsSaved);
+								if (FileIOSuccess) {
+								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO Success."));
+								}
+								else {
+								UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO FAIL."));
+								}
+								*/
+
+								// Reset our playstarted flag
+								bRequestBeginPlayStarted = false;
+
+								// Tell the backend that it's safe to bring this server down.
+								NotifyDownReady();
+							}
+						}
+
+						
+
+						if (activePlayer->gamePlayerKeyId.Len() > 1) {
+							FString access_token = activePlayer->PlayerController->CurrentAccessTokenFromOSS;
+
+							FString APIURI = "/api/v1/game/player/" + activePlayer->gamePlayerKeyId + "/update";
+
+							bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::SaveGamePlayerRequestComplete, APIURI, JsonOutputString, access_token);
+							return requestSuccess;
+						}
+						else {
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - No gamePlayerKeyId found - skipping game player update"));
+							return false;
+
+						}
 					}
-
-				}
-
-				InventoryJsonObject->SetArrayField("InventorySlots", InventorySlotArray);
-
-				TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&InventoryOutputString);
-				FJsonSerializer::Serialize(InventoryJsonObject.ToSharedRef(), Writer);
-				//UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] InventoryOutputString: %s"), *InventoryOutputString);
-
-				// Convert Character Customization data into json friendly 
-				// At this stage our character class data has been validated by the server and is safe to store on the backend.
-				TSharedPtr<FJsonObject> CharacterJsonObject = MakeShareable(new FJsonObject);
-				CharacterJsonObject->SetBoolField("Setup", playerS->CharacterSetup);
-				CharacterJsonObject->SetNumberField("characterClass", playerS->CharacterClass);
-
-				TSharedRef< TJsonWriter<> > CharactertWriter = TJsonWriterFactory<>::Create(&CharacterOutputString);
-				FJsonSerializer::Serialize(CharacterJsonObject.ToSharedRef(), CharactertWriter);
-
-				// Clear out active player struct too
-				//FMyActivePlayer* activePlayer = getPlayerByPlayerKey(playerKeyId);
-				activePlayer->currencyCurrent = 0;
-
-
-				FString nonceString = "10951350917635";
-				FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-											 //FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
-
-											 //TSharedPtr<FJsonObject> PlayerJsonObj;
-				TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
-				PlayerJsonObj->SetStringField("nonce", "nonceString");
-				PlayerJsonObj->SetStringField("encryption", encryption);
-				PlayerJsonObj->SetStringField("inventory", InventoryOutputString);
-				PlayerJsonObj->SetStringField("equipment", "hardcoded test");
-				PlayerJsonObj->SetStringField("abilities", AbilitiesOutputString);
-				PlayerJsonObj->SetStringField("interface", InterfaceOutputString);
-				PlayerJsonObj->SetStringField("character", CharacterOutputString);
-				PlayerJsonObj->SetNumberField("rank", activePlayer->rank);
-				PlayerJsonObj->SetNumberField("score", activePlayer->score);
-				PlayerJsonObj->SetNumberField("level", 1);  // TODO set this up in the struct
-				PlayerJsonObj->SetNumberField("experience", activePlayer->experience);
-				PlayerJsonObj->SetNumberField("experienceThisLevel", 1);
-				PlayerJsonObj->SetNumberField("coordLocationX", 1);
-				PlayerJsonObj->SetNumberField("coordLocationY", 1);
-				PlayerJsonObj->SetNumberField("coordLocationZ", 1);
-				PlayerJsonObj->SetStringField("zoneName", "hardcoded test");
-				PlayerJsonObj->SetStringField("zoneKey", "hardcoded test");
-
-				FString JsonOutputString;
-				TSharedRef< TJsonWriter<> > FinalWriter = TJsonWriterFactory<>::Create(&JsonOutputString);
-				FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), FinalWriter);
-
-				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SaveGamePlayer - setup output string"));
-
-				//OutputString = OutputString + JsonOutputString;
-				//UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] JsonOutputString: %s"), *JsonOutputString);
-				if (bAttemptUnLock) {
-					//OutputString = OutputString + "&unlock=True";
-					PlayerJsonObj->SetBoolField("unlock", true);
-				}
-
-				// Only do this if we actually have a gamePlayerKeyId
-				// We might not...  If a user was not authorized for example.
-
-				if (activePlayer->gamePlayerKeyId.Len() > 1) {
-					FString access_token = activePlayer->PlayerController->CurrentAccessTokenFromOSS;
-
-					FString APIURI = "/api/v1/game/player/" + activePlayer->gamePlayerKeyId + "/update";
-
-					bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::SaveGamePlayerRequestComplete, APIURI, JsonOutputString, access_token);
-				}
-				else {
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - No gamePlayerKeyId found - skipping game player update"));
-					return false;
 				}
 			}
+		}
+		//  if no playercontroller, use the backed-up data instead
+
+		// Setup variables to hold encoded json data
+		//FString CharacterOutputString;
+
+		// Convert Character Customization data into json friendly 
+		TSharedPtr<FJsonObject> CharacterJsonObject = MakeShareable(new FJsonObject);
+		CharacterJsonObject->SetBoolField("Setup", activePlayer->PSBackupCharacterSetup);
+		CharacterJsonObject->SetNumberField("Mesh", activePlayer->PSBackupCharacterMesh);
+		CharacterJsonObject->SetNumberField("Gender", activePlayer->PSBackupCharacterGender);
+
+		TSharedRef< TJsonWriter<> > CharactertWriter = TJsonWriterFactory<>::Create(&CharacterOutputString);
+		FJsonSerializer::Serialize(CharacterJsonObject.ToSharedRef(), CharactertWriter);
+
+
+		///////////////////////////////////////////////////////
+		// Convert player inventory slots to json friendly array
+		TSharedPtr<FJsonObject> InventoryJsonObject = MakeShareable(new FJsonObject);
+		InventoryJsonObject->SetNumberField("InventoryCapacity", activePlayer->PSBackupInventoryCapacity);
+		TArray< TSharedPtr<FJsonValue> > InventorySlotArray;
+
+		for (int32 InventorySlotIndex = 0; InventorySlotIndex < activePlayer->PSBackupInventorySlots.Num(); InventorySlotIndex++)
+		{
+			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found InventorySlotIndex"));
+			// only add valid slots
+			if (activePlayer->PSBackupInventorySlots[InventorySlotIndex].itemClassTitle != "empty")
+			{
+				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - InventorySlots[InventorySlotIndex].itemClass IsValid "));
+				TSharedPtr< FJsonObject > SlotObj = MakeShareable(new FJsonObject);
+				SlotObj->SetStringField("ItemId", activePlayer->PSBackupInventorySlots[InventorySlotIndex].itemId);
+				SlotObj->SetStringField("ItemTitle", activePlayer->PSBackupInventorySlots[InventorySlotIndex].itemTitle);
+				SlotObj->SetStringField("ItemDescription", activePlayer->PSBackupInventorySlots[InventorySlotIndex].itemDescription);
+				SlotObj->SetNumberField("Quantity", activePlayer->PSBackupInventorySlots[InventorySlotIndex].quantity);
+				SlotObj->SetNumberField("DTID", activePlayer->PSBackupInventorySlots[InventorySlotIndex].DataTableId);
+
+				// Deal with attributes
+				FString AttributesOutputString;
+				// Convert to json friendly array
+				TSharedPtr<FJsonObject> AttributesJsonObject = MakeShareable(new FJsonObject);
+				TArray< TSharedPtr<FJsonValue> > AttributesArray;
+
+				for (int attributeIndex = 0; attributeIndex < activePlayer->PSBackupInventorySlots[InventorySlotIndex].Attributes.Num(); attributeIndex++)
+				{
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] Found attribute"));
+
+					TSharedPtr< FJsonObject > AttributeObj = MakeShareable(new FJsonObject);
+					AttributeObj->SetNumberField(FString::FromInt(attributeIndex), activePlayer->PSBackupInventorySlots[InventorySlotIndex].Attributes[attributeIndex]);
+					TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AttributeObj));
+					AttributesArray.Add(JsonValue);
+				}
+
+				// For Inventory, we already have a json serialized text area, so we don't need to do it again.
+				// Just create a plain array field
+				SlotObj->SetArrayField("attributes", AttributesArray);
+
+				TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(SlotObj));
+				InventorySlotArray.Add(JsonValue);
+			}
+
+		}
+
+		InventoryJsonObject->SetArrayField("InventorySlots", InventorySlotArray);
+
+		TSharedRef< TJsonWriter<> > InventoryWriter = TJsonWriterFactory<>::Create(&InventoryOutputString);
+		FJsonSerializer::Serialize(InventoryJsonObject.ToSharedRef(), InventoryWriter);
+
+
+		///////////////////////////////////////////////////////
+		// Convert player equipment slots to json friendly array
+
+		TSharedPtr<FJsonObject> EquipmentJsonObject = MakeShareable(new FJsonObject);
+		EquipmentJsonObject->SetNumberField("EquipmentCapacity", 10);
+		TArray< TSharedPtr<FJsonValue> > EquipmentSlotArray;
+
+		for (int32 EquipmentSlotIndex = 0; EquipmentSlotIndex < activePlayer->PSBackupMyEquipment.Num(); EquipmentSlotIndex++)
+		{
+			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - Found InventorySlotIndex"));
+			// only add valid slots
+			if (activePlayer->PSBackupMyEquipment[EquipmentSlotIndex].itemClassTitle != "empty")
+			{
+				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] - InventorySlots[InventorySlotIndex].itemClass IsValid "));
+				TSharedPtr< FJsonObject > SlotObj = MakeShareable(new FJsonObject);
+				SlotObj->SetStringField("ItemTitle", activePlayer->PSBackupMyEquipment[EquipmentSlotIndex].itemTitle);
+				SlotObj->SetNumberField("DTID", activePlayer->PSBackupMyEquipment[EquipmentSlotIndex].DataTableId);
+
+				// Deal with attributes
+				FString AttributesOutputString;
+				// Convert to json friendly array
+				TSharedPtr<FJsonObject> AttributesJsonObject = MakeShareable(new FJsonObject);
+				TArray< TSharedPtr<FJsonValue> > AttributesArray;
+
+				for (int attributeIndex = 0; attributeIndex < activePlayer->PSBackupMyEquipment[EquipmentSlotIndex].Attributes.Num(); attributeIndex++)
+				{
+					//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [SaveGamePlayer] Found attribute"));
+
+					TSharedPtr< FJsonObject > AttributeObj = MakeShareable(new FJsonObject);
+					AttributeObj->SetNumberField(FString::FromInt(attributeIndex), activePlayer->PSBackupMyEquipment[EquipmentSlotIndex].Attributes[attributeIndex]);
+					TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AttributeObj));
+					AttributesArray.Add(JsonValue);
+				}
+
+				// For Inventory, we already have a json serialized text area, so we don't need to do it again.
+				// Just create a plain array field
+				SlotObj->SetArrayField("attributes", AttributesArray);
+
+				TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(SlotObj));
+				EquipmentSlotArray.Add(JsonValue);
+			}
+
+		}
+
+		EquipmentJsonObject->SetArrayField("EquipmentSlots", EquipmentSlotArray);
+
+		TSharedRef< TJsonWriter<> > EquipmentWriter = TJsonWriterFactory<>::Create(&EquipmentOutputString);
+		FJsonSerializer::Serialize(EquipmentJsonObject.ToSharedRef(), EquipmentWriter);
+
+
+		FString nonceString = "10951350917635";
+		FString encryption = "off";  // Allowing unencrypted on sandbox for now.  
+
+		TSharedPtr<FJsonObject> PlayerJsonObj = MakeShareable(new FJsonObject);
+		PlayerJsonObj->SetStringField("nonce", "nonceString");
+		PlayerJsonObj->SetStringField("encryption", encryption);
+		PlayerJsonObj->SetStringField("inventory", InventoryOutputString);
+		PlayerJsonObj->SetStringField("equipment", EquipmentOutputString);
+		PlayerJsonObj->SetStringField("abilities", "hardcoded test");
+		PlayerJsonObj->SetStringField("interface", "hardcoded test");
+		PlayerJsonObj->SetStringField("crafting", "hardcoded test");
+		PlayerJsonObj->SetStringField("recipes", "hardcoded test");
+		PlayerJsonObj->SetStringField("character", CharacterOutputString);
+		PlayerJsonObj->SetNumberField("rank", Rank);
+		PlayerJsonObj->SetNumberField("score", Score);
+
+		PlayerJsonObj->SetNumberField("experience", Experience);
+		PlayerJsonObj->SetNumberField("experienceThisLevel", ExperienceThisLevel);
+		PlayerJsonObj->SetNumberField("level", Level);
+
+		if (bAttemptUnLock) {
+			PlayerJsonObj->SetBoolField("unlock", true);
+		}
+
+		FString JsonOutputString;
+		TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
+		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
+
+		//FString access_token = PlayerController->CurrentAccessTokenFromOSS;
+		FString access_token = "";
+
+		FString APIURI = "/api/v1/game/player/" + gamePlayerKeyId + "/update";
+
+		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::SaveGamePlayerRequestComplete, APIURI, JsonOutputString, access_token);
+
+		//return requestSuccess;
+
+
+	}
+
+	// Check to see if there are any more players, if not...  Save and prepare for server shutdown
+	// Only if continuous
+	if (UEtopiaMode == "continuous")
+	{
+		int32 authorizedPlayerCount = getActivePlayerCount();
+		if (authorizedPlayerCount > 0)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeActivatePlayer - There are still players authorized on this server."));
+		}
+		else {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeActivatePlayer - No Authorized players found - moving to save."));
+
+			/*
+			bool FileIOSuccess;
+			bool allComponentsSaved;
+			FString FileName = "serversavedata.dat";
+			URamaSaveLibrary::RamaSave_SaveToFile(GetWorld(), FileName, FileIOSuccess, allComponentsSaved);
+			if (FileIOSuccess) {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO Success."));
+			}
+			else {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO FAIL."));
+			}
+			*/
+
+			// Reset our playstarted flag
+			bRequestBeginPlayStarted = false;
+
+			// Tell the backend that it's safe to bring this server down.
+			NotifyDownReady();
 		}
 	}
 	return false;
@@ -2338,19 +2466,12 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 	if (IsRunningDedicatedServer()) {
 
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeActivatePlayer"));
-		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DEBUG TEST"));
-
-		// check to see if this player is in the active list already
-		bool playerIDFound = false;
-		int32 ActivePlayerIndex = 0;
-		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] check to see if this player is in the active list already"));
-		//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [AuthorizePlayer] ActivePlayers: %i"), ActivePlayers);
 
 		if (UEtopiaMode == "competitive") {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - Mode set to competitive"));
 
-			FMyMatchPlayer* CurrentActivMatchPlayer = getMatchPlayerByPlayerId(playerID);
-			if (CurrentActivMatchPlayer) {
+			FMyActivePlayer* CurrentActivePlayer = getPlayerByPlayerId(playerID);
+			if (CurrentActivePlayer) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - existing playerID found"));
 				// TODO match player deactivate
 			}
@@ -2372,129 +2493,45 @@ bool UMyGameInstance::DeActivatePlayer(int32 playerID)
 				}
 
 				FString GamePlayerKeyIdString = CurrentActivePlayer->gamePlayerKeyId;
+				FString playerKeyId = CurrentActivePlayer->userKeyId;
 
-				// update the TArray as authorized=false
-				FMyActivePlayer leavingplayer;
-				leavingplayer.playerID = playerID;
-				leavingplayer.authorized = false;
-				leavingplayer.playerKeyId = CurrentActivePlayer->playerKeyId;
-
-				FString playerKeyId = CurrentActivePlayer->playerKeyId;
-
-				// we don't want to totally overwrite it, just update it.
-				//PlayerRecord.ActivePlayers[ActivePlayerIndex] = leavingplayer;
 				CurrentActivePlayer->authorized = false;
 				CurrentActivePlayer->deactivateStarted = true;
 
 				FString access_token = CurrentActivePlayer->PlayerController->CurrentAccessTokenFromOSS;
-
-
-				//UE_LOG(LogTemp, Log, TEXT("playerKeyId: %d"), *playerKeyId);
-				//UE_LOG(LogTemp, Log, TEXT("Object is: %s"), *GetName());
-
 				FString nonceString = "10951350917635";
 				FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-
-
 				FString OutputString;
-				// TSharedRef<TJsonWriter<TCHAR>> JsonWriter = TJsonWriterFactory<>::Create(&OutputString);
-				// FJsonSerializer::Serialize(JsonObject.ToSharedRef(), JsonWriter);
 
 				// Build Params as text string
 				OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
 				// urlencode the params
 
-				FString APIURI = "/api/v1/server/player/" + playerKeyId + "/deactivate";;
-
+				FString APIURI = "/api/v1/server/player/" + playerKeyId + "/deactivate";
 				bool requestSuccess = PerformHttpRequest(&UMyGameInstance::DeActivateRequestComplete, APIURI, OutputString, access_token);
+				SaveGamePlayer(CurrentActivePlayer->userKeyId, true);
 
-				SaveGamePlayer(CurrentActivePlayer->playerKeyId, true);
+				//  cleanup any TravelAuthorizedActors that this player owns.
+				APlayerState* thisPlayerState = CurrentActivePlayer->PlayerController->PlayerState;
+				AMyPlayerState* playerS = nullptr;
+				playerS = Cast<AMyPlayerState>(thisPlayerState);
 
-				//return requestSuccess;
-
-				// TODO cleanup any TravelAuthorizedActors that this player owns.
-
-				APlayerController* pc = NULL;
-				for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - Found a playerState"));
+				// delete the travel approved actors from the world
+				for (int i = 0; i < playerS->ServerTravelApprovedActors.Num(); i++)
 				{
-					pc = Iterator->Get();
-
-					APlayerState* thisPlayerState = pc->PlayerState;
-					AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-
-					if (playerS->playerKeyId == leavingplayer.playerKeyId)
-					{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - Found a playerState with matching playerKeyID"));
-						UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
-						//TODO first delete the travel approved actors from the world
-						for (int i = 0; i < playerS->ServerTravelApprovedActors.Num(); i++)
-						{
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer Found playerS->ServerTravelApprovedActors"));
-							playerS->ServerTravelApprovedActors[i]->Destroy();
-						}
-						playerS->ServerLinksAuthorized.Empty();
-						playerS->ServerTravelApprovedActors.Empty();
-
-					}
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer Found playerS->ServerTravelApprovedActors"));
+					playerS->ServerTravelApprovedActors[i]->Destroy();
 				}
-
-
+				playerS->ServerLinksAuthorized.Empty();
+				playerS->ServerTravelApprovedActors.Empty();
 			}
 			else {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - Not found - Ignoring"));
 			}
-
-			// Check to see if there are any more players, if not...  Save and prepare for server shutdown
-			int32 authorizedPlayerCount = getActivePlayerCount();
-			if (authorizedPlayerCount > 0)
-			{
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - There are still players authorized on this server."));
-			}
-			else {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeAuthorizePlayer - No Authorized players found - moving to save."));
-
-
-				bool FileIOSuccess;
-				bool allComponentsSaved;
-				FString FileName = "serversavedata.dat";
-				URamaSaveLibrary::RamaSave_SaveToFile(GetWorld(), FileName, FileIOSuccess, allComponentsSaved);
-				if (FileIOSuccess) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO Success."));
-				}
-				else {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] File IO FAIL."));
-				}
-
-
-
-				// removing lobby level entirely. Leaving this here for reference
-
-				//Return the server back to the lobbyLevel in case a user logs in before the server is decomissioned
-
-				//FString UrlString = TEXT("/Game/LobbyLevel?listen");
-				//World'/Game/LobbyLevel.LobbyLevel'
-				//GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
-				//GetWorld()->ServerTravel(UrlString);
-
-				// Reset our playstarted flag
-				bRequestBeginPlayStarted = false;
-
-				// Reset the ServerPortal Actor Array
-				//ServerPortalActorReference.Empty();
-
-				// Try to submit match results one last time
-				SubmitReport();
-
-				// Tell the backend that it's safe to bring this server down.
-				NotifyDownReady();
-
-
-			}
 		}
-
 	}
 	return true;
-
 }
 
 void UMyGameInstance::DeActivateRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
@@ -2532,6 +2569,150 @@ void UMyGameInstance::DeActivateRequestComplete(FHttpRequestPtr HttpRequest, FHt
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeActivateRequestComplete] Done!"));
 }
 
+
+bool UMyGameInstance::BackupExitingPlayerState(int32 playerID, AMyPlayerState* playerState)
+{
+	// this only runs serverside
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] BackupExitingPlayerState"));
+
+	if (UEtopiaMode == "competitive") {
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] BackupExitingPlayerState - Mode set to competitive"));
+
+		FMyActivePlayer* CurrentActivePlayer = getPlayerByPlayerId(playerID);
+		if (CurrentActivePlayer) {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] BackupExitingPlayerState - existing playerID found"));
+
+			CurrentActivePlayer->PSBackupCharacterSetup = playerState->CharacterSetup;
+			CurrentActivePlayer->PSBackupInventorySlots = playerState->InventorySlots;
+			CurrentActivePlayer->PSBackupMyEquipment = playerState->MyEquipment;
+			CurrentActivePlayer->PSBackupInventoryCapacity = playerState->InventoryCapacity;
+
+			// Trying putting this here instead of deactivate.
+			CurrentActivePlayer->bIsConnected = false;
+
+			// Also set a flag so we know that this player has a playerstate backup
+			CurrentActivePlayer->bWasConnected = true;
+
+			return true;
+
+		}
+
+	}
+	else {
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] BackupExitingPlayerState - Mode set to continuous"));
+
+		FMyActivePlayer* CurrentActivePlayer = getPlayerByPlayerId(playerID);
+		if (CurrentActivePlayer) {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] BackupExitingPlayerState - existing playerID found"));
+
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UMyGameInstance::RestoreJoiningPlayerState(FString playerKeyId)
+{
+	// this only runs serverside
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RestoreJoiningPlayerState"));
+
+	// Keep track of the playerState and playerCharacter that is associated with this player
+	APlayerState* thisPlayerState;
+	AMyPlayerState* playerS = nullptr;
+
+	AMyPlayerController* PlayerController = nullptr;
+	FString playerArrayplayerKeyId;
+	FMyActivePlayer* activePlayer = nullptr;
+
+	//playerC = PlayerController
+
+	// For very simple match based games, gamePlayer data is not required.
+	// But for more advanced match games, with persistent user data, the getGamePlayer call is required.
+	// So we'll need to distinguish here if we are running in competitive or continuous mode.
+	// TODO - revisit this.  Merging "ActivePlayers" and "MatchPlayers" into a single array seems like a possible solution.
+
+	if (UEtopiaMode == "competitive")
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RestoreJoiningPlayerState] - Mode set to competitive"));
+
+		activePlayer = getPlayerByPlayerKey(playerKeyId);
+		playerArrayplayerKeyId = activePlayer->userKeyId;
+
+		if (activePlayer)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RestoreJoiningPlayerState] - Found activePlayer"));
+
+			activePlayer->gamePlayerDataLoaded = true;
+
+			PlayerController = Cast<AMyPlayerController>(activePlayer->PlayerController);
+			if (PlayerController)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RestoreJoiningPlayerState] - Found PlayerController"));
+
+				thisPlayerState = PlayerController->PlayerState;
+				playerS = Cast<AMyPlayerState>(thisPlayerState);
+
+				if (playerS)
+				{
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RestoreJoiningPlayerState] - Found playerState"));
+
+					playerS->CharacterSetup = activePlayer->PSBackupCharacterSetup;
+					playerS->InventorySlots = activePlayer->PSBackupInventorySlots;
+					playerS->MyEquipment = activePlayer->PSBackupMyEquipment;
+					playerS->InventoryCapacity = activePlayer->PSBackupInventoryCapacity;
+
+					return true;
+				}
+			}
+		}
+	}
+
+
+	return false;
+}
+
+
+bool UMyGameInstance::ReconnectPlayer(class AMyPlayerController* NewPlayerController, FString playerKeyId, int32 playerID, const FUniqueNetIdRepl& UniqueId)
+{
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] ReconnectPlayer"));
+
+	// Stick the playerKeyID in the playerState so we can find this player later.
+	FMyActivePlayer* activePlayer = nullptr;
+	APlayerState* thisPlayerState = NewPlayerController->PlayerState;
+	AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
+	playerS->playerKeyId = playerKeyId;
+
+	// it's always competitive now
+	activePlayer = getPlayerByPlayerKey(playerKeyId);
+
+	if (activePlayer)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ReconnectPlayer] - Found activePlayer"));
+
+		activePlayer->PlayerController = NewPlayerController;
+		activePlayer->bIsConnected = true;
+
+		// TODO - missing some things in here.  Player lost all inventory and such
+		activePlayer->joined = true;
+		activePlayer->currentRoundAlive = true;
+
+		// And set combatEnabled
+		playerS->bCombatEnabled = combatEnabled;
+
+		// Bind the timer delegate
+		activePlayer->GetPlayerInfoTimerDel.BindUFunction(this, FName("GetGamePlayer"), playerKeyId, true);
+		// Set the timer
+		GetWorld()->GetTimerManager().SetTimer(activePlayer->GetPlayerInfoDelayHandle, activePlayer->GetPlayerInfoTimerDel, 1.f, false);
+
+		return true;
+
+	}
+
+	return false;
+
+}
+
 void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, bool checkOnly, bool toShard)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] TransferPlayer"));
@@ -2554,7 +2735,7 @@ void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, b
 		return;
 	}
 
-	FString playerplayerKeyId = playerRecord->playerKeyId;
+	FString playerplayerKeyId = playerRecord->userKeyId;
 	bool permissionCanUserTravel = false;
 
 	if (toShard)
@@ -2580,10 +2761,7 @@ void UMyGameInstance::TransferPlayer(const FString& ServerKey, int32 playerID, b
 
 		if (!checkOnly)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] TransferPlayer - Checkonly is false - deactivating ASAP"));
-			// run final save - time is of the essence here.  We can't wait for them to log out and timeout.
-			// Disabling this here.  Do it after we get the results back!
-			// DeActivatePlayer(playerID);
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] TransferPlayer - Checkonly is false"));
 		}
 		return;
 	}
@@ -2666,13 +2844,15 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] Found serverlink"));
 				}
 
+				// get the player
+				FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+
 				// Deal with shard to shard travel
 				if (toShard)
 				{
 					if (allowedToTravel)
 					{
-						// get the player
-						FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+						
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
 						AMyPlayerController* pc = ActivePlayer->PlayerController;
 
@@ -2684,13 +2864,8 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 				else
 				{
 					if (checkOnly == "true") {
-						// get the player
-						FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+						
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
-
-						// we need our uetopiaplugcharacter to set the ServerPortalKeyIdsAuthorized
-
-						// just get the controller from our active array.
 
 						//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - looking for a playerKeyId match"));
 						AMyPlayerController* pc = ActivePlayer->PlayerController;
@@ -2703,8 +2878,6 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 						{
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Found a playerState with matching playerKeyID"));
 							UE_LOG(LogTemp, Log, TEXT("playerS->PlayerId: %d"), thisPlayerState->PlayerId);
-
-
 
 							// Instanced servers have different keys and need to be handled differently.
 							// Since we can't poll for these server links on a global basis, we'll get the status on a transfer request.
@@ -2735,8 +2908,6 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 									playerS->ServerLinksAuthorized.Add(newApprovedLink);
 								}
 
-								//playerS->ServerPortalKeyIdsAuthorized.Add(targetServerKeyId);
-
 								// Spawn and setup the travelapproved actor visible only to the owner
 								FMyServerLink thisServerLink = GetServerLinkByTargetServerKeyId(targetServerKeyId);
 
@@ -2751,23 +2922,10 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 								if (World) {
 									//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] - Spawning a TravelApprovedActor"));
 
-									// This is strange...
-									// moved to an RPC on CLient so the client only creates this aesthetic only object for themselves.
-
-
 									FVector spawnlocation = FVector(thisServerLink.coordLocationX, thisServerLink.coordLocationY, thisServerLink.coordLocationZ);
 									FTransform SpawnTransform = FTransform(spawnlocation);
 									SpawnTransform.SetScale3D(FVector(2.5f, 2.5f, 2.5f));
 									SpawnTransform.SetRotation(FRotator(thisServerLink.rotationX, thisServerLink.rotationY, thisServerLink.rotationZ).Quaternion());
-
-									//AMyTravelApprovedActor* const TravelApprovedActor = World->SpawnActor<AMyTravelApprovedActor>(AMyTravelApprovedActor::StaticClass(), SpawnTransform);
-									//TravelApprovedActor->setPlayerKeyId(userKeyId);
-									//TravelApprovedActor->SetOwner(pc);
-									//TravelApprovedActor->GetStaticMeshComponent()->SetOnlyOwnerSee(true);
-
-									// add the travel approved actor to our player state list.
-									// we need to keep track of it so we can delete it later.
-									//playerS->ServerTravelApprovedActors.Add(TravelApprovedActor);
 
 									// Send RPC to the client to spawn it.
 									pc->ClientTravelApprovedSpawnActor(SpawnTransform);
@@ -2780,11 +2938,9 @@ void UMyGameInstance::TransferPlayerRequestComplete(FHttpRequestPtr HttpRequest,
 					else
 					{
 						if (allowedToTravel) {
-							// get the player
-							FMyActivePlayer* ActivePlayer = getPlayerByPlayerKey(userKeyId);
+							
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [TransferPlayerRequestComplete] ActivePlayer->UniqueId: %s"), *ActivePlayer->UniqueId->ToString());
 							AMyPlayerController* pc = ActivePlayer->PlayerController;
-
 
 							pc->ExecuteClientTravel(instanceHostConnectionLink);
 							DeActivatePlayer(ActivePlayer->playerID);
@@ -2867,33 +3023,26 @@ void UMyGameInstance::PurchaseRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 						return;
 					}
 
-					APlayerController* pc = NULL;
-					for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+					APlayerController* pc = Cast<AMyPlayerController>(playerRecord->PlayerController);
+					APlayerState* thisPlayerState = pc->PlayerState;
+					AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
+
+					if (playerS)
 					{
-						pc = Iterator->Get();
+						// Do whatever you want with your result here.
+						// Data Tables most likely.
 
-						APlayerState* thisPlayerState = pc->PlayerState;
-						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-
-						if (playerS->playerKeyId == userKeyId)
-						{
-
-							// update player inventory
-							if (itemName == "Cube") {
-								UE_LOG(LogTemp, Log, TEXT("Purchase was a cube"));
-								//playerS->InventoryCubes = playerS->InventoryCubes + 1;
+						if (itemName == "Cube") {
+							UE_LOG(LogTemp, Log, TEXT("Purchase was a cube"));
+							// put the item in the player inventory 
 
 
-							}
-							// update player currency balance
-							playerRecord->currencyCurrent = playerRecord->currencyCurrent - purchaseAmount;
-							playerS->Currency = playerS->Currency - purchaseAmount;
 						}
+						// update player currency balance
+						playerRecord->currencyCurrent = playerRecord->currencyCurrent - purchaseAmount;
+						playerS->Currency = playerS->Currency - purchaseAmount;
 					}
-
 				}
-
-
 			}
 		}
 	}
@@ -3015,42 +3164,7 @@ void UMyGameInstance::VendorCreateRequestComplete(FHttpRequestPtr HttpRequest, F
 						thisActor->bOwnerCanPickUp = false;  // have to switch this off in edit vendor if it should be able to be picked up again.
 						thisActor->VendorTypeKeyId = VendorTypeKeyId;
 					}
-
-					/*
-					APlayerController* pc = NULL;
-					for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-					{
-						pc = Iterator->Get();
-
-						APlayerState* thisPlayerState = pc->PlayerState;
-						AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-
-						if (playerS->playerKeyId == createdByUserKeyId)
-						{
-
-
-							// update player inventory
-							if (itemName == "Cube") {
-							UE_LOG(LogTemp, Log, TEXT("Purchase was a cube"));
-							playerS->InventoryCubes = playerS->InventoryCubes + 1;
-
-
-							}
-							// update player currency balance
-							playerRecord->currencyCurrent = playerRecord->currencyCurrent - purchaseAmount;
-							playerS->Currency = playerS->Currency - purchaseAmount;
-
-
-
-						}
-					}
-					*/
-
-
-
 				}
-
-
 			}
 		}
 	}
@@ -3222,11 +3336,7 @@ void UMyGameInstance::VendorDeleteRequestComplete(FHttpRequestPtr HttpRequest, F
 				if (Success) {
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
 					// we don't care too much about this data other than it worked.
-
-
 				}
-
-
 			}
 		}
 	}
@@ -3252,12 +3362,11 @@ bool UMyGameInstance::VendorItemCreate(AMyPlayerController* playerController, FS
 		PlayerJsonObj->SetStringField("userKeyId", myPlayerState->playerKeyId);
 		//PlayerJsonObj->SetStringField("vendorTypeKeyId", VendorTypeKeyId);
 		//PlayerJsonObj->SetStringField("VendorTemporaryKeyId", VendorTemporaryKeyId);
-		PlayerJsonObj->SetNumberField("quantity", playerController->InventorySlots[index].quantity);
+		PlayerJsonObj->SetNumberField("quantity", myPlayerState->InventorySlots[index].quantity);
 		PlayerJsonObj->SetNumberField("pricePerUnit", pricePerUnit);
-		PlayerJsonObj->SetStringField("title", playerController->InventorySlots[index].itemTitle);
-		PlayerJsonObj->SetStringField("description", playerController->InventorySlots[index].itemDescription);
-		PlayerJsonObj->SetStringField("blueprintPath", playerController->InventorySlots[index].itemClassPath);
-		//PlayerJsonObj->SetStringField("iconPath", "temp unused");
+		PlayerJsonObj->SetStringField("title", myPlayerState->InventorySlots[index].itemTitle);
+		PlayerJsonObj->SetStringField("description", myPlayerState->InventorySlots[index].itemDescription);
+		PlayerJsonObj->SetStringField("blueprintPath", myPlayerState->InventorySlots[index].itemClassPath);
 
 		// Deal with attributes
 		//////////////////////////////////////////////////////////////
@@ -3266,12 +3375,12 @@ bool UMyGameInstance::VendorItemCreate(AMyPlayerController* playerController, FS
 		TSharedPtr<FJsonObject> AttributesJsonObject = MakeShareable(new FJsonObject);
 		TArray< TSharedPtr<FJsonValue> > AttributesArray;
 
-		for (int attributeIndex = 0; attributeIndex < playerController->InventorySlots[index].Attributes.Num(); attributeIndex++)
+		for (int attributeIndex = 0; attributeIndex < myPlayerState->InventorySlots[index].Attributes.Num(); attributeIndex++)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [VendorItemCreate] Found attribute"));
 
 			TSharedPtr< FJsonObject > AttributeObj = MakeShareable(new FJsonObject);
-			AttributeObj->SetNumberField(FString::FromInt(attributeIndex), playerController->InventorySlots[index].Attributes[attributeIndex]);
+			AttributeObj->SetNumberField(FString::FromInt(attributeIndex), myPlayerState->InventorySlots[index].Attributes[attributeIndex]);
 			TSharedRef< FJsonValueObject > JsonValue = MakeShareable(new FJsonValueObject(AttributeObj));
 			AttributesArray.Add(JsonValue);
 		}
@@ -3282,7 +3391,6 @@ bool UMyGameInstance::VendorItemCreate(AMyPlayerController* playerController, FS
 		UE_LOG(LogTemp, Log, TEXT("[UMyGameInstance] AttributesOutputString: %s"), *AttributesOutputString);
 
 		PlayerJsonObj->SetStringField("attributes", AttributesOutputString);
-
 
 		FString JsonOutputString;
 		TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -3297,7 +3405,7 @@ bool UMyGameInstance::VendorItemCreate(AMyPlayerController* playerController, FS
 		// TODO thnk this through - we might want to just lock the inventory item so that the user can't do anything with it until the request completes.
 
 		// For now, just deleting it.
-		playerController->ServerAttemptRemoveItemAtIndex_Implementation(index, playerController->InventorySlots[index].quantity);
+		playerController->ServerAttemptRemoveItemAtIndex_Implementation(index, myPlayerState->InventorySlots[index].quantity);
 
 		return requestSuccess;
 	}
@@ -3358,12 +3466,6 @@ bool UMyGameInstance::VendorItemDelete(AMyPlayerController* playerController, FS
 		PlayerJsonObj->SetStringField("userKeyId", myPlayerState->playerKeyId);
 		//PlayerJsonObj->SetStringField("vendorTypeKeyId", VendorTypeKeyId);
 		//PlayerJsonObj->SetStringField("VendorTemporaryKeyId", VendorTemporaryKeyId);
-		//PlayerJsonObj->SetNumberField("quantity", playerController->InventorySlots[index].quantity);
-		//PlayerJsonObj->SetNumberField("pricePerUnit", pricePerUnit);
-		//PlayerJsonObj->SetStringField("title", playerController->InventorySlots[index].itemTitle);
-		//PlayerJsonObj->SetStringField("description", playerController->InventorySlots[index].itemDescription);
-		//PlayerJsonObj->SetStringField("blueprintPath", playerController->InventorySlots[index].itemClassPath);
-		//PlayerJsonObj->SetStringField("iconPath", "temp unused");
 
 		FString JsonOutputString;
 		TSharedRef< TJsonWriter<> > Writer = TJsonWriterFactory<>::Create(&JsonOutputString);
@@ -3407,7 +3509,7 @@ void UMyGameInstance::VendorItemDeleteRequestComplete(FHttpRequestPtr HttpReques
 				bool Success = JsonParsed->GetBoolField("success");
 				if (Success) {
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
-					// TODO - put the item in inventory
+					// put the item in inventory
 
 					FString bpItemClassStr;
 					JsonParsed->TryGetStringField("blueprintPath", bpItemClassStr);
@@ -3423,7 +3525,7 @@ void UMyGameInstance::VendorItemDeleteRequestComplete(FHttpRequestPtr HttpReques
 						if (basePickupBP) {
 							UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
 
-							// get the character controller that matches our userKeyId
+							// set up vars
 							FString userKeyId;
 							JsonParsed->TryGetStringField("userKeyId", userKeyId);
 							int32 quantity;
@@ -3477,31 +3579,9 @@ void UMyGameInstance::VendorItemDeleteRequestComplete(FHttpRequestPtr HttpReques
 								}
 							}
 
-
-
-							// getPlayerByKey
-
+							// get the character controller that matches our userKeyId
 							FMyActivePlayer* thisPlayer = getPlayerByPlayerKey(userKeyId);
-
 							thisPlayer->PlayerController->AddItem(basePickupBP, quantity, false);
-
-							/*
-							itemSlot.itemClassTitle = basePickupBP->GetName();
-							itemSlot.itemTitle = basePickupBP->Title.ToString();
-							itemSlot.itemClassPath = inventorySlotObj->GetStringField(FString("ItemClass"));
-							itemSlot.Icon = basePickupBP->Icon;
-
-							inventorySlotObj->TryGetNumberField("Quantity", itemSlot.quantity);
-							inventorySlotObj->TryGetStringField("ItemId", itemSlot.itemId);
-							inventorySlotObj->TryGetStringField("ItemTitle", itemSlot.itemTitle);
-
-							itemSlot.bCanBeUsed = basePickupBP->bCanBeUsed;
-							itemSlot.UseText = basePickupBP->UseText;
-							itemSlot.bCanBeStacked = basePickupBP->bCanBeStacked;
-							itemSlot.MaxStackSize = basePickupBP->MaxStackSize;
-
-							playerC->InventorySlots.Add(itemSlot);
-							*/
 
 						}
 					}
@@ -3536,7 +3616,6 @@ bool UMyGameInstance::VendorItemBuy(AMyPlayerController* playerController, FStri
 		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
 
 		FString APIURI = "/api/v1/server/vendor/" + VendorKeyId + "/item/" + VendorItemKeyId + "/buy";
-
 		FString access_token = playerController->CurrentAccessTokenFromOSS;
 
 		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::VendorItemBuyRequestComplete, APIURI, JsonOutputString, access_token);
@@ -3613,11 +3692,8 @@ void UMyGameInstance::VendorItemBuyRequestComplete(FHttpRequestPtr HttpRequest, 
 							// at this point we have a JSON encoded string:  savedAttributes
 
 							bool AttributeParseSuccess = false;
-							//FString AttributeJsonRaw = savedAttributes;
 							TSharedPtr<FJsonObject> AttributesJsonParsed;
 							TSharedRef<TJsonReader<TCHAR>> AttributesJsonReader = TJsonReaderFactory<TCHAR>::Create(savedAttributes);
-
-							//const JsonValPtrArray *AttributesJson;
 
 							if (FJsonSerializer::Deserialize(AttributesJsonReader, AttributesJsonParsed))
 							{
@@ -3651,14 +3727,17 @@ void UMyGameInstance::VendorItemBuyRequestComplete(FHttpRequestPtr HttpRequest, 
 									currentIndex++;
 								}
 							}
-
-
-							// getPlayerByKey
-
 							FMyActivePlayer* thisPlayer = getPlayerByPlayerKey(userKeyId);
 
+							
 							thisPlayer->PlayerController->AddItem(basePickupBP, quantity, false);
-							thisPlayer->PlayerController->CurrencyAvailable = thisPlayer->PlayerController->CurrencyAvailable - currencySpent;
+
+							AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(thisPlayer->PlayerController->PlayerState);
+							if (myPlayerState)
+							{
+								myPlayerState->Currency = myPlayerState->Currency - currencySpent;
+							}
+							
 
 						}
 					}
@@ -3692,7 +3771,6 @@ bool UMyGameInstance::VendorWithdraw(AMyPlayerController* playerController, FStr
 		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
 
 		FString APIURI = "/api/v1/server/vendor/" + VendorKeyId + "/withdraw";
-
 		FString access_token = playerController->CurrentAccessTokenFromOSS;
 
 		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::VendorWithdrawRequestComplete, APIURI, JsonOutputString, access_token);
@@ -3740,8 +3818,12 @@ void UMyGameInstance::VendorWithdrawRequestComplete(FHttpRequestPtr HttpRequest,
 
 					FMyActivePlayer* thisPlayer = getPlayerByPlayerKey(userKeyId);
 
-					thisPlayer->PlayerController->CurrencyAvailable = thisPlayer->PlayerController->CurrencyAvailable + transaction_amount;
+					AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayer->PlayerController->PlayerState);
+					if (playerS)
+					{
+						playerS->Currency = playerS->Currency + transaction_amount;
 
+					}
 				}
 			}
 		}
@@ -3772,7 +3854,6 @@ bool UMyGameInstance::VendorOfferDecline(AMyPlayerController* playerController, 
 		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
 
 		FString APIURI = "/api/v1/server/vendor/" + VendorKeyId + "/item/" + VendorItemKeyId + "/decline";
-
 		FString access_token = playerController->CurrentAccessTokenFromOSS;
 
 		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::VendorOfferDeclineRequestComplete, APIURI, JsonOutputString, access_token);
@@ -3811,7 +3892,6 @@ void UMyGameInstance::VendorOfferDeclineRequestComplete(FHttpRequestPtr HttpRequ
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
 					// WE don't have to do anything with this.
 					// Maybe display a success or something.
-
 				}
 			}
 		}
@@ -3843,7 +3923,6 @@ bool UMyGameInstance::VendorItemClaim(AMyPlayerController* playerController, FSt
 		FJsonSerializer::Serialize(PlayerJsonObj.ToSharedRef(), Writer);
 
 		FString APIURI = "/api/v1/server/vendor/" + VendorKeyId + "/item/" + VendorItemKeyId + "/claim";
-
 		FString access_token = playerController->CurrentAccessTokenFromOSS;
 
 		bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::VendorItemClaimRequestComplete, APIURI, JsonOutputString, access_token);
@@ -3896,7 +3975,7 @@ void UMyGameInstance::VendorItemClaimRequestComplete(FHttpRequestPtr HttpRequest
 						if (basePickupBP) {
 							UE_LOG(LogTemp, Log, TEXT("Found basePickupBP"));
 
-							// get the character controller that matches our userKeyId
+							// set up vars
 							FString userKeyId;
 							JsonParsed->TryGetStringField("userKeyId", userKeyId);
 							int32 quantity;
@@ -3912,7 +3991,6 @@ void UMyGameInstance::VendorItemClaimRequestComplete(FHttpRequestPtr HttpRequest
 							// at this point we have a JSON encoded string:  savedAttributes
 
 							bool AttributeParseSuccess = false;
-							//FString AttributeJsonRaw = savedAttributes;
 							TSharedPtr<FJsonObject> AttributesJsonParsed;
 							TSharedRef<TJsonReader<TCHAR>> AttributesJsonReader = TJsonReaderFactory<TCHAR>::Create(savedAttributes);
 
@@ -3951,7 +4029,7 @@ void UMyGameInstance::VendorItemClaimRequestComplete(FHttpRequestPtr HttpRequest
 								}
 							}
 
-
+							// get the character controller that matches our userKeyId
 							FMyActivePlayer* thisPlayer = getPlayerByPlayerKey(userKeyId);
 
 							thisPlayer->PlayerController->AddItem(basePickupBP, quantity, false);
@@ -4042,26 +4120,7 @@ void UMyGameInstance::RewardRequestComplete(FHttpRequestPtr HttpRequest, FHttpRe
 
 					playerRecord->currencyCurrent = playerRecord->currencyCurrent + purchaseAmount;
 					playerS->Currency = playerRecord->currencyCurrent;
-					playerRecord->PlayerController->CurrencyAvailable = playerRecord->currencyCurrent;
-
-					/*
-					APlayerController* pc = NULL;
-					for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-					{
-					pc = Iterator->Get();
-
-					APlayerState* thisPlayerState = pc->PlayerState;
-					AMyPlayerState* playerS = Cast<AMyPlayerState>(thisPlayerState);
-
-					if (playerS->playerKeyId == userKeyId)
-					{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] Reward - Player Key ID match"));
-					playerRecord->currencyCurrent = playerRecord->currencyCurrent + purchaseAmount;
-					playerS->Currency = playerS->Currency + purchaseAmount;
-					}
-					}
-					*/
-
+					//playerRecord->PlayerController->CurrencyAvailable = playerRecord->currencyCurrent;
 
 				}
 			}
@@ -4128,7 +4187,6 @@ void UMyGameInstance::GetPlayerDropsRequestComplete(FHttpRequestPtr HttpRequest,
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
 					FString userKeyId = JsonParsed->GetStringField("userKeyId");
 
-					//FMyMatchPlayer* playerRecord = getMatchPlayerByPlayerKey(userKeyId);
 					FMyActivePlayer* playerRecord = getPlayerByPlayerKey(userKeyId);
 					if (playerRecord)
 					{
@@ -4159,11 +4217,8 @@ void UMyGameInstance::GetPlayerDropsRequestComplete(FHttpRequestPtr HttpRequest,
 								NewDrop.expires = json->GetStringField("expires");
 
 								playerS->MyDrops.Add(NewDrop);
-
 							}
-
 						}
-
 					}
 				}
 			}
@@ -4318,7 +4373,6 @@ void UMyGameInstance::QueryGameDataListRequestComplete(FHttpRequestPtr HttpReque
 					UE_LOG(LogTemp, Log, TEXT("Success True"));
 
 					// TODO - do something with the returned array of keys
-
 				}
 			}
 		}
@@ -4378,7 +4432,6 @@ void UMyGameInstance::QueryGameDataRequestComplete(FHttpRequestPtr HttpRequest, 
 					FString game_data_json_string = JsonParsed->GetStringField("data");
 
 					// TODO - do something with the returned string
-
 				}
 			}
 		}
@@ -4396,121 +4449,20 @@ void UMyGameInstance::RequestBeginPlay()
 	GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
 	GetWorld()->ServerTravel(UrlString);
 	bRequestBeginPlayStarted = true;
-
-
 }
 
-void UMyGameInstance::LoadServerStateFromFile()
-{
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] LoadServerStateFromFile"));
-
-	/*
-	DEPRECATED - THIS LIVES IN GAME STATE
-	bool FileIOSuccess;
-	//bool allComponentsLoaded;
-	//bool destroyActorsBeforeLoad = false;
-	//bool dontLoadPlayerPawns = false;
-	TArray<FString> StreamingLevelsStates;
-	FString FileName = "serversavedata.dat";
-
-	URamaSaveLibrary::RamaSave_LoadFromFile(GetWorld(), FileIOSuccess, FileName);
-	//URamaSaveLibrary::RamaSave_LoadStreamingStateFromFile(GetWorld(), FileIOSuccess, FileName, StreamingLevelsStates);
-	//URamaSaveLibrary::RamaSave_LoadFromFile(GetWorld(), FileIOSuccess, allComponentsLoaded, FileName, destroyActorsBeforeLoad, dontLoadPlayerPawns);
-	if (FileIOSuccess) {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RequestBeginPlay File IO Success."));
-	}
-	else {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RequestBeginPlay File IO FAIL."));
-	}
-
-
-	*/
-
-
-
-}
-
-bool UMyGameInstance::OutgoingChat(int32 playerID, FText message)
-{
-
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] OutgoingChat"));
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DEBUG TEST"));
-
-	// check to see if this player is in the active list already
-	bool playerIDFound = false;
-	int32 ActivePlayerIndex = 0;
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] check to see if this player is in the active list already"));
-
-	// Get our player record
-	FMyActivePlayer* CurrentActivePlayer = getPlayerByPlayerId(playerID);
-
-	if (CurrentActivePlayer == nullptr) {
-		return false;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] OutgoingChat - existing playerID found"));
-
-	FString playerKeyId = CurrentActivePlayer->playerKeyId;
-	FString access_token = CurrentActivePlayer->PlayerController->CurrentAccessTokenFromOSS;
-
-	UE_LOG(LogTemp, Log, TEXT("playerKeyId: %s"), *playerKeyId);
-	UE_LOG(LogTemp, Log, TEXT("Object is: %s"), *GetName());
-	UE_LOG(LogTemp, Log, TEXT("message is: %s"), *message.ToString());
-
-	FString nonceString = "10951350917635";
-	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-
-	FString OutputString;
-
-	// Build Params as text string
-	OutputString = "nonce=" + nonceString + "&encryption=" + encryption + "&message=" + message.ToString();
-	// urlencode the params
-
-	FString APIURI = "/api/v1/player/" + playerKeyId + "/chat";
-
-	bool requestSuccess = PerformHttpRequest(&UMyGameInstance::OutgoingChatComplete, APIURI, OutputString, access_token);
-
-	return requestSuccess;
-
-}
-
-void UMyGameInstance::OutgoingChatComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
-{
-	if (!HttpResponse.IsValid())
-	{
-		UE_LOG(LogTemp, Log, TEXT("Test failed. NULL response"));
-	}
-	else
-	{
-		UE_LOG(LogTemp, Log, TEXT("Completed test [%s] Url=[%s] Response=[%d] [%s]"),
-			*HttpRequest->GetVerb(),
-			*HttpRequest->GetURL(),
-			HttpResponse->GetResponseCode(),
-			*HttpResponse->GetContentAsString());
-
-		FString JsonRaw = *HttpResponse->GetContentAsString();
-		//  We don't care too much about the results from this call.
-	}
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [OutgoingChatComplete] Done!"));
-}
 
 bool UMyGameInstance::SubmitMatchMakerResults()
 {
-
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitMatchMakerResults"));
-
 	MatchInfo.encryption = "off";
 	MatchInfo.nonce = "10951350917635";
 	FString json_string;
 	FJsonObjectConverter::UStructToJsonObjectString(MatchInfo.StaticStruct(), &MatchInfo, json_string, 0, 0);
 	UE_LOG(LogTemp, Log, TEXT("json_string: %s"), *json_string);
-
 	FString APIURI = "/api/v1/matchmaker/results";
-
 	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::SubmitMatchMakerResultsComplete, APIURI, json_string, "");  // NO AccessToken
-
 	return requestSuccess;
-
 }
 
 
@@ -4575,9 +4527,7 @@ void UMyGameInstance::SubmitReport()
 
 		PlayerRecord.encryption = "off";
 		PlayerRecord.nonce = "10951350917635";
-
 		FString json_string;
-
 		FJsonObjectConverter::UStructToJsonObjectString(FMyActivePlayers::StaticStruct(), &PlayerRecord, json_string, 0, 0);
 
 		//UE_LOG(LogTemp, Log, TEXT("json_string: %s"), *json_string);
@@ -4605,9 +4555,7 @@ void UMyGameInstance::SubmitReport()
 				PlayerRecord.ActivePlayers[b].events.Empty();
 			}
 
-
 			return;
-
 		}
 		else {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] SubmitReport - No kills or events - Ignoring"));
@@ -4692,8 +4640,6 @@ bool UMyGameInstance::StartMatchmaking(ULocalPlayer* PlayerOwner, FString MatchT
 			FUniqueNetIdRepl playerNetId = PlayerOwner->GetPreferredUniqueNetId();
 			GameSession->StartMatchmaking(playerNetId.GetUniqueNetId(), GameSessionName, MatchType);
 
-			//GameSession->FindSessions(PlayerOwner->GetPreferredUniqueNetId(), GameSessionName, bFindLAN, true);
-
 			bResult = true;
 		}
 	}
@@ -4701,7 +4647,7 @@ bool UMyGameInstance::StartMatchmaking(ULocalPlayer* PlayerOwner, FString MatchT
 }
 
 
-/** Initiates matchmaker */
+/** Stops matchmaker */
 bool UMyGameInstance::CancelMatchmaking(ULocalPlayer* PlayerOwner)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::CancelMatchmaking"));
@@ -4857,18 +4803,9 @@ void UMyGameInstance::BeginWelcomeScreenState()
 	// Remove any possible splitscren players
 	RemoveSplitScreenPlayers();
 
-	//LoadFrontEndMap(WelcomeScreenMap);
-
 	ULocalPlayer* const LocalPlayer = GetFirstGamePlayer();
-	//LocalPlayer->SetCachedUniqueNetId(nullptr);
-	//check(!WelcomeMenuUI.IsValid());
-	//WelcomeMenuUI = MakeShareable(new FShooterWelcomeMenu);
-	//WelcomeMenuUI->Construct(this);
-	//WelcomeMenuUI->AddToGameViewport();
 
-
-
-	// Disallow splitscreen (we will allow while in the playing state)
+	// Disallow splitscreen
 	GetGameViewportClient()->SetDisableSplitscreenOverride(true);
 }
 
@@ -4910,15 +4847,6 @@ void UMyGameInstance::RemoveExistingLocalPlayer(ULocalPlayer* ExistingPlayer)
 {
 	check(ExistingPlayer);
 	if (ExistingPlayer->PlayerController != NULL)
-		//{
-		//	// Kill the player
-		//	AShooterCharacter* MyPawn = Cast<AShooterCharacter>(ExistingPlayer->PlayerController->GetPawn());
-		//	if (MyPawn)
-		//	{
-		//		MyPawn->KilledBy(NULL);
-		//	}
-		//}
-
 		// Remove local split-screen players from the list
 		RemoveLocalPlayer(ExistingPlayer);
 }
@@ -4938,7 +4866,6 @@ bool UMyGameInstance::JoinSession(ULocalPlayer* LocalPlayer, int32 SessionIndexI
 		AddNetworkFailureHandlers();
 
 		OnJoinSessionCompleteDelegateHandle = GameSession->OnJoinSessionComplete().AddUObject(this, &UMyGameInstance::OnJoinSessionComplete);
-		//.AddUObject(this, &UMyGameInstance::OnJoinSessionComplete);
 
 		// this chenged in 4.20 - it is not returning the same type anymore
 		FUniqueNetIdRepl playerNetId = LocalPlayer->GetPreferredUniqueNetId();
@@ -4986,7 +4913,6 @@ bool UMyGameInstance::JoinSession(ULocalPlayer* LocalPlayer, const FOnlineSessio
 			}
 		}
 	}
-
 	return false;
 }
 
@@ -5030,7 +4956,6 @@ void UMyGameInstance::FinishJoinSession(EOnJoinSessionCompleteResult::Type Resul
 
 		FText OKButton = NSLOCTEXT("DialogButtons", "OKAY", "OK");
 		RemoveNetworkFailureHandlers();
-		//ShowMessageThenGoMain(ReturnReason, OKButton, FText::GetEmpty());
 		return;
 	}
 
@@ -5070,7 +4995,6 @@ void UMyGameInstance::InternalTravelToSession(const FName& SessionName)
 	{
 		FText FailReason = NSLOCTEXT("NetworkErrors", "TravelSessionFailed", "Travel to Session failed.");
 		FText OKButton = NSLOCTEXT("DialogButtons", "OKAY", "OK");
-		//ShowMessageThenGoMain(FailReason, OKButton, FText::GetEmpty());
 		UE_LOG(LogOnlineGame, Warning, TEXT("Failed to travel to session upon joining it"));
 		return;
 	}
@@ -5176,7 +5100,6 @@ void UMyGameInstance::GotoState(FName NewState)
 void UMyGameInstance::HandleSessionFailure(const FUniqueNetId& NetId, ESessionFailure::Type FailureType)
 {
 	UE_LOG(LogOnlineGame, Warning, TEXT("UMyGameInstance::HandleSessionFailure: %u"), (uint32)FailureType);
-
 }
 
 void UMyGameInstance::OnEndSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -5264,9 +5187,6 @@ bool UMyGameInstance::RegisterNewSession(FString IncServerSessionHostAddress, FS
 		GetServerInfo();
 		GetServerLinks();
 	}
-
-
-
 	return true;
 }
 
@@ -5299,47 +5219,12 @@ bool UMyGameInstance::IsLocalPlayerOnline(ULocalPlayer* LocalPlayer)
 
 bool UMyGameInstance::ValidatePlayerForOnlinePlay(ULocalPlayer* LocalPlayer)
 {
-	// This is all UI stuff.
-	// Removing it for now
-
 	return true;
 }
 
 void UMyGameInstance::HandleUserLoginChanged(int32 GameUserIndex, ELoginStatus::Type PreviousLoginStatus, ELoginStatus::Type LoginStatus, const FUniqueNetId& UserId)
 {
-	/*
-	const bool bDowngraded = (LoginStatus == ELoginStatus::NotLoggedIn && !GetIsOnline()) || (LoginStatus != ELoginStatus::LoggedIn && GetIsOnline());
-
-	UE_LOG(LogOnline, Log, TEXT("HandleUserLoginChanged: bDownGraded: %i"), (int)bDowngraded);
-
-	TSharedPtr<GenericApplication> GenericApplication = FSlateApplication::Get().GetPlatformApplication();
-	bIsLicensed = GenericApplication->ApplicationLicenseValid();
-
-	// Find the local player associated with this unique net id
-	ULocalPlayer * LocalPlayer = FindLocalPlayerFromUniqueNetId(UserId);
-
-	// If this user is signed out, but was previously signed in, punt to welcome (or remove splitscreen if that makes sense)
-	if (LocalPlayer != NULL)
-	{
-	if (bDowngraded)
-	{
-	UE_LOG(LogOnline, Log, TEXT("HandleUserLoginChanged: Player logged out: %s"), *UserId.ToString());
-
-	//LabelPlayerAsQuitter(LocalPlayer);
-
-	// Check to see if this was the master, or if this was a split-screen player on the client
-	if (LocalPlayer == GetFirstGamePlayer() || GetIsOnline())
-	{
-	HandleSignInChangeMessaging();
-	}
-	else
-	{
-	// Remove local split-screen players from the list
-	RemoveExistingLocalPlayer(LocalPlayer);
-	}
-	}
-	}
-	*/
+	
 }
 
 void UMyGameInstance::HandleUserLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
@@ -5354,26 +5239,17 @@ void UMyGameInstance::HandleUserLoginComplete(int32 LocalUserNum, bool bWasSucce
 	{
 		return;
 	}
-	const auto OnlineSub = IOnlineSubsystem::Get();
-	if (OnlineSub)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::HandleUserLoginComplete OnlineSub"));
-		const auto FriendsInterface = OnlineSub->GetFriendsInterface();
-		if (FriendsInterface.IsValid())
-		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::HandleUserLoginComplete FriendsInterface.IsValid()"));
-
-			// ALl of this moved to OnlineSubsystem-> Connect
-
-			//TArray< TSharedRef<FOnlineFriend> > FriendList;
-			//APlayerController* thisPlayer = GetFirstLocalPlayerController();
-			//AMyPlayerController* thisMyPlayer = Cast<AMyPlayerController>(thisPlayer);
-			//FriendsInterface->ReadFriendsList(LocalUserNum, "default", thisMyPlayer->OnReadFriendsListCompleteDelegate);
-
-			//TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
-			//FriendsInterface->QueryRecentPlayers(*pid, "default");
-		}
-	}
+	//const auto OnlineSub = IOnlineSubsystem::Get();
+	//if (OnlineSub)
+	//{
+	//	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::HandleUserLoginComplete OnlineSub"));
+	//	const auto FriendsInterface = OnlineSub->GetFriendsInterface();
+	//	if (FriendsInterface.IsValid())
+	//	{
+	//		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] GAME INSTANCE UMyGameInstance::HandleUserLoginComplete FriendsInterface.IsValid()"));
+	//
+	//	}
+	//}
 }
 
 void UMyGameInstance::HandleSignInChangeMessaging()
@@ -5399,7 +5275,6 @@ void UMyGameInstance::BeginLogin(FString InType, FString InId, FString InToken)
 			IdentityInterface->Login(0, *Credentials);
 		}
 	}
-
 }
 
 
@@ -5407,38 +5282,34 @@ void UMyGameInstance::BeginLogin(FString InType, FString InId, FString InToken)
 FMyActivePlayer* UMyGameInstance::getPlayerByPlayerId(int32 playerID)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getPlayerByPlayerID"));
-	for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
 	{
-		if (PlayerRecord.ActivePlayers[b].playerID) {
+		if (MatchInfo.players[b].playerID) {
 			UE_LOG(LogTemp, Log, TEXT("Comparing playerID: %d PlayerRecord.ActivePlayers[b].playerID:%d"),
 				playerID,
-				PlayerRecord.ActivePlayers[b].playerID);
+				MatchInfo.players[b].playerID);
 
-			if (PlayerRecord.ActivePlayers[b].playerID == playerID) {
+			if (MatchInfo.players[b].playerID == playerID) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getPlayerByPlayerID - FOUND MATCHING playerID"));
-				FMyActivePlayer* playerPointer = &PlayerRecord.ActivePlayers[b];
+				FMyActivePlayer* playerPointer = &MatchInfo.players[b];
 				return playerPointer;
 			}
 		}
 		else {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] DeActivatePlayer - PlayerRecord.ActivePlayers[b].playerID DOES NOT EXIST"));
 		}
-
 	}
 	return nullptr;
 }
 
-
-
 FMyActivePlayer* UMyGameInstance::getPlayerByPlayerKey(FString playerKeyId)
 {
-	// TODO rename this, should be user not player
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getPlayerByPlayerKey"));
-	for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
 	{
-		if (PlayerRecord.ActivePlayers[b].playerKeyId == playerKeyId) {
+		if (MatchInfo.players[b].userKeyId == playerKeyId) {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getPlayerByPlayerKey - FOUND MATCHING playerID"));
-			FMyActivePlayer* playerPointer = &PlayerRecord.ActivePlayers[b];
+			FMyActivePlayer* playerPointer = &MatchInfo.players[b];
 			return playerPointer;
 		}
 	}
@@ -5447,40 +5318,37 @@ FMyActivePlayer* UMyGameInstance::getPlayerByPlayerKey(FString playerKeyId)
 
 void UMyGameInstance::deletePlayerByPlayerKey(FString playerKeyId)
 {
-	// TODO rename this, should be user not player
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] deletePlayerByPlayerKey"));
-	for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
 	{
-		if (PlayerRecord.ActivePlayers[b].playerKeyId == playerKeyId) {
+		if (MatchInfo.players[b].userKeyId == playerKeyId) {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] deletePlayerByPlayerKey - FOUND MATCHING playerID"));
-			PlayerRecord.ActivePlayers.RemoveAt(b);
-			//FMyActivePlayer* playerPointer = &PlayerRecord.ActivePlayers[b];
+			MatchInfo.players.RemoveAt(b);
 			return ;
 		}
 	}
 	return ;
 }
 
-FMyMatchPlayer* UMyGameInstance::getMatchPlayerByPlayerId(int32 playerID)
+FMyActivePlayer* UMyGameInstance::getMatchPlayerByPlayerId(int32 playerID)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getMatchPlayerByPlayerID"));
 	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
 	{
 		if (MatchInfo.players[b].playerID) {
 			UE_LOG(LogTemp, Log, TEXT("Comparing playerID: %d MatchInfo.players[b].playerID:%d"),
-				playerID,
-				MatchInfo.players[b].playerID);
+			playerID,
+			MatchInfo.players[b].playerID);
 
 			if (MatchInfo.players[b].playerID == playerID) {
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getMatchPlayerByPlayerID - FOUND MATCHING playerID"));
-				FMyMatchPlayer* playerPointer = &MatchInfo.players[b];
+				FMyActivePlayer* playerPointer = &MatchInfo.players[b];
 				return playerPointer;
 			}
 		}
 		else {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getMatchPlayerByPlayerId - MatchInfo.players[b].playerID DOES NOT EXIST"));
 		}
-
 	}
 	return nullptr;
 }
@@ -5490,9 +5358,9 @@ int32 UMyGameInstance::getActivePlayerCount()
 {
 	int32 count = 0;
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getActivePlayerCount"));
-	for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
 	{
-		if (PlayerRecord.ActivePlayers[b].authorized) {
+		if (MatchInfo.players[b].authorized) {
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] getActivePlayerCount - FOUND authorized"));
 			count++;
 		}
@@ -5520,385 +5388,8 @@ bool UMyGameInstance::RecordKill(int32 killerPlayerID, int32 victimPlayerID)
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] "));
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] killerPlayerID: %i"), killerPlayerID);
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] victimPlayerID: %i "), victimPlayerID);
-	if (UEtopiaMode == "competitive") {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordKill - Mode set to competitive"));
-		/*
-		// If we are here, this server is running in competitive/matchmaker mode.
-		//
-		*/
-		// get attacker activeplayer
-		bool attackerPlayerIDFound = false;
-		int32 killerPlayerIndex = 0;
-		// sum all the round kills while we're looping
-		int32 roundKillsTotal = 0;
 
-		// TODO refactor this to use our get player function instead
-
-		for (int32 b = 0; b < MatchInfo.players.Num(); b++)
-		{
-			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
-			if (MatchInfo.players[b].playerID == killerPlayerID) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - FOUND MATCHING killer playerID"));
-				attackerPlayerIDFound = true;
-				killerPlayerIndex = b;
-			}
-			roundKillsTotal = roundKillsTotal + MatchInfo.players[b].roundKills;
-		}
-		// we need one more since this kill has not been added to the list yet
-		roundKillsTotal = roundKillsTotal + 1;
-
-		if (killerPlayerID == victimPlayerID) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] suicide"));
-		}
-		else {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] Not a suicide"));
-
-			// get victim
-			bool victimPlayerIDFound = false;
-			int32 victimPlayerIndex = 0;
-
-			for (int32 b = 0; b < MatchInfo.players.Num(); b++)
-			{
-				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
-				if (MatchInfo.players[b].playerID == victimPlayerID) {
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - FOUND MATCHING victim playerID"));
-					victimPlayerIDFound = true;
-					victimPlayerIndex = b;
-					// set currentRoundAlive
-					MatchInfo.players[b].currentRoundAlive = false;
-				}
-			}
-
-			// check to see if this victim is already in the kill list
-
-			bool victimIDFoundInKillList = false;
-
-			for (int32 b = 0; b < MatchInfo.players[killerPlayerIndex].killed.Num(); b++)
-			{
-				if (MatchInfo.players[killerPlayerIndex].killed[b] == MatchInfo.players[victimPlayerIndex].userKeyId)
-				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Victim already in kill list"));
-					victimIDFoundInKillList = true;
-				}
-			}
-
-			if (victimIDFoundInKillList == false) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Adding victim to kill list"));
-				MatchInfo.players[killerPlayerIndex].killed.Add(MatchInfo.players[victimPlayerIndex].userKeyId);
-			}
-
-			// Increase the killer's kill count
-			MatchInfo.players[killerPlayerIndex].roundKills = MatchInfo.players[killerPlayerIndex].roundKills + 1;
-			// And increase the victim's deaths
-			MatchInfo.players[victimPlayerIndex].roundDeaths = MatchInfo.players[victimPlayerIndex].roundDeaths + 1;
-
-			// Give the killer some xp and score
-			MatchInfo.players[killerPlayerIndex].score = MatchInfo.players[killerPlayerIndex].score + 100;
-			MatchInfo.players[killerPlayerIndex].experience = MatchInfo.players[killerPlayerIndex].experience + 10;
-
-			//calculate new ranks;
-			CalculateNewRank(killerPlayerIndex, victimPlayerIndex, true);
-
-			//Calculate winning team
-
-
-		}
-
-		AGameState* gameState = Cast<AGameState>(GetWorld()->GetGameState());
-		AMyGameState* uetopiaGameState = Cast<AMyGameState>(gameState);
-
-
-		// Check to see if the round is over
-		// reset the level if one team is all dead
-		// If you have a game that has more than two teams you should rewrite this for your end round logic
-		bool anyTeamDead = false;
-		int32 stillAliveTeamId = 0;
-		for (int32 b = 0; b <= teamCount; b++) // b is the team ID we're checking
-		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] Checking team %d"), b);
-			bool thisTeamAlive = false;
-
-			for (int32 ip = 0; ip < MatchInfo.players.Num(); ip++) // ip is player index
-			{
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] Checking player %d"), ip);
-				if (MatchInfo.players[ip].teamId == b) {
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Player is a member of this team"));
-					// current round alive boolean check
-					if (MatchInfo.players[ip].currentRoundAlive) {
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Player is alive"));
-						thisTeamAlive = true;
-						stillAliveTeamId = b;
-					}
-					else {
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Player is dead"));
-					}
-				}
-			}
-
-			if (thisTeamAlive == false) {
-				anyTeamDead = true;
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - A team is dead"));
-			}
-
-
-		}
-
-		// Get the index from our TeamList struct - it might not be the same index!
-		int32 TeamStillAliveTeamListIndex = 0;
-		for (int32 b = 0; b < TeamList.teams.Num(); b++)
-		{
-			if (TeamList.teams[b].number == stillAliveTeamId)
-			{
-				TeamStillAliveTeamListIndex = b;
-			}
-		}
-
-
-		if (anyTeamDead) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Detected dead team"));
-			// flag and count the team win
-			// this is only for two teams - if you have more, change this.
-			for (int32 b = 0; b < MatchInfo.players.Num(); b++)
-			{
-				if (MatchInfo.players[b].teamId == stillAliveTeamId) {
-					MatchInfo.players[b].score = MatchInfo.players[b].score + 200;
-					MatchInfo.players[b].experience = MatchInfo.players[b].experience + 75;
-
-				}
-			}
-
-			TeamList.teams[TeamStillAliveTeamListIndex].roundWinCount = TeamList.teams[TeamStillAliveTeamListIndex].roundWinCount + 1;
-
-
-		}
-
-
-
-		//Check to see if the game is over
-		if (TeamList.teams[TeamStillAliveTeamListIndex].roundWinCount >= RoundWinsNeededToWinMatch)
-		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Ending the Game"));
-
-			//set winner for the winning team
-			for (int32 b = 0; b < MatchInfo.players.Num(); b++)
-			{
-				if (MatchInfo.players[b].teamId == stillAliveTeamId) {
-					MatchInfo.players[b].win = true;
-					MatchInfo.players[b].score = MatchInfo.players[b].score + 400;
-					MatchInfo.players[b].experience = MatchInfo.players[b].experience + 200;
-				}
-			}
-
-			bool gamesubmitted = SubmitMatchMakerResults();
-
-			//Deauthorize everyone
-
-			for (int32 b = 0; b < MatchInfo.players.Num(); b++)
-			{
-				DeActivatePlayer(MatchInfo.players[b].playerID);
-			}
-
-			// We might need some kind of delay in here because we're going to wipe this data.  plz don't crash
-
-			// Reset the active players
-			// ActivePlayers.Empty();
-			// Kick everyone back to login
-			// travel all clinets back to login
-			APlayerController* pc = NULL;
-			FString UrlString = TEXT("/Game/LoginLevel");
-
-			for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-			{
-				pc = Iterator->Get();
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - kicking back to login"));
-				pc->ClientTravel(UrlString, ETravelType::TRAVEL_Absolute);
-			}
-
-
-
-		}
-		else {
-			if (anyTeamDead) {
-				// restart the round
-				// reset alive status
-				for (int32 b = 0; b < MatchInfo.players.Num(); b++)
-				{
-					MatchInfo.players[b].currentRoundAlive = true;
-				}
-
-				FString UrlString = TEXT("/Game/Maps/ThirdPersonExampleMap?listen");
-				GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
-				GetWorld()->ServerTravel(UrlString);
-			}
-		}
-
-
-	}
-	else {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordKill - Mode set to continuous"));
-		// get attacker activeplayer
-		bool attackerPlayerIDFound = false;
-		int32 killerPlayerIndex = 0;
-		// sum all the round kills while we're looping
-		int32 roundKillsTotal = 0;
-
-		// TODO refactor this to use our get player function instead
-
-		for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
-		{
-			//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
-			if (PlayerRecord.ActivePlayers[b].playerID == killerPlayerID) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - FOUND MATCHING killer playerID"));
-				attackerPlayerIDFound = true;
-				killerPlayerIndex = b;
-			}
-			roundKillsTotal = roundKillsTotal + PlayerRecord.ActivePlayers[b].roundKills;
-		}
-		// we need one more since this kill has not been added to the list yet
-		roundKillsTotal = roundKillsTotal + 1;
-
-		if (killerPlayerID == victimPlayerID) {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] suicide"));
-		}
-		else {
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] Not a suicide"));
-
-			// get victim activeplayer
-			bool victimPlayerIDFound = false;
-			int32 victimPlayerIndex = 0;
-
-			for (int32 b = 0; b < PlayerRecord.ActivePlayers.Num(); b++)
-			{
-				//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [DeAuthorizePlayer] playerID: %s"), ActivePlayers[b].playerID);
-				if (PlayerRecord.ActivePlayers[b].playerID == victimPlayerID) {
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - FOUND MATCHING victim playerID"));
-					victimPlayerIDFound = true;
-					victimPlayerIndex = b;
-					break;
-				}
-			}
-
-			// check to see if this victim is already in the kill list
-
-			bool victimIDFoundInKillList = false;
-
-			for (int32 b = 0; b < PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Num(); b++)
-			{
-				if (PlayerRecord.ActivePlayers[killerPlayerIndex].killed[b] == PlayerRecord.ActivePlayers[victimPlayerIndex].playerKeyId)
-				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Victim already in kill list"));
-					victimIDFoundInKillList = true;
-				}
-			}
-
-			if (victimIDFoundInKillList == false) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Adding victim to kill list"));
-				PlayerRecord.ActivePlayers[killerPlayerIndex].killed.Add(PlayerRecord.ActivePlayers[victimPlayerIndex].playerKeyId);
-			}
-
-			// create an event also
-			FString eventSummary = "killed " + PlayerRecord.ActivePlayers[victimPlayerIndex].playerTitle;
-			RecordEvent(killerPlayerID, eventSummary, "location_searching", "Kill");  // look at https://material.io/icons/ for other icons
-
-			// Increase the killer's kill count
-			PlayerRecord.ActivePlayers[killerPlayerIndex].roundKills = PlayerRecord.ActivePlayers[killerPlayerIndex].roundKills + 1;
-			// And increase the victim's deaths
-			PlayerRecord.ActivePlayers[victimPlayerIndex].roundDeaths = PlayerRecord.ActivePlayers[victimPlayerIndex].roundDeaths + 1;
-
-			// Give the killer some xp and score
-			PlayerRecord.ActivePlayers[killerPlayerIndex].score = PlayerRecord.ActivePlayers[killerPlayerIndex].score + 100;
-			PlayerRecord.ActivePlayers[killerPlayerIndex].experience = PlayerRecord.ActivePlayers[killerPlayerIndex].experience + 10;
-
-			//Change rank
-			CalculateNewRankContinuous(killerPlayerIndex, victimPlayerIndex, true);
-
-			// Optionally, you can also have a CRED cost associated with killing/dying.
-			// Leaving it muted here, since it's not a standard MMO feature.
-
-			// Increase the killer's balance
-			//PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[killerPlayerIndex].currencyCurrent + killRewardBTC;
-
-			// Decrease the victim's balance
-			//PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent = PlayerRecord.ActivePlayers[victimPlayerIndex].currencyCurrent - incrementCurrency;
-
-			// TODO kick the victim if it falls below the minimum?
-
-
-			/*
-			APlayerController* pc = NULL;
-			// Send out a chat message to all players
-			FText chatSender = NSLOCTEXT("UETOPIA", "chatSender", "SYSTEM");
-			FText chatMessageText = NSLOCTEXT("UETOPIA", "chatMessageText", " killed ");  //TODO figure out how to set up this string correctly.
-
-			for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
-			{
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Sending text chat"));
-				pc = Iterator->Get();
-				APlayerState* thisPlayerState = pc->PlayerState;
-				AMyPlayerState* thisMyPlayerState = Cast<AMyPlayerState>(thisPlayerState);
-				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
-
-
-				// old way
-				TSubclassOf<APlayerController> thisPlayerController = pc;
-				AMyPlayerController* thisPlayerController = Cast<AMyPlayerController>(pc);
-				if (thisPlayerController) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Cast Controller success"));
-
-				APlayerState* thisPlayerState = thisPlayerController->PlayerState;
-				AMyPlayerState* thisMyPlayerState = Cast<AMyPlayerState>(thisPlayerState);
-				if (thisMyPlayerState) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Cast State success"));
-				thisMyPlayerState->ReceiveChatMessage(chatSender, chatMessageText);
-				}
-				}
-
-			}
-			*/
-
-
-		}
-
-		// Normally on MMOs, there are no rounds.
-		// If your game has specific rounds, and you don't want to use matchmaker
-		// You can use some logic like this example to detect a round finish, and reset.
-		/*
-		//Check to see if the game is over
-		if (roundKillsTotal >= MinimumKillsBeforeResultsSubmit) {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Ending the Game"));
-		bool gamesubmitted = SubmitMatchResults();
-
-		//Deauthorize everyone
-		for (int32 b = 0; b < ActivePlayers.Num(); b++)
-		{
-		DeAuthorizePlayer(ActivePlayers[b].playerID);
-		}
-
-		// We might need some kind of delay in here because we're going to wipe this data.  plz don't crash
-
-		// Reset the active players
-		ActivePlayers.Empty();
-		// Kick everyone back to login
-		FString UrlString = TEXT("/Game/MyLoginLevel?listen");
-		GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
-		GetWorld()->ServerTravel(UrlString);
-
-		}
-		else {
-		// Check to see if the round is over
-		if (roundKillsTotal >= MinimumPlayerDeathsBeforeRoundReset) {
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordKill] - Ending the Round"));
-		// travel to the third person map
-		FString UrlString = TEXT("/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap?listen");
-		GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
-		GetWorld()->ServerTravel(UrlString);
-		}
-		}
-		*/
-
-
-
-	}
+	
 
 
 	return true;
@@ -5923,15 +5414,15 @@ bool UMyGameInstance::RecordEvent(int32 playerID, FString eventSummary, FString 
 				break;
 			}
 		}
-	}
 
-	if (!eventAlreadyExists)
-	{
-		FUserEvent tempEvent;
-		tempEvent.EventSummary = eventSummary;
-		tempEvent.EventIcon = eventIcon;
-		tempEvent.EventType = eventType;
-		CurrentActivePlayer->events.Add(tempEvent);
+		if (!eventAlreadyExists)
+		{
+			FUserEvent tempEvent;
+			tempEvent.EventSummary = eventSummary;
+			tempEvent.EventIcon = eventIcon;
+			tempEvent.EventType = eventType;
+			CurrentActivePlayer->events.Add(tempEvent);
+		}
 	}
 	return true;
 }
@@ -6000,8 +5491,6 @@ void UMyGameInstance::SpawnServerPortals()
 
 						const FVector spawnlocation = FVector(ServerLinks.links[b].coordLocationX, ServerLinks.links[b].coordLocationY, ServerLinks.links[b].coordLocationZ);
 						const FRotator spawnRotation = FRotator(ServerLinks.links[b].rotationX, ServerLinks.links[b].rotationY, ServerLinks.links[b].rotationZ);
-						//const FVector spawnScale = FVector(1.0f, 1.0f, 1.0f);
-						//FTransform SpawnTransform = FTransform(spawnRotation, spawnlocation, spawnScale);
 
 						// Parallel/Instanced servers have a different class, with probably a different model.
 						// switch based on the instance type
@@ -6046,7 +5535,6 @@ void UMyGameInstance::SpawnServerPortals()
 							}
 						}
 						else {
-							//AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), SpawnTransform);
 							AMyServerPortalActor* const PortalActor = World->SpawnActor<AMyServerPortalActor>(AMyServerPortalActor::StaticClass(), spawnlocation, spawnRotation);
 							PortalActor->setServerKeyId(*ServerLinks.links[b].targetServerKeyId);
 							PortalActor->setServerUrl(*ServerLinks.links[b].hostConnectionLink);
@@ -6070,16 +5558,117 @@ void UMyGameInstance::SpawnServerPortals()
 							ServerPortalActorReference.Add(PortalActor);
 
 						}
-
-
-
 					}
-
 				}
 				// TODO deal with portals that disappear and need deletion
 			}
 		}
 	}
+}
+
+
+bool UMyGameInstance::KickPlayersFromServer()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] KickPlayersFromServer."));
+
+	// Run deactivate and Save Game players
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
+	{
+		DeActivatePlayer(MatchInfo.players[b].playerID);
+		SaveGamePlayer(MatchInfo.players[b].userKeyId, true);
+
+	}
+
+	// Kick everyone back to login
+	// travel all clinets back to login
+	APlayerController* pc = NULL;
+	FString UrlString = TEXT("/Game/LoginLevel");
+
+	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	{
+		pc = Iterator->Get();
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [KickPlayersFromServer] - kicking back to login"));
+		pc->ClientTravel(UrlString, ETravelType::TRAVEL_Absolute);
+	}
+	return true;
+}
+
+
+bool UMyGameInstance::RecordRoundWin(int32 winnerTeamID) {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordRoundWin."));
+
+	// Just record it.  Handle all of the other logic in game mode
+	int32 roundWinnerIndex = 0;
+	int32 roundLoserIndex = 0;
+	for (int32 b = 0; b < TeamList.teams.Num(); b++)
+	{
+		if (TeamList.teams[b].number == winnerTeamID) {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] Found Winning team."));
+
+			roundWinnerIndex = b;
+		}
+		else {
+			roundLoserIndex = b;
+		}
+	}
+	TeamList.teams[roundWinnerIndex].roundWinCount = TeamList.teams[roundWinnerIndex].roundWinCount + 1;
+
+	return true;
+}
+
+bool UMyGameInstance::RecordMatchWin(int32 winnerTeamID) {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] RecordMatchWin."));
+
+	// Just record it.  Handle all of the other logic in game mode
+	int32 roundWinnerIndex = 0;
+	int32 roundLoserIndex = 0;
+	for (int32 b = 0; b < TeamList.teams.Num(); b++)
+	{
+		if (TeamList.teams[b].number == winnerTeamID) {
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] Found Winning team."));
+			roundWinnerIndex = b;
+		}
+		else {
+			roundLoserIndex = b;
+		}
+	}
+	TeamList.teams[roundWinnerIndex].roundWinCount = TeamList.teams[roundWinnerIndex].roundWinCount + 1;
+
+	//  the match is over.
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordMatchWin] - Ending the Game"));
+
+	// calculate new ranks for all of the players
+	CalculateNewTeamRank(roundWinnerIndex, roundLoserIndex);
+
+	//set winner for the winning team
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
+	{
+		if (MatchInfo.players[b].teamId == winnerTeamID) {
+			MatchInfo.players[b].win = true;
+			MatchInfo.players[b].score = MatchInfo.players[b].score + 1;
+			MatchInfo.players[b].experience = MatchInfo.players[b].experience + 1;
+			MatchInfo.players[b].experienceThisLevel = MatchInfo.players[b].experienceThisLevel + 1;
+
+			// DO level up - TODO move this to a function
+			//  level / 3 = exp required to level
+
+			if (MatchInfo.players[b].level / 3.0f < MatchInfo.players[b].experienceThisLevel)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [RecordMatchWin] - Level Up"));
+
+				MatchInfo.players[b].experienceThisLevel = MatchInfo.players[b].experienceThisLevel - (MatchInfo.players[b].level / 3.0f);
+				MatchInfo.players[b].level = MatchInfo.players[b].level + 1;
+			}
+		}
+	}
+
+	bool gamesubmitted = SubmitMatchMakerResults();
+
+	//Deauthorize everyone later.  first show results and loot screen.
+
+	ShowMatchResults();
+	return true;
 }
 
 FMyServerLink UMyGameInstance::GetServerLinkByTargetServerKeyId(FString incomingTargetServerKeyId) {
@@ -6124,9 +5713,7 @@ void UMyGameInstance::AttemptSpawnReward()
 
 							// reduce the server's balance by the reward amount
 							serverCurrency = serverCurrency - SpawnRewardValue;
-
 						}
-
 					}
 				}
 			}
@@ -6141,8 +5728,37 @@ void UMyGameInstance::AttemptStartMatch()
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] AttemptStartMatch - Dedicated server found."));
 		// travel to the third person map
+		// This is just a simple example.  
+
+		// calculate the average rank of the teams
+		int32 team0RankTotal = 0;
+		for (int32 b = 0; b < TeamList.teams[0].players.Num(); b++)
+		{
+			team0RankTotal = team0RankTotal + TeamList.teams[0].players[b].rank;
+		}
+		TeamList.teams[0].averageRank = team0RankTotal / TeamList.teams[0].players.Num();
+
+		int32 team1RankTotal = 0;
+		for (int32 b = 0; b < TeamList.teams[1].players.Num(); b++)
+		{
+			team1RankTotal = team1RankTotal + TeamList.teams[1].players[b].rank;
+		}
+		TeamList.teams[1].averageRank = team1RankTotal / TeamList.teams[1].players.Num();
+
 		MatchStarted = true;
-		FString UrlString = TEXT("/Game/Maps/ThirdPersonExampleMap?listen");
+
+		// Default map in case we don't get a match.
+		FString UrlString = TEXT("/Game/Maps/Arena?listen");
+
+		// You can also switch maps depending on the gameMode
+		if (MatchInfo.gameModeTitle == "1v1")
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [AttemptStartMatch] gameModeTitle = 1v1"));
+
+		}
+
+		// Or do some kind of map randomization
+
 		GetWorld()->GetAuthGameMode()->bUseSeamlessTravel = true;
 		GetWorld()->ServerTravel(UrlString);
 	}
@@ -6206,17 +5822,92 @@ void UMyGameInstance::CalculateNewRankContinuous(int32 WinnerPlayerIndex, int32 
 	PlayerRecord.ActivePlayers[LoserPlayerIndex].rank = newLoserRank;
 }
 
+
+void UMyGameInstance::CalculateNewTeamRank(int32 WinnerTeamIndex, int32 LoserTeamIndex) {
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] "));
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] WinnerTeamIndex %d"), WinnerTeamIndex);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] LoserTeamIndex %d"), LoserTeamIndex);
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] WinnerRank %d"), TeamList.teams[WinnerTeamIndex].averageRank);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] LoserRank %d"), TeamList.teams[LoserTeamIndex].averageRank);
+	// redoing this according to:
+	// https://metinmediamath.wordpress.com/2013/11/27/how-to-calculate-the-elo-rating-including-example/
+	float winnerTransformedRankExp = TeamList.teams[WinnerTeamIndex].averageRank / 400.0f;
+	float winnerTransformedRank = pow(10.0f, winnerTransformedRankExp);
+	float loserTransformedRankExp = TeamList.teams[LoserTeamIndex].averageRank / 400.0f;
+	float loserTransformedRank = pow(10.0f, loserTransformedRankExp);
+
+	float winnerExpected = winnerTransformedRank / (winnerTransformedRank + loserTransformedRank);
+	float loserExpected = loserTransformedRank / (winnerTransformedRank + loserTransformedRank);
+
+	float k = 32.0f;
+
+	int32 newWinnerRank = round(TeamList.teams[WinnerTeamIndex].averageRank + k * (1.0f - winnerExpected));
+	int32 newLoserRank = round(TeamList.teams[LoserTeamIndex].averageRank + k * (0.0f - loserExpected));
+
+
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] newWinnerRank %d"), newWinnerRank);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] NewLoserRank %d"), newLoserRank);
+
+	// Now figure out the differences for each team, and apply it to the individual players.
+
+	int32 winnerRankDifference = newWinnerRank - TeamList.teams[WinnerTeamIndex].averageRank;
+	int32 loserRankDifference = newLoserRank - TeamList.teams[LoserTeamIndex].averageRank;
+
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] winnerRankDifference %d"), winnerRankDifference);
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [CalculateNewRank] loserRankDifference %d"), loserRankDifference);
+
+	for (int32 b = 0; b < TeamList.teams[WinnerTeamIndex].players.Num(); b++)
+	{
+		TeamList.teams[WinnerTeamIndex].players[b].rank = TeamList.teams[WinnerTeamIndex].players[b].rank + winnerRankDifference;
+		FMyActivePlayer* thisMatchPlayer = getPlayerByPlayerKey(TeamList.teams[WinnerTeamIndex].players[b].userKeyId);
+		thisMatchPlayer->rank = thisMatchPlayer->rank + winnerRankDifference;
+	}
+
+	for (int32 b = 0; b < TeamList.teams[LoserTeamIndex].players.Num(); b++)
+	{
+		TeamList.teams[LoserTeamIndex].players[b].rank = TeamList.teams[LoserTeamIndex].players[b].rank + loserRankDifference;
+		FMyActivePlayer* thisMatchPlayer = getPlayerByPlayerKey(TeamList.teams[LoserTeamIndex].players[b].userKeyId);
+		thisMatchPlayer->rank = thisMatchPlayer->rank + loserRankDifference;
+	}
+
+}
+
+
+bool UMyGameInstance::ShowMatchResults()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ShowMatchResults] "));
+	for (int32 b = 0; b < MatchInfo.players.Num(); b++)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] [ShowMatchResults] telling player to change state"));
+
+		if (MatchInfo.players[b].bIsConnected)
+		{
+			if (MatchInfo.players[b].PlayerController->PlayerState)
+			{
+				AMyPlayerState* thisMyPlayerState = Cast<AMyPlayerState>(MatchInfo.players[b].PlayerController->PlayerState);
+				if (thisMyPlayerState)
+				{
+					// Tell the client to trigger the delegate.
+					thisMyPlayerState->TriggerShowMatchResults();
+				}
+			}
+
+			// Tell HUD to change UI state
+			MatchInfo.players[b].PlayerController->ClientChangeUIState(EConnectUIState::MatchResults);
+		}
+	}
+	return true;
+}
+
 bool UMyGameInstance::NotifyDownReady()
 {
 
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [UMyGameInstance] NotifyDownReady"));
 
-	// return custom server configuration variables.
-	// Like, How many items are allowed on the ground.
-	// For a private or group instance (my vault, guild hall) This should be something that can be upgraded
-	// Either through crafting or microtransactions.  In either case, the server itself needs to be able to update this value so it can be read back in
-
-
+	
 	//////////////////////////////////////////////////////////////
 	// Convert server configuration to JSON
 
@@ -6231,7 +5922,6 @@ bool UMyGameInstance::NotifyDownReady()
 
 	FString nonceString = "10951350917635";
 	FString encryption = "off";  // Allowing unencrypted on sandbox for now.
-	//FString OutputString = "nonce=" + nonceString + "&encryption=" + encryption;
 
 	TSharedPtr<FJsonObject> ServerJsonObj = MakeShareable(new FJsonObject);
 
@@ -6239,7 +5929,6 @@ bool UMyGameInstance::NotifyDownReady()
 		//UE_LOG(LogTemp, Log, TEXT("ServerSessionHostAddress: %s"), *ServerSessionHostAddress);
 		//UE_LOG(LogTemp, Log, TEXT("ServerSessionID: %s"), *ServerSessionID);
 		ServerJsonObj->SetStringField("session_host_address", ServerSessionHostAddress);
-		//OutputString = OutputString + "&session_host_address=" + ServerSessionHostAddress + "&session_id=" + ServerSessionID;
 	}
 
 	ServerJsonObj->SetStringField("nonce", "nonceString");
@@ -6251,7 +5940,6 @@ bool UMyGameInstance::NotifyDownReady()
 	FJsonSerializer::Serialize(ServerJsonObj.ToSharedRef(), FinalWriter);
 
 	FString APIURI = "/api/v1/server/down_ready";
-	//bool requestSuccess = PerformHttpRequest(&UMyGameInstance::NotifyDownReadyComplete, APIURI, OutputString, "");  // NO AccessToken
 	bool requestSuccess = PerformJsonHttpRequest(&UMyGameInstance::NotifyDownReadyComplete, APIURI, JsonOutputString, ""); // NO AccessToken
 
 	return requestSuccess;
@@ -6282,7 +5970,6 @@ void UMyGameInstance::NotifyDownReadyComplete(FHttpRequestPtr HttpRequest, FHttp
 			{
 				UE_LOG(LogTemp, Log, TEXT("Authorization True"));
 				// we don't care about the results
-
 			}
 		}
 	}

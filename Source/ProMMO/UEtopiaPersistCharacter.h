@@ -48,6 +48,9 @@ class PROMMO_API AUEtopiaPersistCharacter : public ACharacter, public IAbilitySy
 
 	virtual void PossessedBy(AController* NewController) override;
 
+	// via Zlo on discord
+	virtual void OnRep_PlayerState() override;
+
 	UFUNCTION(Client, Reliable)
 	void InitAbilitySystemClient();
 
@@ -59,18 +62,16 @@ class PROMMO_API AUEtopiaPersistCharacter : public ACharacter, public IAbilitySy
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
 
-	/** Our ability system */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Abilities, meta = (AllowPrivateAccess = "true"))
-		class UAbilitySystemComponent* AbilitySystem;
+	// get this from player state
+	UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 
-	UAbilitySystemComponent* GetAbilitySystemComponent() const override
-	{
-		return AbilitySystem;
-	};
+	// This is just a way to assign an ability without the full auth flow involved.  Unmute if you need it.
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Abilities)
+	//	TSubclassOf<class UGameplayAbility> Ability;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Abilities)
-		TSubclassOf<class UGameplayAbility> Ability;
+	/** Called when the Pawn is being restarted (usually by being possessed by a Controller). */
+	void Restart() override;
 
 	/** player pressed start fire action */
 	void OnStartFire();
@@ -102,9 +103,6 @@ class PROMMO_API AUEtopiaPersistCharacter : public ACharacter, public IAbilitySy
 	/** player pressed buy action */
 	bool bMouseShowing;
 	void OnToggleMouse();
-
-	// TODO - OnShardTransfer
-
 
 	/** spawnable blueprint object reference */
 	TSubclassOf<AMySpawnableObject> BlueprintVar; // the base class that the blueprint uses
@@ -156,14 +154,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UETOPIA")
 		float GetCooldownTimeRemaining(FGameplayAbilitySpecHandle CallingAbilityHandle, float& TotalDuration);
 
-	// Current health of the Pawn
-	// TODO Deprecate - this is an attribute now!
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "UETOPIA")
-		float Health;
-
-	UPROPERTY()
-		UMyAttributeSet*	AttributeSet;
-
 	//UFUNCTION(Server, Reliable, WithValidation)
 	void Die(AController* Killer, AActor* DamageCauser, const FGameplayEffectSpec& KillingEffectSpec, float KillingDamageMagnitude, FVector KillingDamageNormal);
 
@@ -210,7 +200,7 @@ protected:
 
 protected:
 	// APawn interface
-	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
+	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponentIn) override;
 	// End of APawn interface
 
 public:
@@ -229,12 +219,5 @@ public:
 
 	class AMyServerPortalActor* GetPortalFocus();
 	class AMyBaseVendor* GetVendorFocus();
-
-	// THis function is used to tell the client to load a particular UI state
-	UFUNCTION(Client, Reliable)
-		void ClientChangeUIState(EConnectUIState NewState);
-	// It calls the BP Native event, on the client, which is tied in to the UI via blueprints.
-	UFUNCTION(BlueprintNativeEvent)
-		void OnUIStateChange(EConnectUIState UIState);
 
 };

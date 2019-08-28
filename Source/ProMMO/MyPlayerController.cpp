@@ -6,18 +6,11 @@
 #include "MyBaseGameplayAbility.h"
 #include "OnlineSubsystemUtils.h"
 #include "ILoginFlowModule.h"
-//#include "OnlinePartyUEtopia.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/ScrollBox.h"
 #include "UEtopiaPersistCharacter.h"
 #include "Net/UnrealNetwork.h"
-#include "Runtime/ImageWrapper/Public/IImageWrapper.h"
-#include "Runtime/ImageWrapper/Public/IImageWrapperModule.h"
-#include "DDSLoader.h"
-#include "DynamicTextureStaticMeshActor.h"
 #include "MyTravelApprovedActor.h"
 #include "MyPlayerState.h"
-
 
 typedef TSharedPtr<FJsonValue> JsonValPtr;
 typedef TArray<JsonValPtr> JsonValPtrArray;
@@ -91,28 +84,20 @@ AMyPlayerController::AMyPlayerController()
 	OnReadFriendsListCompleteDelegate = FOnReadFriendsListComplete::CreateUObject(this, &AMyPlayerController::OnReadFriendsComplete);
 	OnCreatePartyCompleteDelegate = FOnCreatePartyComplete::CreateUObject(this, &AMyPlayerController::OnCreatePartyComplete);
 
-	// Get the notification handler so we can tie alert notifications in.
-	const auto NotificationHandler = OnlineSub->GetOnlineNotificationHandler();
-	//check(NotificationHandler.IsValid());
-
-
-
-	// Why is this not working?
-	//NotificationHandler->AddPlayerNotificationBinding_Handle()
-
-	//OnlineSub->GetOnlineNotificationTransportManager()->
-
 	// Start a player as captain so they can join matchmaker queue without being in a party first
 	IAmCaptain = true;
-
-	// set inventory to zero - this gets set on GetGamePlayerRequestComplete inside game instance.
-	InventorySlots.SetNum(0);
-
 
 	GConfig->GetString(
 		TEXT("UEtopia.Client"),
 		TEXT("APIURL"),
 		APIURL,
+		GGameIni
+	);
+
+	GConfig->GetBool(
+		TEXT("UEtopia.Client"),
+		TEXT("CharactersEnabled"),
+		UEtopiaCharactersEnabled,
 		GGameIni
 	);
 
@@ -123,6 +108,7 @@ AMyPlayerController::AMyPlayerController()
 
 	PlayerDataLoaded = false;
 
+	CurrentUIState = EConnectUIState::Loading;
 }
 
 void AMyPlayerController::BeginPlay()
@@ -170,40 +156,50 @@ void AMyPlayerController::BeginPlay()
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] BeginPlay on Regular Level"));
 
-			const auto OnlineSub = IOnlineSubsystem::Get();
-			if (OnlineSub)
-			{
+			//Hide the Cursor.
+			// TODO - you probably want to do something more fancy to allow users access to the mouse in-game.
+			bShowMouseCursor = false;
+
+
+		}
+		// IN both cases we want to refresh our UI data
+		const auto OnlineSub = IOnlineSubsystem::Get();
+		if (OnlineSub)
+		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Got Online Sub"));
+			const auto IdentityInterface = OnlineSub->GetIdentityInterface();
+			if (IdentityInterface.IsValid())
+			{
 
-			TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
-			AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
+				TSharedPtr <const FUniqueNetId> pid = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(0);
+				AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
 
-			// Attempting to set this up to not crash in PIE, and also still work in standalone
+				// Attempting to set this up to not crash in PIE, and also still work in standalone
 				if (GetWorld()->WorldType == EWorldType::PIE)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] Detected PIE - Skipping friends and recent player loading"));
 
-					playerChar->ClientChangeUIState(EConnectUIState::Play);
+					ClientChangeUIState(EConnectUIState::Play);
 				}
 				else
 				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] NOT PIE - Loading friends and recent players"));
-					OnlineSub->GetFriendsInterface()->ReadFriendsList(0,"default");
-					OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
+					// Creating a local player where we can get the UserID from
+					ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
+					TSharedPtr<const FUniqueNetId> UserId = OnlineSub->GetIdentityInterface()->GetUniquePlayerId(LocalPlayer->GetControllerId());
+					if (UserId.IsValid())
+					{
+						const auto LoginStatus = IdentityInterface->GetLoginStatus(*UserId);
+						if (LoginStatus == ELoginStatus::LoggedIn)
+						{
+							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] NOT PIE - Loading friends and recent players"));
+							OnlineSub->GetFriendsInterface()->ReadFriendsList(0, "default");
+							OnlineSub->GetFriendsInterface()->QueryRecentPlayers(*pid, "default");
+						}
+					}
 				}
-
-
 			}
-
-
-
-
 		}
 	}
-
-
-
-
 }
 
 
@@ -223,7 +219,21 @@ void AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Implementation(cons
 		CurrentAccessTokenFromOSS = CurrentAccessTokenFromOSSIn;
 
 		UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
-		TheGameInstance->ActivatePlayer(this, playerKeyId, playerIDTemp, UniqueId);
+		// Check to see if they have already been activated.  If not, activate.
+		FMyActivePlayer* activePlayer = TheGameInstance->getPlayerByPlayerKey(playerKeyId);
+		if (activePlayer && activePlayer->gamePlayerDataLoaded)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Implementation found gamePlayerDataLoaded player - running reconnect"));
+
+			//  reconnect player
+			TheGameInstance->ReconnectPlayer(this, playerKeyId, playerIDTemp, UniqueId);
+
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerSetCurrentAccessTokenFromOSS_Implementation new player - activating"));
+			TheGameInstance->ActivatePlayer(this, playerKeyId, playerIDTemp, UniqueId);
+		}
 	}
 	return;
 }
@@ -256,24 +266,17 @@ void AMyPlayerController::ClientGetCurrentAccessTokenFromOSS_Implementation()
 void AMyPlayerController::TravelPlayer(const FString& ServerUrl)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] TransferPlayer - Client Side"));
-
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] TransferPlayer ServerUrl: %s"), *ServerUrl);
-
 	// Just testing to see if the client can just handle it without the server being involved
 	// This does need a serverside check to prevent cheating, but for now this is fine.
-
 	ClientTravel(ServerUrl, ETravelType::TRAVEL_Absolute);
-
 }
 
 void AMyPlayerController::ExecuteClientTravel_Implementation(const FString& ServerUrl)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ExecuteClientTravel_Implementation - Client Side"));
-
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ExecuteClientTravel_Implementation ServerUrl: %s"), *ServerUrl);
-
 	ClientTravel(ServerUrl, ETravelType::TRAVEL_Absolute);
-
 }
 
 void AMyPlayerController::ClientTravelApprovedSpawnActor_Implementation(FTransform SpawnTransform)
@@ -289,12 +292,8 @@ void AMyPlayerController::ClientTravelApprovedSpawnActor_Implementation(FTransfo
 void AMyPlayerController::RequestBeginPlay_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] RequestBeginPlay"));
-
 	// We just want to accept the request here from the player and have the game instance do the transfer.
-
-	UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
-	//TheGameInstance->RequestBeginPlay();
-
+	// TODO implement this however you want
 }
 bool AMyPlayerController::RequestBeginPlay_Validate()
 {
@@ -320,10 +319,6 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 
 			// Clear old entries
 			MyCachedFriends.Empty();
-			//InvitesToAccept.Empty();
-			//FriendsToDelete.Empty();
-
-			//GetPrimaryPlayerController()->PlayerState->
 
 			// Log each friend's data out
 			for (int32 Index = 0; Index < Friends.Num(); Index++)
@@ -347,14 +342,6 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 				ThisFriend.bIsPlayingThisGame = Presence.bIsPlayingThisGame;
 
 				MyCachedFriends.Add(ThisFriend);
-
-				// keep track of pending invites from the list and accept them
-				if (Friend.GetInviteStatus() == EInviteStatus::PendingInbound)
-				{
-					//InvitesToAccept.AddUnique(Friend.GetUserId());
-				}
-				// keep track of list of friends to delete
-				//FriendsToDelete.AddUnique(Friend.GetUserId());
 			}
 		}
 		else
@@ -363,11 +350,6 @@ void AMyPlayerController::OnReadFriendsComplete(int32 LocalPlayer, bool bWasSucc
 				TEXT("GetFriendsList(%d) failed"), LocalPlayer);
 		}
 	}
-	// this is causing duplicates
-	//OnFriendsChanged.Broadcast();
-
-	// Can't have this in here.
-	//OnFriendsChange();
 }
 
 void AMyPlayerController::OnFriendsChange() {
@@ -395,16 +377,11 @@ void AMyPlayerController::OnReadRecentPlayersComplete(const FUniqueNetId& UserId
 			for (int32 Index = 0; Index < RecentPlayers.Num(); Index++)
 			{
 				const FOnlineRecentPlayer& RecentPlayer = *RecentPlayers[Index];
-
 				//UE_LOG(LogOnline, Log, TEXT("\t%s has unique id (%s)"), *RecentPlayer.GetDisplayName(), *RecentPlayer.GetUserId()->ToString());
-
-
 				FMyRecentPlayer ThisRecentPlayer;
 				ThisRecentPlayer.playerTitle = RecentPlayer.GetDisplayName();
 				ThisRecentPlayer.playerKeyId = RecentPlayer.GetUserId()->ToString();
-
 				MyCachedRecentPlayers.MyRecentPlayers.Add(ThisRecentPlayer);
-
 			}
 		}
 		else
@@ -412,15 +389,13 @@ void AMyPlayerController::OnReadRecentPlayersComplete(const FUniqueNetId& UserId
 			//UE_LOG(LogOnline, Log,TEXT("GetRecentPlayers failed"));
 		}
 	}
-
-	// TODO delegates
 	OnRecentPlayersChange();
 }
 
 
 void AMyPlayerController::OnRecentPlayersChange() {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerControllere::OnRecentPlayersChange"));
-OnRecentPlayersChanged.Broadcast();
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerControllere::OnRecentPlayersChange"));
+	OnRecentPlayersChanged.Broadcast();
 }
 
 
@@ -441,7 +416,6 @@ void AMyPlayerController::InviteUserToFriends(const FString& UserKeyId)
 
 	// Tell the OSS to send the invite
 	OnlineSub->GetFriendsInterface()->SendInvite(0, *UserToInviteId, "default");
-
 }
 
 void AMyPlayerController::OnFriendInviteReceivedComplete(const FUniqueNetId& LocalUserId, const FUniqueNetId& SenderId)
@@ -566,8 +540,6 @@ void AMyPlayerController::InviteUserToParty(const FString& PartyKeyId, const FSt
 
 	// Fabricate a new FUniqueNetId by the userKeyId
 	const TSharedPtr<const FUniqueNetId> UserToInviteId = OnlineSub->GetIdentityInterface()->CreateUniquePlayerId(UserKeyId);
-
-	/* */
 	UE_LOG_ONLINE(Log, TEXT("PartyKeyId: %s"), *PartyKeyId);
 	FOnlinePartyIdUEtopiaDup PartyId = FOnlinePartyIdUEtopiaDup(PartyKeyId);
 
@@ -582,23 +554,16 @@ void AMyPlayerController::InviteUserToParty(const FString& PartyKeyId, const FSt
 	PartyData.SetAttribute("key_id", PartyKeyId);
 
 	// Tell the OSS to send the invite
-	// this changed in 4.20
-	//OnlineSub->GetPartyInterface()->SendInvitation(*UserId, PartyId, PartyInviteRecipient, PartyData, OnSendPartyInvitationComplete);
 	OnlineSub->GetPartyInterface()->SendInvitation(*UserId, PartyId, PartyInviteRecipient, OnSendPartyInvitationComplete);
-
 }
 
 void AMyPlayerController::OnPartyInviteReceivedComplete(const FUniqueNetId& LocalUserId, const FOnlinePartyId& PartyId, const FUniqueNetId& SenderId)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnPartyInviteReceivedComplete"));
-	// It would be nice to be able to display a UI widget here.
-	// we have to get the array from the OSS party interface
+	// get the array from the OSS party interface
 
 	const auto OnlineSub = IOnlineSubsystem::Get();
 	OnlineSub->GetPartyInterface()->GetPendingInvites(LocalUserId, PendingInvitesArray);
-
-	// Now we need to do something with it.
-	// Just going to stick it in a Struct
 
 	MyCachedPartyInvitations.Empty();
 
@@ -608,26 +573,6 @@ void AMyPlayerController::OnPartyInviteReceivedComplete(const FUniqueNetId& Loca
 		IOnlinePartyJoinInfo& PartyInfo = *PendingInvitesArray[Index];
 
 		FMyPartyInvitation ThisPartyInvitation;
-		//FOnlinePartyData ThisPartyData;
-		// This was removed in 4.20
-		//ThisPartyData = PartyInfo.GetClientData();
-
-		//FVariantData partyKeyId;
-		//FVariantData partyTitle ;
-		//FVariantData senderUserKeyId;
-		//FVariantData senderUserTitle;
-		//FVariantData recipientUserKeyId;
-
-
-		//ThisPartyData.GetAttribute("partyTitle", partyTitle);
-		//ThisPartyData.GetAttribute("senderUserKeyId", senderUserKeyId);
-		//ThisPartyData.GetAttribute("senderUserTitle", senderUserTitle);
-		//ThisPartyData.GetAttribute("partyKeyId", partyKeyId);
-
-		//partyTitle.GetValue(ThisPartyInvitation.partyTitle);
-		//senderUserKeyId.GetValue(ThisPartyInvitation.senderUserKeyId);
-		//senderUserTitle.GetValue(ThisPartyInvitation.senderUserTitle);
-		//partyKeyId.GetValue(ThisPartyInvitation.partyKeyId);
 
 		ThisPartyInvitation.partyKeyId = PartyId.ToString();
 		// Is there some other way to get the party title now?
@@ -671,7 +616,6 @@ void AMyPlayerController::OnPartyInviteResponseReceivedComplete(const FUniqueNet
 	{
 		responseString = "Accepted";
 	}
-
 
 	OnPartyInviteResponseReceivedDisplayUI.Broadcast(senderTitle, responseString);
 }
@@ -730,11 +674,6 @@ void AMyPlayerController::OnPartyDataReceivedComplete(const FUniqueNetId& LocalU
 		IAmCaptain = true;
 	}
 
-	// Set the teamTitle in the playerState
-	//AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
-	//myPlayerState->teamTitle = partyTitle.ToString();
-
-
 	// Cache the Party data in our local struct, so we can get it easily in BP
 	// Clear it first
 	MyCachedPartyMembers.Empty();
@@ -751,25 +690,16 @@ void AMyPlayerController::OnPartyDataReceivedComplete(const FUniqueNetId& LocalU
 		FVariantData userTitle;
 		FVariantData userKeyId;
 		FVariantData captain;
-
-
-
 		FMyFriend ThisPartyMember;
 
 		PartyData->GetAttribute(AttributePrefix + "title", userTitle);
 		PartyData->GetAttribute(AttributePrefix + "key_id", userKeyId);
 		PartyData->GetAttribute(AttributePrefix + "captain", captain);
 
-
 		ThisPartyMember.playerTitle = userTitle.ToString();
 		ThisPartyMember.playerKeyId = userKeyId.ToString();
 
 		UE_LOG_ONLINE(Log, TEXT("captain.ToString(): %s"), *captain.ToString());
-
-
-
-		// TODO add captain to partymember
-		//ThisPartyMember.
 
 		MyCachedPartyMembers.Add(ThisPartyMember);
 	}
@@ -781,7 +711,6 @@ void AMyPlayerController::OnPartyDataReceivedComplete(const FUniqueNetId& LocalU
 		IAmCaptain = true;
 	}
 
-	// delegate
 	OnPartyDataReceivedUETopiaDisplayUI.Broadcast();
 }
 
@@ -863,8 +792,16 @@ void AMyPlayerController::SendChatMessage(int32 CurrentChannelIndex, FString Cha
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SendChatMessage"));
 	const auto OnlineSub = IOnlineSubsystem::Get();
 
-	// Get the ChatChannel by index
-	//MyCachedChatChannels.MyChatChannels[CurrentChannelIndex].chatChannelKeyId;
+	// prevent crashing on invalid channel index
+	if (!MyCachedChatChannels.MyChatChannels.IsValidIndex(CurrentChannelIndex))
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SendChatMessage Invalid chat channel index"));
+
+		FString Message = "Invalid chat channel.";
+		SendLocalChatMessage(Message);
+
+		return;
+	}
 
 	// Creating a local player where we can get the UserID from
 	ULocalPlayer* LocalPlayer = Cast<ULocalPlayer>(Player);
@@ -1135,14 +1072,16 @@ void AMyPlayerController::HandleUserLoginComplete(int32 LocalUserNum, bool bWasS
 bool AMyPlayerController::IsSlotEmpty(const int32 Index)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::IsSlotEmpty"));
-	return(InventorySlots[Index].quantity == 0);
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+	return(myPlayerState->InventorySlots[Index].quantity == 0);
 }
 
 int32 AMyPlayerController::SearchEmptySlot()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchEmptySlot"));
-	for (int i = 0; i < InventorySlots.Num(); i++) {
-		if (InventorySlots[i].quantity == 0)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+	for (int i = 0; i < myPlayerState->InventorySlots.Num(); i++) {
+		if (myPlayerState->InventorySlots[i].quantity == 0)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchEmptySlot Found empty slot"));
 			return i;
@@ -1151,24 +1090,25 @@ int32 AMyPlayerController::SearchEmptySlot()
 	return -1;
 }
 
-int32 AMyPlayerController::SearchSlotWithAvailableSpace( AMyBasePickup* ClassTypeIn)
+int32 AMyPlayerController::SearchSlotWithAvailableSpace(AMyBasePickup* ClassTypeIn)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchSlotWithAvailableSpace"));
-	for (int i = 0; i < InventorySlots.Num(); i++) {
-		if (InventorySlots[i].quantity != 0)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+	for (int i = 0; i < myPlayerState->InventorySlots.Num(); i++) {
+		if (myPlayerState->InventorySlots[i].quantity != 0)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchSlotWithAvailableSpace quantity != 0"));
-			UE_LOG(LogTemp, Log, TEXT("InventorySlots[i].itemClassPath: %s"), *InventorySlots[i].itemClassPath);
+			//UE_LOG(LogTemp, Log, TEXT("InventorySlots[i].itemClassPath: %s"), *myPlayerState->InventorySlots[i].itemClassPath);
 			FString ClassClassPath = GetClassPath(ClassTypeIn->GetClass());
 			UE_LOG(LogTemp, Log, TEXT("ClassTypeIn->GetClass(): %s"), *ClassClassPath);
-			if (InventorySlots[i].itemClassPath == ClassClassPath)
+			if (myPlayerState->InventorySlots[i].itemClassPath == ClassClassPath)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchSlotWithAvailableSpace itemClass == ClassTypeIn"));
 				// Also check to see if the Attributes match.  There could be same classes, with different attributes.
-				if (InventorySlots[i].Attributes == ClassTypeIn->Attributes)
+				if (myPlayerState->InventorySlots[i].Attributes == ClassTypeIn->Attributes)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchSlotWithAvailableSpace InventorySlots[i].Attributes == ClassTypeIn->Attributes"));
-					if (InventorySlots[i].quantity < ClassTypeIn->MaxStackSize)
+					if (myPlayerState->InventorySlots[i].quantity < ClassTypeIn->MaxStackSize)
 					{
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SearchSlotWithAvailableSpace found slot with space"));
 						return i;
@@ -1185,6 +1125,7 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 	// This should only ever be called from the server.
 	// TODO - add dedicated server check
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem"));
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
 
 	if (IsValid(ClassTypeIn))
 	{
@@ -1196,14 +1137,14 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 			if (availableStackableSlot >= 0)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem found availableStackableSlot"));
-				if (quantity + InventorySlots[availableStackableSlot].quantity > ClassTypeIn->MaxStackSize)
+				if (quantity + myPlayerState->InventorySlots[availableStackableSlot].quantity > ClassTypeIn->MaxStackSize)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem quantity will NOT fit inside availableStackableSlot"));
-					int32 amountFilled = ClassTypeIn->MaxStackSize - InventorySlots[availableStackableSlot].quantity;
+					int32 amountFilled = ClassTypeIn->MaxStackSize - myPlayerState->InventorySlots[availableStackableSlot].quantity;
 					if (!checkOnly)
 					{
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem checkOnly is false - ADDING"));
-						InventorySlots[availableStackableSlot].quantity = ClassTypeIn->MaxStackSize;
+						myPlayerState->InventorySlots[availableStackableSlot].quantity = ClassTypeIn->MaxStackSize;
 					}
 					return AddItem(ClassTypeIn, quantity - amountFilled, checkOnly);
 				}
@@ -1213,11 +1154,7 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 					if (!checkOnly)
 					{
 						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem checkOnly is false - ADDING"));
-						InventorySlots[availableStackableSlot].quantity = InventorySlots[availableStackableSlot].quantity + quantity;
-
-						// Trigger the inventory changed delegate
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem DoRep_InventoryChanged"));
-						//DoRep_InventoryChanged = !DoRep_InventoryChanged;
+						myPlayerState->InventorySlots[availableStackableSlot].quantity = myPlayerState->InventorySlots[availableStackableSlot].quantity + quantity;
 					}
 					return true;
 				}
@@ -1235,17 +1172,17 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 						{
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem checkOnly is false - ADDING"));
 							//InventorySlots[availableEmptySlot].itemClass = ClassTypeIn;
-							InventorySlots[availableEmptySlot].itemTitle = ClassTypeIn->Title.ToString();
-							InventorySlots[availableEmptySlot].itemDescription = ClassTypeIn->Description.ToString();
-							InventorySlots[availableEmptySlot].itemClassTitle = ClassTypeIn->GetName();
-							InventorySlots[availableEmptySlot].itemClassPath = GetClassPath(ClassTypeIn->GetClass());
-							InventorySlots[availableEmptySlot].quantity = 1;
-							InventorySlots[availableEmptySlot].Icon = ClassTypeIn->Icon;
-							InventorySlots[availableEmptySlot].UseText = ClassTypeIn->UseText;
-							InventorySlots[availableEmptySlot].bCanBeUsed = ClassTypeIn->bCanBeUsed;
-							InventorySlots[availableEmptySlot].bCanBeStacked = ClassTypeIn->bCanBeStacked;
-							InventorySlots[availableEmptySlot].MaxStackSize = ClassTypeIn->MaxStackSize;
-							InventorySlots[availableEmptySlot].Attributes = ClassTypeIn->Attributes;
+							myPlayerState->InventorySlots[availableEmptySlot].itemTitle = ClassTypeIn->Title.ToString();
+							myPlayerState->InventorySlots[availableEmptySlot].itemDescription = ClassTypeIn->Description.ToString();
+							myPlayerState->InventorySlots[availableEmptySlot].itemClassTitle = ClassTypeIn->GetName();
+							myPlayerState->InventorySlots[availableEmptySlot].itemClassPath = GetClassPath(ClassTypeIn->GetClass());
+							myPlayerState->InventorySlots[availableEmptySlot].quantity = 1;
+							myPlayerState->InventorySlots[availableEmptySlot].Icon = ClassTypeIn->Icon;
+							myPlayerState->InventorySlots[availableEmptySlot].UseText = ClassTypeIn->UseText;
+							myPlayerState->InventorySlots[availableEmptySlot].bCanBeUsed = ClassTypeIn->bCanBeUsed;
+							myPlayerState->InventorySlots[availableEmptySlot].bCanBeStacked = ClassTypeIn->bCanBeStacked;
+							myPlayerState->InventorySlots[availableEmptySlot].MaxStackSize = ClassTypeIn->MaxStackSize;
+							myPlayerState->InventorySlots[availableEmptySlot].Attributes = ClassTypeIn->Attributes;
 
 							// TODO all the other vars
 						}
@@ -1258,23 +1195,20 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 						{
 							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem checkOnly is false - ADDING"));
 							//InventorySlots[availableEmptySlot].itemClass = ClassTypeIn->StaticClass;
-							InventorySlots[availableEmptySlot].itemTitle = ClassTypeIn->Title.ToString();
-							InventorySlots[availableEmptySlot].itemDescription = ClassTypeIn->Description.ToString();
-							InventorySlots[availableEmptySlot].itemClassTitle = ClassTypeIn->GetName();
-							InventorySlots[availableEmptySlot].itemClassPath = GetClassPath(ClassTypeIn->GetClass());
-							InventorySlots[availableEmptySlot].quantity = quantity;
-							InventorySlots[availableEmptySlot].Icon = ClassTypeIn->Icon;
-							InventorySlots[availableEmptySlot].UseText = ClassTypeIn->UseText;
-							InventorySlots[availableEmptySlot].bCanBeUsed = ClassTypeIn->bCanBeUsed;
-							InventorySlots[availableEmptySlot].bCanBeStacked = ClassTypeIn->bCanBeStacked;
-							InventorySlots[availableEmptySlot].MaxStackSize = ClassTypeIn->MaxStackSize;
-							InventorySlots[availableEmptySlot].Attributes = ClassTypeIn->Attributes;
+							myPlayerState->InventorySlots[availableEmptySlot].itemTitle = ClassTypeIn->Title.ToString();
+							myPlayerState->InventorySlots[availableEmptySlot].itemDescription = ClassTypeIn->Description.ToString();
+							myPlayerState->InventorySlots[availableEmptySlot].itemClassTitle = ClassTypeIn->GetName();
+							myPlayerState->InventorySlots[availableEmptySlot].itemClassPath = GetClassPath(ClassTypeIn->GetClass());
+							myPlayerState->InventorySlots[availableEmptySlot].quantity = quantity;
+							myPlayerState->InventorySlots[availableEmptySlot].Icon = ClassTypeIn->Icon;
+							myPlayerState->InventorySlots[availableEmptySlot].UseText = ClassTypeIn->UseText;
+							myPlayerState->InventorySlots[availableEmptySlot].bCanBeUsed = ClassTypeIn->bCanBeUsed;
+							myPlayerState->InventorySlots[availableEmptySlot].bCanBeStacked = ClassTypeIn->bCanBeStacked;
+							myPlayerState->InventorySlots[availableEmptySlot].MaxStackSize = ClassTypeIn->MaxStackSize;
+							myPlayerState->InventorySlots[availableEmptySlot].Attributes = ClassTypeIn->Attributes;
 
 							// TODO all the other vars
 
-							// Trigger the inventory changed delegate
-							UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem DoRep_InventoryChanged"));
-							//DoRep_InventoryChanged = !DoRep_InventoryChanged;
 						}
 						return true;
 					}
@@ -1292,37 +1226,28 @@ bool AMyPlayerController::AddItem( AMyBasePickup* ClassTypeIn, int32 quantity, b
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem checkOnly is false - ADDING"));
 
 					//InventorySlots[availableEmptySlot].itemClass = ClassTypeIn->StaticClass;
-					InventorySlots[availableEmptySlot].itemTitle = ClassTypeIn->Title.ToString();
-					InventorySlots[availableEmptySlot].itemDescription = ClassTypeIn->Description.ToString();
-					InventorySlots[availableEmptySlot].itemClassTitle = ClassTypeIn->GetName();
-					InventorySlots[availableEmptySlot].itemClassPath = GetClassPath(ClassTypeIn->GetClass());
-					InventorySlots[availableEmptySlot].quantity = 1;
-					InventorySlots[availableEmptySlot].Icon = ClassTypeIn->Icon;
-					InventorySlots[availableEmptySlot].UseText = ClassTypeIn->UseText;
-					InventorySlots[availableEmptySlot].bCanBeUsed = ClassTypeIn->bCanBeUsed;
-					InventorySlots[availableEmptySlot].bCanBeStacked = ClassTypeIn->bCanBeStacked;
-					InventorySlots[availableEmptySlot].MaxStackSize = ClassTypeIn->MaxStackSize;
-					InventorySlots[availableEmptySlot].Attributes = ClassTypeIn->Attributes;
+					myPlayerState->InventorySlots[availableEmptySlot].itemTitle = ClassTypeIn->Title.ToString();
+					myPlayerState->InventorySlots[availableEmptySlot].itemDescription = ClassTypeIn->Description.ToString();
+					myPlayerState->InventorySlots[availableEmptySlot].itemClassTitle = ClassTypeIn->GetName();
+					myPlayerState->InventorySlots[availableEmptySlot].itemClassPath = GetClassPath(ClassTypeIn->GetClass());
+					myPlayerState->InventorySlots[availableEmptySlot].quantity = 1;
+					myPlayerState->InventorySlots[availableEmptySlot].Icon = ClassTypeIn->Icon;
+					myPlayerState->InventorySlots[availableEmptySlot].UseText = ClassTypeIn->UseText;
+					myPlayerState->InventorySlots[availableEmptySlot].bCanBeUsed = ClassTypeIn->bCanBeUsed;
+					myPlayerState->InventorySlots[availableEmptySlot].bCanBeStacked = ClassTypeIn->bCanBeStacked;
+					myPlayerState->InventorySlots[availableEmptySlot].MaxStackSize = ClassTypeIn->MaxStackSize;
+					myPlayerState->InventorySlots[availableEmptySlot].Attributes = ClassTypeIn->Attributes;
 				}
 				if (quantity > 1)
 				{
-
 					return AddItem(ClassTypeIn, quantity - 1, checkOnly);
 				}
 				else {
-					if (!checkOnly)
-					{
-						// Trigger the inventory changed delegate
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::AddItem DoRep_InventoryChanged"));
-						//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-					}
 					return true;
 				}
 			}
 		}
 	}
-
-
 	return false;
 }
 
@@ -1343,20 +1268,19 @@ bool AMyPlayerController::ServerAttemptRemoveItemAtIndex_Validate(int32 index, i
 void AMyPlayerController::ServerAttemptRemoveItemAtIndex_Implementation(int32 index, int32 quantity)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptRemoveItemAtIndex_Implementation"));
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
 
 	if (!IsSlotEmpty(index) && quantity > 0)
 	{
-		if (quantity >= InventorySlots[index].quantity)
+		if (quantity >= myPlayerState->InventorySlots[index].quantity)
 		{
-			InventorySlots[index].quantity = 0;
+			myPlayerState->InventorySlots[index].quantity = 0;
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::RemoveItemAtIndex DoRep_InventoryChanged"));
-			//DoRep_InventoryChanged = !DoRep_InventoryChanged;
 		}
 		else
 		{
-			InventorySlots[index].quantity = InventorySlots[index].quantity - quantity;
+			myPlayerState->InventorySlots[index].quantity = myPlayerState->InventorySlots[index].quantity - quantity;
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::RemoveItemAtIndex DoRep_InventoryChanged"));
-			//DoRep_InventoryChanged = !DoRep_InventoryChanged;
 		}
 	}
 	return;
@@ -1378,15 +1302,15 @@ bool AMyPlayerController::ServerAttemptSwapSlots_Validate(int32 index, int32 qua
 void AMyPlayerController::ServerAttemptSwapSlots_Implementation(int32 index1, int32 index2)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SwapSlots"));
-	if (index1 > InventorySlots.Num() || index2 > InventorySlots.Num())
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	if (index1 > myPlayerState->InventorySlots.Num() || index2 > myPlayerState->InventorySlots.Num())
 	{
 		return;
 	}
-	FMyInventorySlot localslot2 = InventorySlots[index2];
-	InventorySlots[index2] = InventorySlots[index1];
-	InventorySlots[index1] = localslot2;
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SwapSlots DoRep_InventoryChanged"));
-	//DoRep_InventoryChanged = !DoRep_InventoryChanged;
+	FMyInventorySlot localslot2 = myPlayerState->InventorySlots[index2];
+	myPlayerState->InventorySlots[index2] = myPlayerState->InventorySlots[index1];
+	myPlayerState->InventorySlots[index1] = localslot2;
 	return;
 }
 
@@ -1406,19 +1330,19 @@ bool AMyPlayerController::ServerAttemptSplitStack_Validate(int32 index, int32 qu
 void AMyPlayerController::ServerAttemptSplitStack_Implementation(int32 index, int32 quantity)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStack"));
-	if (InventorySlots[index].quantity <= 0)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	if (myPlayerState->InventorySlots[index].quantity <= 0)
 	{
 		return;
 	}
-	if (InventorySlots[index].bCanBeStacked && InventorySlots[index].quantity > quantity)
+	if (myPlayerState->InventorySlots[index].bCanBeStacked && myPlayerState->InventorySlots[index].quantity > quantity)
 	{
 		int32 newIndex = SearchEmptySlot();
 		if (newIndex >= 0) {
-			InventorySlots[newIndex] = InventorySlots[index];
-			InventorySlots[newIndex].quantity = InventorySlots[index].quantity - quantity;
-			InventorySlots[index].quantity = quantity;
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::SplitStack DoRep_InventoryChanged"));
-			//DoRep_InventoryChanged = !DoRep_InventoryChanged;
+			myPlayerState->InventorySlots[newIndex] = myPlayerState->InventorySlots[index];
+			myPlayerState->InventorySlots[newIndex].quantity = myPlayerState->InventorySlots[index].quantity - quantity;
+			myPlayerState->InventorySlots[index].quantity = quantity;
 			return;
 		}
 		else
@@ -1434,16 +1358,18 @@ void AMyPlayerController::ServerAttemptSplitStack_Implementation(int32 index, in
 bool AMyPlayerController::SplitStackToIndex(int32 indexFrom, int32 indexTo, int32 quantity)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex"));
-	if (InventorySlots[indexTo].quantity == 0)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	if (myPlayerState->InventorySlots[indexTo].quantity == 0)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexTo is empty"));
-		if (InventorySlots[indexFrom].quantity > 1)
+		if (myPlayerState->InventorySlots[indexFrom].quantity > 1)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom is not empty"));
-			if (InventorySlots[indexFrom].bCanBeStacked)
+			if (myPlayerState->InventorySlots[indexFrom].bCanBeStacked)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom can be stacked"));
-				if (InventorySlots[indexFrom].quantity > quantity)
+				if (myPlayerState->InventorySlots[indexFrom].quantity > quantity)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom amount is greater than split amount"));
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex Requesting SplitStackToIndex on server"));
@@ -1466,25 +1392,25 @@ bool AMyPlayerController::ServerAttemptSplitStackToIndex_Validate(int32 indexFro
 void AMyPlayerController::ServerAttemptSplitStackToIndex_Implementation(int32 indexFrom, int32 indexTo, int32 quantity)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptSplitStackToIndex_Implementation"));
-	if (InventorySlots[indexTo].quantity == 0)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	if (myPlayerState->InventorySlots[indexTo].quantity == 0)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexTo is empty"));
-		if (InventorySlots[indexFrom].quantity > 1)
+		if (myPlayerState->InventorySlots[indexFrom].quantity > 1)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom is not empty"));
-			if (InventorySlots[indexFrom].bCanBeStacked)
+			if (myPlayerState->InventorySlots[indexFrom].bCanBeStacked)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom can be stacked"));
-				if (InventorySlots[indexFrom].quantity > quantity)
+				if (myPlayerState->InventorySlots[indexFrom].quantity > quantity)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::SplitStackToIndex indexFrom amount is greater than split amount"));
 
-					InventorySlots[indexTo] = InventorySlots[indexFrom];
-					InventorySlots[indexTo].quantity = quantity;
-					InventorySlots[indexFrom].quantity = InventorySlots[indexFrom].quantity - quantity;
+					myPlayerState->InventorySlots[indexTo] = myPlayerState->InventorySlots[indexFrom];
+					myPlayerState->InventorySlots[indexTo].quantity = quantity;
+					myPlayerState->InventorySlots[indexFrom].quantity = myPlayerState->InventorySlots[indexFrom].quantity - quantity;
 
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptSplitStackToIndex_Implementation DoRep_InventoryChanged"));
-					//DoRep_InventoryChanged = !DoRep_InventoryChanged;
 				}
 			}
 		}
@@ -1502,7 +1428,7 @@ bool AMyPlayerController::DropItem(int32 index)
 
 	if (myPlayerState->allowDrop)
 	{
-		if (InventorySlots[index].quantity > 0)
+		if (myPlayerState->InventorySlots[index].quantity > 0)
 		{
 			ServerAttemptDropItem(index);
 			return true;
@@ -1522,7 +1448,7 @@ bool AMyPlayerController::ServerAttemptDropItem_Validate(int32 index)
 
 void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation]  "));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptDropItem_Implementation]  "));
 
 	// check to see if this player is even allowed to drop
 	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
@@ -1536,9 +1462,9 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 
 		if (BasePickupsInLevel.Num() < TheGameInstance->maxPickupItemCount)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] BasePickupsInLevel < TheGameInstance->maxPickupItemCount "));
-			if (InventorySlots[index].quantity > 0) {
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] InventorySlots[index].quantity > 0 "));
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptDropItem_Implementation] BasePickupsInLevel < TheGameInstance->maxPickupItemCount "));
+			if (myPlayerState->InventorySlots[index].quantity > 0) {
+				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptDropItem_Implementation] InventorySlots[index].quantity > 0 "));
 
 				float placementDistance = 200.0f;
 				FVector ShootDir = GetPawn()->GetActorForwardVector();
@@ -1550,40 +1476,29 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 				UWorld* World = GetWorld(); // get a reference to the world
 				if (World)
 				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] got world "));
+					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptDropItem_Implementation] got world "));
 					// if world exists, spawn the blueprint actor
 
 					UClass* LoadedActorOwnerClass;
-					LoadedActorOwnerClass = LoadClassFromPath(InventorySlots[index].itemClassPath);
+					LoadedActorOwnerClass = LoadClassFromPath(myPlayerState->InventorySlots[index].itemClassPath);
 
 					//////  Instead of a stright spawn actor we need to use Deferred so we can set the attributes to something to what they are in the inventory.
-					//LoadedBasePickup->Attributes = InventorySlots[index].Attributes;
-					//World->SpawnActor<AMyBasePickup>(LoadedBasePickup, SpawnTransform);
 
 					AMyBasePickup* pActor = World->SpawnActorDeferred<AMyBasePickup>(LoadedActorOwnerClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 					if (pActor)
 					{
-						pActor->Attributes = InventorySlots[index].Attributes;
-						pActor->bCanBeStacked = InventorySlots[index].bCanBeStacked;
-						pActor->Quantity = InventorySlots[index].quantity;
+						pActor->Attributes = myPlayerState->InventorySlots[index].Attributes;
+						pActor->bCanBeStacked = myPlayerState->InventorySlots[index].bCanBeStacked;
+						pActor->Quantity = myPlayerState->InventorySlots[index].quantity;
 						UGameplayStatics::FinishSpawningActor(pActor, SpawnTransform);
 					}
-
-
 				}
-
-				InventorySlots[index].quantity = 0;
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptSpawnActor_Implementation DoRep_InventoryChanged"));
-				//DoRep_InventoryChanged = !DoRep_InventoryChanged;
-
-
-
-
+				myPlayerState->InventorySlots[index].quantity = 0;
 			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] maxPickupItemCount exceeded. "));
+			UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptDropItem_Implementation] maxPickupItemCount exceeded. "));
 
 			// Send a local chat to the player in this case
 			SendLocalChatMessage("The level cannot accept any more dropped items.");
@@ -1591,22 +1506,19 @@ void AMyPlayerController::ServerAttemptDropItem_Implementation(int32 index)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSpawnActor_Implementation] Drop not permitted. "));
+		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptDropItem_Implementation] Drop not permitted. "));
 
 		// Send a local chat to the player in this case
 		SendLocalChatMessage("Drop not permitted.  This could be due to server settings, or group permissions.");
 	}
-
-
-
-
 }
 
 bool AMyPlayerController::UseItem(int32 index)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::UseItem"));
 	// this is executing on the client, not server.
-	if (InventorySlots[index].quantity > 0)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+	if (myPlayerState->InventorySlots[index].quantity > 0)
 	{
 		ServerAttemptUseItem(index);
 		return true;
@@ -1625,8 +1537,10 @@ void AMyPlayerController::ServerAttemptUseItem_Implementation(int32 index)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptUseItem_Implementation"));
 
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
 	UClass* LoadedActorOwnerClass;
-	LoadedActorOwnerClass = LoadClassFromPath(InventorySlots[index].itemClassPath);
+	LoadedActorOwnerClass = LoadClassFromPath(myPlayerState->InventorySlots[index].itemClassPath);
 
 	float placementDistance = 200.0f;
 	FVector ShootDir = GetPawn()->GetActorForwardVector();
@@ -1635,19 +1549,13 @@ void AMyPlayerController::ServerAttemptUseItem_Implementation(int32 index)
 	FVector spawnlocation = spawnlocationstart + Origin;
 	FTransform const SpawnTransform(ShootDir.Rotation(), spawnlocation);
 
-	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
-
 	AMyBasePickup* myBasePickup = Cast<AMyBasePickup>(LoadedActorOwnerClass->GetDefaultObject());
 	if (myBasePickup)
 	{
 		myBasePickup->OnItemUsed(SpawnTransform, myPlayerState->playerKeyId, LoadedActorOwnerClass);
 	}
 
-
-	InventorySlots[index].quantity = InventorySlots[index].quantity - 1;
-
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptUseItem_Implementation DoRep_InventoryChanged"));
-	//DoRep_InventoryChanged = !DoRep_InventoryChanged;
+	myPlayerState->InventorySlots[index].quantity = myPlayerState->InventorySlots[index].quantity - 1;
 
 }
 
@@ -1656,18 +1564,20 @@ bool AMyPlayerController::AddToIndex(int32 indexFrom, int32 indexTo)
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex"));
 	// this is executing on the client, not server.
 
-	UClass* IndexFromClass;
-	IndexFromClass = LoadClassFromPath(InventorySlots[indexFrom].itemClassPath);
-	UClass* IndexToClass;
-	IndexToClass = LoadClassFromPath(InventorySlots[indexTo].itemClassPath);
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
 
-	if (InventorySlots[indexFrom].itemClassPath == InventorySlots[indexTo].itemClassPath)
+	UClass* IndexFromClass;
+	IndexFromClass = LoadClassFromPath(myPlayerState->InventorySlots[indexFrom].itemClassPath);
+	UClass* IndexToClass;
+	IndexToClass = LoadClassFromPath(myPlayerState->InventorySlots[indexTo].itemClassPath);
+
+	if (myPlayerState->InventorySlots[indexFrom].itemClassPath == myPlayerState->InventorySlots[indexTo].itemClassPath)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex Items match"));
-		if (InventorySlots[indexTo].quantity < InventorySlots[indexTo].MaxStackSize)
+		if (myPlayerState->InventorySlots[indexTo].quantity < myPlayerState->InventorySlots[indexTo].MaxStackSize)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex there is space available"));
-			if (InventorySlots[indexTo].bCanBeStacked)
+			if (myPlayerState->InventorySlots[indexTo].bCanBeStacked)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex Can be stacked"));
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex Requesting Add to index on the server"));
@@ -1676,7 +1586,6 @@ bool AMyPlayerController::AddToIndex(int32 indexFrom, int32 indexTo)
 				return true;
 			}
 		}
-
 	}
 	return false;
 }
@@ -1692,50 +1601,40 @@ void AMyPlayerController::ServerAttemptAddToIndex_Implementation(int32 indexFrom
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptAddToIndex_Implementation"));
 
-	if (InventorySlots[indexFrom].itemClassPath == InventorySlots[indexTo].itemClassPath)
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
+	if (myPlayerState->InventorySlots[indexFrom].itemClassPath == myPlayerState->InventorySlots[indexTo].itemClassPath)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex Items match"));
-		if (InventorySlots[indexTo].quantity < InventorySlots[indexTo].MaxStackSize)
+		if (myPlayerState->InventorySlots[indexTo].quantity < myPlayerState->InventorySlots[indexTo].MaxStackSize)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex there is space available"));
-			if (InventorySlots[indexTo].bCanBeStacked)
+			if (myPlayerState->InventorySlots[indexTo].bCanBeStacked)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex Can be stacked"));
-				int32 availableStackQuantity = InventorySlots[indexTo].MaxStackSize - InventorySlots[indexTo].quantity;
-				if (availableStackQuantity >= InventorySlots[indexFrom].quantity)
+				int32 availableStackQuantity = myPlayerState->InventorySlots[indexTo].MaxStackSize - myPlayerState->InventorySlots[indexTo].quantity;
+				if (availableStackQuantity >= myPlayerState->InventorySlots[indexFrom].quantity)
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex All Items can fit"));
-					InventorySlots[indexTo].quantity = InventorySlots[indexTo].quantity + InventorySlots[indexFrom].quantity;
+					myPlayerState->InventorySlots[indexTo].quantity = myPlayerState->InventorySlots[indexTo].quantity + myPlayerState->InventorySlots[indexFrom].quantity;
 					// clear out the from slot
-					InventorySlots[indexFrom].quantity = 0;
-					InventorySlots[indexFrom].itemClassTitle = "empty";
+					myPlayerState->InventorySlots[indexFrom].quantity = 0;
+					myPlayerState->InventorySlots[indexFrom].itemClassTitle = "empty";
 				}
 				else
 				{
 					UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::AddToIndex There are leftover items that cannot fit"));
-					int32 amountRemaining = InventorySlots[indexFrom].quantity - availableStackQuantity;
+					int32 amountRemaining = myPlayerState->InventorySlots[indexFrom].quantity - availableStackQuantity;
 
-					InventorySlots[indexTo].quantity = InventorySlots[indexTo].MaxStackSize;
-					InventorySlots[indexFrom].quantity = amountRemaining;
+					myPlayerState->InventorySlots[indexTo].quantity = myPlayerState->InventorySlots[indexTo].MaxStackSize;
+					myPlayerState->InventorySlots[indexFrom].quantity = amountRemaining;
 				}
-
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::ServerAttemptUseItem_Implementation DoRep_InventoryChanged"));
-				//DoRep_InventoryChanged = !DoRep_InventoryChanged;
 			}
 		}
 	}
-
 	return;
-
 }
 
-
-
-void AMyPlayerController::OnRep_OnInventoryChange_Implementation()
-{
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnInventoryChange"));
-	OnInventoryChanged.Broadcast();
-}
 
 void AMyPlayerController::InventoryItemSellStart(int32 index)
 {
@@ -1752,9 +1651,11 @@ void AMyPlayerController::InventoryItemSellStart(int32 index)
 void AMyPlayerController::InventoryItemSellConfirm(int32 index, int32 pricePerUnit)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::InventoryItemSellConfirm"));
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
 	if (pricePerUnit >= 0)
 	{
-		if (InventorySlots[index].quantity > 0)
+		if (myPlayerState->InventorySlots[index].quantity > 0)
 		{
 			ServerAttemptInventoryItemSellConfirm(index, pricePerUnit);
 		}
@@ -1770,17 +1671,14 @@ bool AMyPlayerController::ServerAttemptInventoryItemSellConfirm_Validate(int32 i
 void AMyPlayerController::ServerAttemptInventoryItemSellConfirm_Implementation(int32 index, int32 pricePerUnit)
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptInventoryItemSellConfirm_Implementation"));
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
 	if (pricePerUnit >= 0)
 	{
-		if (InventorySlots[index].quantity > 0)
+		if (myPlayerState->InventorySlots[index].quantity > 0)
 		{
 			UMyGameInstance* TheGameInstance = Cast<UMyGameInstance>(GetWorld()->GetGameInstance());
-
 			TheGameInstance->VendorItemCreate(this, InteractingWithVendorKeyId, index, pricePerUnit);
-
-			// set the bOwnerCanPickUp and bAnyoneCanPickUp flags to prevent it from getting picked back up while full
-
-
 		}
 	}
 }
@@ -1833,20 +1731,19 @@ bool AMyPlayerController::PerformJsonHttpRequest(void(AMyPlayerController::*dele
 
 bool AMyPlayerController::ServerAttemptSetVendorInteract_Validate(AMyBaseVendor* VendorRef)
 {
-//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
-return true;
+	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AUEtopiaPersistCharacter] [ServerAttemptSpawnActor_Validate]  "));
+	return true;
 }
 
 void AMyPlayerController::ServerAttemptSetVendorInteract_Implementation(AMyBaseVendor* VendorRef)
 {
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptSetVendorInteract_Implementation"));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptSetVendorInteract_Implementation"));
 
-bInteractingWithVendor = true;
-InteractingWithVendorKeyId = VendorRef->VendorKeyId;
-MyCurrentVendorRef = VendorRef;
+	bInteractingWithVendor = true;
+	InteractingWithVendorKeyId = VendorRef->VendorKeyId;
+	MyCurrentVendorRef = VendorRef;
 
-UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSetVendorInteract_Implementation] VendorKeyId: %s "), *VendorRef->VendorKeyId);
-
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [ServerAttemptSetVendorInteract_Implementation] VendorKeyId: %s "), *VendorRef->VendorKeyId);
 }
 
 void AMyPlayerController::AttemptVendorInteract(AMyBaseVendor* VendorRef)
@@ -1855,10 +1752,6 @@ void AMyPlayerController::AttemptVendorInteract(AMyBaseVendor* VendorRef)
 
 	// TODO check to see if in range
 	FOnVendorInteractDisplayUI.Broadcast(VendorRef);
-
-	//UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] [AttemptVendorInteract] VendorKeyId: %s "), *VendorRef->VendorKeyId);
-
-	//FOnVendorInteractChanged.Broadcast(VendorKeyId, true);
 }
 
 bool AMyPlayerController::ServerAttemptVendorUpdate_Validate(const FString& Title, const FString& Description, const FString& DiscordWebhook, bool bIsSelling, bool bIsBuying, bool bDisableForPickup)
@@ -1893,8 +1786,6 @@ void AMyPlayerController::AttemptVendorUpdate(const FString& Title, const FStrin
 
 }
 
-
-
 bool AMyPlayerController::FindServerClusters()
 {
 	// Running on Client
@@ -1918,14 +1809,10 @@ bool AMyPlayerController::FindServerClusters()
 
 		bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::FindServerClustersComplete, APIURI, JsonOutputString);
 
-
-
 		// Clean out the server cluster list
 		MyServerClusterResults.server_clusters.Empty();
 
-
-		return requestSuccess;;
-
+		return requestSuccess;
 	}
 	return false;
 
@@ -2350,9 +2237,11 @@ void AMyPlayerController::ServerAttemptAddItemToVendor_Implementation(int32 inde
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::ServerAttemptAddItemToVendor_Implementation"));
 
+	AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
+
 	if (quantity > 0)
 	{
-		if (InventorySlots[indexFrom].quantity >= quantity)
+		if (myPlayerState->InventorySlots[indexFrom].quantity >= quantity)
 		{
 			if (pricePerUnit >= 0)
 			{
@@ -2554,6 +2443,13 @@ void AMyPlayerController::GetCharacterListComplete(FHttpRequestPtr HttpRequest, 
 							CharacterObj->TryGetBoolField("characterAlive", NewCharacter.characterAlive);
 							CharacterObj->TryGetBoolField("currentlySelectedActive", NewCharacter.currentlySelectedActive);
 
+							CharacterObj->TryGetNumberField("rank", NewCharacter.rank);
+							CharacterObj->TryGetNumberField("score", NewCharacter.score);
+							CharacterObj->TryGetNumberField("level", NewCharacter.level);
+
+							// TODO - use the "character" string to parse out any of your custom values
+							// If it does not exist, fall back to characterCustom
+
 							// TODO - run some logic to assign an icon
 							NewCharacter.Icon = nullptr;
 
@@ -2561,11 +2457,8 @@ void AMyPlayerController::GetCharacterListComplete(FHttpRequestPtr HttpRequest, 
 						}
 					}
 				}
-
 			}
-
 			OnGetCharacterListCompleteDelegate.Broadcast();
-
 		}
 	}
 }
@@ -2606,7 +2499,6 @@ bool AMyPlayerController::CreateCharacter(FString title, FString description, FS
 	FString APIURI = "/_ah/api/characters/v1/create";
 	bool requestSuccess = PerformJsonHttpRequest(&AMyPlayerController::CreateCharacterComplete, APIURI, JsonOutputString);
 	return requestSuccess;
-
 }
 
 void AMyPlayerController::CreateCharacterComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
@@ -2731,7 +2623,6 @@ void AMyPlayerController::SaveCharacterCustomization(FString characterClass)
 		ClassIndex = 1;
 	}
 
-
 	// Run RPC on server
 	SaveCharacterCustomizationServer(ClassIndex);
 }
@@ -2755,9 +2646,11 @@ void AMyPlayerController::SaveCharacterCustomizationServer_Implementation(int32 
 	playerS->CharacterSetup = true;
 	playerS->CharacterClass = characterClass;
 
-	// Tell this client to change UI state to playing
-	playerChar->ClientChangeUIState(EConnectUIState::Play);
-
+	if (playerChar)
+	{
+		// Tell this client to change UI state to play
+		ClientChangeUIState(EConnectUIState::Play);
+	}
 }
 
 
@@ -2846,12 +2739,6 @@ void AMyPlayerController::ServerAttemptAddAbilityToBar_Implementation(int32 inde
 	MyAbilitySlots[index].title = GrantedAbility.title;
 		//MyAbilitySlots[index].UseText = GrantedAbility.
 	MyAbilitySlots[index].GrantedAbility = GrantedAbility;
-
-
-	//Trigger the deleagte.
-
-	//DoRep_AbilityInterfaceChanged = !DoRep_AbilityInterfaceChanged;
-
 
 	return;
 }
@@ -2996,21 +2883,6 @@ void AMyPlayerController::OnRep_OnAbilityInterfaceChange_Implementation()
 	OnAbilityInterfaceChanged.Broadcast();
 }
 
-/*
-bool AMyPlayerController::AttributesCompareEqual(TMap<FString, float> Attributes1, TMap<FString, float> Attributes2)
-{
-for (auto& Elem : Attributes1)
-{
-if (Attributes2[Elem.Key] != Elem.Value)
-{
-return false;
-}
-
-}
-return true;
-}
-*/
-
 void AMyPlayerController::UnFreeze()
 {
 	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::UnFreeze"));
@@ -3021,14 +2893,9 @@ void AMyPlayerController::UnFreeze()
 	OnAbilityInterfaceChanged.Broadcast();
 	OnChatChannelsChangedUETopia.Broadcast();
 	OnFriendsChanged.Broadcast();
-	OnInventoryChanged.Broadcast();
+	//OnInventoryChanged.Broadcast();
 	OnPartyDataReceivedUETopiaDisplayUI.Broadcast();
 	OnRecentPlayersChanged.Broadcast();
-
-	//AUEtopiaPersistCharacter* playerChar = Cast<AUEtopiaPersistCharacter>(GetPawn());
-	//playerChar->RemapAbilities();
-
-	//RemapAbilities()
 }
 
 void AMyPlayerController::ClearHUDWidgets_Implementation()
@@ -3065,11 +2932,7 @@ void AMyPlayerController::ServerAttemptShardSwitch_Implementation(const FString&
 		UMyGameInstance* gameInstance = Cast<UMyGameInstance>(World->GetGameInstance());
 		AMyPlayerState* myPlayerState = Cast<AMyPlayerState>(PlayerState);
 		gameInstance->TransferPlayer(ShardKeyId, PlayerState->PlayerId, false, true);
-
-
-
 	}
-
 }
 
 bool AMyPlayerController::ServerAttemptShardSwitch_Validate(const FString& ShardKeyId)
@@ -3108,8 +2971,6 @@ void AMyPlayerController::ServerAttemptClaimDrop_Implementation(const FString& d
 	{
 		TheGameInstance->ClaimPlayerDrop(myPlayerState->playerKeyId, dropKeyId);
 	}
-
-
 }
 
 
@@ -3120,242 +2981,55 @@ void AMyPlayerController::SendLocalChatMessage_Implementation(const FString& Cha
 }
 
 
-void AMyPlayerController::OnRep_OnCustomTextureChange_Implementation()
+///////////////////////////////////////////////////////////
+// These all get overridden in BP and should never actually trigger
+///////////////////////////////////////////////////////////
+
+void AMyPlayerController::OnInventoryChangedBP_Implementation()
 {
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnRep_OnCustomTextureChange_Implementation."));
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] AMyPlayerController::OnInventoryChangedBP_Implementation"));
+}
 
-	// Make sure valid filename was specified
-	if (customTexture.IsEmpty() || customTexture.Contains(TEXT(" ")))
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] OnRep_OnCustomTextureChange_Implementation.  INVALID FILENAME"));
-		customTexture = "https://apitest-dot-ue4topia.appspot.com/img/groups/M_Banners_BaseColor.png";
-	}
+void AMyPlayerController::OnEquipmentChangedBP_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnEquipmentChangedBP_Implementation"));
+}
 
-	// Create the Http request and add to pending request list
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) { return; }
-	if (!Http->IsHttpEnabled()) { return; }
+void AMyPlayerController::OnUIStateChange_Implementation(EConnectUIState UIState)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AUEtopiaCompetitiveCharacter::OnUIStateChange_Implementation"));
+}
 
-	TSharedRef < IHttpRequest > Request = Http->CreateRequest();
-	Request->SetVerb("GET");
-	Request->SetURL(customTexture);
-	Request->SetHeader("User-Agent", "UETOPIA_UE4_API_CLIENT/1.0");
-	Request->SetHeader("Content-Type", "application/x-www-form-urlencoded");
+void AMyPlayerController::OnChatChannelsChangedChangedBP_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnChatChannelsChangedChangedBP_Implementation"));
+}
 
-	//TSharedRef<class IHttpRequest> HttpRequest = FHttpModule::Get().CreateRequest();
-	//FileRequests.Add(&HttpRequest.Get(), FPendingFileRequest(FileName));
+void AMyPlayerController::OnAttributesChangedBP_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnAttributesChangedBP_Implementation"));
+}
 
-	//Request->OnProcessRequestComplete().BindUObject(this, delegateCallback);
+void AMyPlayerController::OnDropsChangedBP_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OnDropsChangedBP_Implementation"));
+}
 
-	Request->OnProcessRequestComplete().BindUObject(this, &AMyPlayerController::ReadCustomTexture_HttpRequestComplete);
-	//HttpRequest->SetURL(customTexture);
-	//HttpRequest->SetVerb(TEXT("GET"));
+void AMyPlayerController::OntitleChangedBP_Implementation()
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA]AMyPlayerController::OntitleChangedBP_Implementation"));
+}
 
-	Request->ProcessRequest();
-
+void AMyPlayerController::ClientChangeUIState_Implementation(EConnectUIState NewState)
+{
+	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ClientChangeUIState_Implementation"));
+	//OnUIStateChange.Broadcast(NewState);
+	CurrentUIState = NewState;
+	OnUIStateChange(NewState);
 	return;
 }
 
-void AMyPlayerController::ReadCustomTexture_HttpRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded)
-{
-	UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete."));
-	if (!HttpRequest.IsValid())
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete REQUEST INVALID."));
-		return;
-	}
 
-	/*
-
-	const FPendingFileRequest* PendingRequest = FileRequests.Find(HttpRequest.Get());
-
-	if (PendingRequest == nullptr)
-	{
-	return;
-	}
-
-
-	*/
-	bool bResult = false;
-	FString ResponseStr, ErrorStr;
-
-	/*
-
-	// Cloud file being operated on
-	{
-	FCloudFile* CloudFile = GetCloudFile(PendingRequest->FileName, true);
-	CloudFile->AsyncState = EOnlineAsyncTaskState::Failed;
-	CloudFile->Data.Empty();
-	}
-	*/
-
-	if (bSucceeded &&
-		HttpResponse.IsValid())
-	{
-		UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. bSucceeded and IsValid "));
-		if (EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
-		{
-			UE_LOG(LogTemp, Log, TEXT("ReadFile request complete. url=%s code=%d"),
-				*HttpRequest->GetURL(), HttpResponse->GetResponseCode());
-
-			// https://answers.unrealengine.com/questions/75929/is-it-possible-to-load-bitmap-or-jpg-files-at-runt.html
-
-			// update the memory copy of the file with data that was just downloaded
-			//FCloudFile* CloudFile = GetCloudFile(PendingRequest->FileName, true);
-
-			// only tracking a single file....
-			// const FString& InFileName
-			const FString& CloudFileTitle = "GroupTexture";
-			FCloudFile CloudFile = FCloudFile(CloudFileTitle);
-			CloudFile.FileName = CloudFileTitle;
-
-			CloudFile.AsyncState = EOnlineAsyncTaskState::Done;
-			CloudFile.Data = HttpResponse->GetContent();
-
-			// cache to disk on successful download
-			SaveCloudFileToDisk(CloudFile.FileName, CloudFile.Data);
-
-			IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-			// Note: PNG format.  Other formats are supported
-			TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
-
-			//FString TexturePath = FPaths::GameContentDir() + TEXT("../Saved/Cloud/") + CloudFileTitle;
-			FString TexturePath = FPaths::CloudDir() + CloudFileTitle;
-			UE_LOG(LogTemp, Warning, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. TexturePath: %s"), *TexturePath);
-			TArray<uint8> FileData;
-
-			if (FFileHelper::LoadFileToArray(FileData, *TexturePath))
-			{
-				UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. LoadFileToArray "));
-				if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(FileData.GetData(), FileData.Num()))
-				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. ImageWrapper->SetCompressed "));
-					const TArray<uint8>* UncompressedBGRA = NULL;
-					if (ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBGRA))
-					{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. ImageWrapper->GetRaw "));
-						LoadedTexture = UTexture2D::CreateTransient(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), PF_B8G8R8A8);
-
-						/* Create transient texture */
-						//LoadedTexture = UTexture2D::CreateTransient(DDSLoadHelper.DDSHeader->dwWidth, DDSLoadHelper.DDSHeader->dwHeight, Format);
-
-						//LoadedTexture->MipGenSettings = TMGS_LeaveExistingMips; // apparently this is editor only functionality???
-						LoadedTexture->PlatformData->NumSlices = 1;
-						LoadedTexture->NeverStream = true;
-						LoadedTexture->Rename(*CloudFileTitle);
-
-						/* Get pointer to actual data */
-						//uint8* DataPtr = (uint8*)DDSLoadHelper.GetDDSDataPointer();
-
-						//uint32 CurrentWidth = DDSLoadHelper.DDSHeader->dwWidth;
-						//uint32 CurrentHeight = DDSLoadHelper.DDSHeader->dwHeight;
-
-						//Copy!
-						void* TextureData = LoadedTexture->PlatformData->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
-						FMemory::Memcpy(TextureData, UncompressedBGRA->GetData(), UncompressedBGRA->Num());
-						LoadedTexture->PlatformData->Mips[0].BulkData.Unlock();
-
-
-						LoadedTexture->UpdateResource();
-					}
-
-
-				}
-
-				// now assign this texture to all of the banners
-				TActorIterator< ADynamicTextureStaticMeshActor > AllActorsItr = TActorIterator< ADynamicTextureStaticMeshActor >(GetWorld());
-
-				//While not reached end (overloaded bool operator)
-				while (AllActorsItr)
-				{
-					UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. Found ADynamicTextureStaticMeshActor "));
-					// TODO do something with the texture/material
-
-
-
-					//AllActorsItr->GetStaticMeshComponent()->GetMaterial(0)->Get;
-					if (AllActorsItr->MaterialInstance->IsValidLowLevel())
-					{
-						UE_LOG(LogTemp, Log, TEXT("[UETOPIA] [AMyPlayerController] ReadCustomTexture_HttpRequestComplete. Material Instance IsValid "));
-						//AllActorsItr->Material = LoadedTexture;
-						AllActorsItr->MaterialInstance->SetTextureParameterValue(FName("BaseColor"), LoadedTexture);
-					}
-
-
-
-					//next actor
-					++AllActorsItr;
-				}
-
-
-				/*
-				// HTTP response; image
-				TArray<uint8> imageDataArray = CloudFile.Data;
-
-				if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(imageDataArray.GetData(), imageDataArray.Num()))
-				{
-
-				const TArray<uint8>* uncompressedBGRA = NULL;
-				if (ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, uncompressedBGRA))
-				{
-				// TODO get actual image dimensions
-				LoadedTexture = UTexture2D::CreateTransient(DDSLoadHelper.DDSHeader->dwWidth, DDSLoadHelper.DDSHeader->dwHeight, Format);
-				LoadedTexture->MipGenSettings = TMGS_LeaveExistingMips;
-				LoadedTexture->PlatformData->NumSlices = 1;
-				LoadedTexture->NeverStream = true;
-				LoadedTexture->Rename(*CloudFileTitle);
-				}
-				}
-				*/
-			}
-
-			bResult = true;
-		}
-		else
-		{
-			ErrorStr = FString::Printf(TEXT("Invalid response. code=%d error=%s"),
-				HttpResponse->GetResponseCode(), *HttpResponse->GetContentAsString());
-
-			UE_LOG(LogTemp, Log, TEXT("Invalid response. code=%d error=%sd"),
-				HttpResponse->GetResponseCode(), *HttpRequest->GetURL());
-		}
-	}
-	else
-	{
-		ErrorStr = TEXT("No response");
-	}
-
-	if (!ErrorStr.IsEmpty())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ReadFile request failed. %s"), *ErrorStr);
-	}
-
-	//TriggerOnReadFileCompleteDelegates(bResult, PendingRequest->FileName);
-
-	//FileRequests.Remove(HttpRequest.Get());
-}
-
-void AMyPlayerController::SaveCloudFileToDisk(const FString& Filename, const TArray<uint8>& Data)
-{
-	// save local disk copy as well
-	FString LocalFilePath = GetLocalFilePath(Filename);
-	bool bSavedLocal = FFileHelper::SaveArrayToFile(Data, *LocalFilePath);
-	if (bSavedLocal)
-	{
-		UE_LOG(LogTemp, Verbose, TEXT("WriteUserFile request complete. Local file cache updated =%s"),
-			*LocalFilePath);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("WriteUserFile request complete. Local file cache failed to update =%s"),
-			*LocalFilePath);
-	}
-}
-
-FString AMyPlayerController::GetLocalFilePath(const FString& FileName)
-{
-	return FPaths::CloudDir() + FPaths::GetCleanFilename(FileName);
-}
 
 void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
 {
@@ -3365,16 +3039,16 @@ void AMyPlayerController::GetLifetimeReplicatedProps(TArray< FLifetimeProperty >
 	//DOREPLIFETIME(AMyPlayerController, DoRep_InventoryChanged);
 	//DOREPLIFETIME(AMyPlayerController, DoRep_AbilitiesChanged);
 	//DOREPLIFETIME(AMyPlayerController, DoRep_AbilityInterfaceChanged);
-	DOREPLIFETIME(AMyPlayerController, InventorySlots);
+	//DOREPLIFETIME(AMyPlayerController, InventorySlots);
 	DOREPLIFETIME(AMyPlayerController, MyAbilitySlots);
 	DOREPLIFETIME(AMyPlayerController, MyGrantedAbilities);
 	DOREPLIFETIME(AMyPlayerController, AbilitySlotsPerRow);
-	DOREPLIFETIME(AMyPlayerController, CurrencyAvailable);
+	//DOREPLIFETIME(AMyPlayerController, CurrencyAvailable);
 	DOREPLIFETIME(AMyPlayerController, bInteractingWithVendor);
 	DOREPLIFETIME(AMyPlayerController, InteractingWithVendorKeyId);
-	DOREPLIFETIME(AMyPlayerController, Experience);
-	DOREPLIFETIME(AMyPlayerController, ExperienceThisLevel);
+	//DOREPLIFETIME(AMyPlayerController, Experience);
+	//DOREPLIFETIME(AMyPlayerController, ExperienceThisLevel);
 	DOREPLIFETIME(AMyPlayerController, bIsShardedServer);
-	DOREPLIFETIME(AMyPlayerController, customTexture);
+	//DOREPLIFETIME(AMyPlayerController, customTexture);
 
 }

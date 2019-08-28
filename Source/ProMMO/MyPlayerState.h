@@ -3,9 +3,17 @@
 #pragma once
 
 #include "GameFramework/PlayerState.h"
+#include "Http.h"
+#include "Json.h"
+#include "JsonUtilities.h"
+#include "Online.h"
 #include "Engine.h"
 #include "MyTravelApprovedActor.h"
 #include "MyTypes.h"
+#include "AbilitySystemInterface.h" 
+#include "GameplayAbility.h"
+#include "MyAttributeSet.h"
+#include "MyAbilitySystemComponent.h"
 #include "MyPlayerState.generated.h"
 
 /**
@@ -26,45 +34,54 @@ struct FMyApprovedServerLink {
 };
 
 
-//THis delegate is working.
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FTextDelegate, FText, chatSender, FText, chatMessage);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerInventoryChange);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameplayEffectChangedDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerEquipmentChange);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerTitleChange);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnShowMatchResults);
 
 
 
 
 UCLASS()
-class PROMMO_API AMyPlayerState : public APlayerState
+class PROMMO_API AMyPlayerState : public APlayerState, public IAbilitySystemInterface
 {
-	GENERATED_BODY()
+	GENERATED_UCLASS_BODY()
 
-		virtual void BeginPlay();
-
-	// Full Inventory moved to player controller.
-	// Only the owning player needs to know about it. - not all of the players.
-		//FMyInventory Inventory;
-
+	virtual void BeginPlay();
 	virtual void CopyProperties(class APlayerState* PlayerState) override;
 
+	/** Our ability system */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Abilities, meta = (AllowPrivateAccess = "true"))
+		class UMyAbilitySystemComponent* AbilitySystem;
+
+	static FName AbilitySystemName;
+
+private:
+	UPROPERTY()
+		UMyAttributeSet* AttributeSet;
+
+	void ClientInitialize(class AController* C) override;
 
 public:
-	// This is the function that gets called in the widget Blueprint
-	UFUNCTION(BlueprintCallable, Category = "UETOPIA", Server, Reliable, WithValidation)
-		void BroadcastChatMessage(const FText& ChatMessageIn);
 
-	// This function is called remotely by the server.
-	UFUNCTION(NetMulticast, Category = "UETOPIA", Unreliable)
-		void ReceiveChatMessage(const FText& ChatSender, const FText& ChatMessage);
-
-
-	UPROPERTY(BlueprintAssignable)
-		FTextDelegate OnTextDelegate;
-
-	/** List of online friends
-	struct FOnlineFriendsList
+	UAbilitySystemComponent* GetAbilitySystemComponent() const override
 	{
-		TArray< TSharedRef<FOnlineFriendUEtopia> > Friends;
-	};
-	*/
+		//return AbilitySystem;
+		UAbilitySystemComponent* aSC = Cast<UAbilitySystemComponent>(AbilitySystem);
+		return aSC;
+	}
+
+	// We need something to track when the player has successfully gone through the login and character selection process
+	// Because on respawn, we want to skip loading screens and go immediately back to the spawn room.
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		bool playerLoginFlowCompleted;
+
+
+	//UPROPERTY(BlueprintAssignable)
+	//	FTextDelegate OnTextDelegate;
 
 	UPROPERTY(BlueprintReadOnly)
 		FString playerIdUEInternal;
@@ -76,9 +93,6 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		FString serverTitle;
 
-	//UPROPERTY(Replicated, BlueprintReadOnly)
-	//	int32 InventoryCubes;
-
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		int32 Currency;
 
@@ -86,15 +100,39 @@ public:
 		int32 Level;
 
 	UPROPERTY(Replicated, BlueprintReadOnly)
+		int32 Experience; // total experience all time
+
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		int32 ExperienceThisLevel;  // Experience so far in this level
+
+	UPROPERTY(Replicated, BlueprintReadOnly)
 		int32 TeamId;
 
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		FString teamTitle;
 
+	// this is used with teamId to find the correct place to spawn the player
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		int32 TeamPlayerIndex;
+
+	// For the match results screen we want to pass in the winning team's title
+	// And maybe more?  
+	// Issues:  We are changing maps so gameState will be lost.
+	// GameInstance is server side only.  Could do a client rpc or something
+	// For now, just sticking this into playerState which will replicate and survive map change.
+	//  This is a simplistic approach, and should be thought through a bit more 
+	// for more complex match results screens.
+	// 
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		FString winningTeamTitle;
+
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		bool allowPickup;
 	UPROPERTY(Replicated, BlueprintReadOnly)
 		bool allowDrop;
+	// Is combat enabled on this server.  It makes way more sense to put this in game mode, but it does not work on the client.
+	UPROPERTY(Replicated, BlueprintReadOnly)
+		bool bCombatEnabled = true;
 
 	// Variables set via get game player api call
 
@@ -119,6 +157,10 @@ public:
 		FString savedAbilities;
 	UPROPERTY(BlueprintReadOnly)
 		FString savedInterface;
+	UPROPERTY(BlueprintReadOnly)
+		FString savedCraftingSlots;
+	UPROPERTY(BlueprintReadOnly)
+		FString savedRecipes; // for crafting
 
 	// Customized and validated character data
 	UPROPERTY(BlueprintReadOnly)
@@ -137,28 +179,69 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 		int32 CharacterClass;
 
-	// We need something to track when the player has successfully gone through the login and character selection process
-	// Because on respawn, we want to skip loading screens and go immediately back to the spawn room.
-	UPROPERTY(Replicated, BlueprintReadOnly)
-		bool playerLoginFlowCompleted;
+	// ABILITIES
 
-	// Keep track of the abilities this player has available.
-	// We need to be able to give them to the character again on respawn
-	// This is confusing so I'm going to add another array to hopefully make it more clear
+	// when this fires, refresh the character attribute UI
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+		FOnGameplayEffectChangedDelegate OnGameplayEffectChangedDelegate;
 
-	// cached abilities get created on login gameInstance->GetGamePlayerComplete
-	// They then get processed, and granted using playerChar->AttemptGiveAbility
-	
-	TArray< FMyGrantedAbility > CachedAbilities;
+	// Function to bind into the ability system to detect new gameplay effects
+	// This ends up running on the server
+	void OnGameplayEffectAppliedToSelf(class UAbilitySystemComponent* FromInstigator, const FGameplayEffectSpec& Spec, FActiveGameplayEffectHandle Handle);
+	void OnGameplayEffectRemoved(FActiveGameplayEffectHandle Handle);
+
+	// RPC down to the client in order to fire the delegate
+	UFUNCTION(Client, Reliable)
+		void OnGameplayEffectsChanged();
+
+	// Delegate to switch the UI state to Match Results
+	// This is moved to playerstate because players that are dead when match ends do not have a pawn, and we use pawn to signal UI State change
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+		FOnShowMatchResults FOnShowMatchResultsDelegate;
+
+	// RPC down to the client in order to fire the delegate
+	UFUNCTION(Client, Reliable)
+		void TriggerShowMatchResults();
+
+	// Inventory
+
+	// Delegate to alert the pawn/controller to reload the inventory.
+	// DEPRECATED - DELETE
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+		FOnPlayerInventoryChange FOnPlayerInventoryChangeDelegate;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_OnInventoryChange, Category = "UETOPIA")
+		TArray<FMyInventorySlot> InventorySlots;
+
+	// this function just calls the playerController function.
+	UFUNCTION()
+		void OnRep_OnInventoryChange();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UETOPIA")
+		int32 InventoryCapacity;
+
+	// Equipment
+	UPROPERTY(BlueprintAssignable, Category = "UETOPIA")
+		FOnPlayerEquipmentChange FOnPlayerEquipmentChangeDelegate;
+
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_OnEquipmentChange, Category = "UETOPIA")
+		TArray<FMyInventorySlot> MyEquipment;
+
+	UFUNCTION()
+		void OnRep_OnEquipmentChange();
 
 	// Once they are granted, they are stored here.
 	// Additionally, they are copied over to the playerController so that the UI/HUD can be updated.
 	TArray< FMyGrantedAbility > GrantedAbilities;
 
-	// Authorizations for servers go in here.  These are server Key Ids.
-	// This is deprecated...  Keeping a copy of the entire server link now to facilitate instances.
-	//UPROPERTY(Replicated, BlueprintReadOnly)
-	//	TArray<FString> ServerPortalKeyIdsAuthorized;
+	// DEPRECATED - TODO delete
+	TArray< FMyGrantedAbility > CachedAbilities;
+
+	// Return a granted ability from an Ability Class PAth
+	FMyGrantedAbility GetGrantedAbilityByClassPath(FString classPathIn);
+
+	// Return and remove a granted ability from an Ability Class PAth
+	FMyGrantedAbility RemoveGrantedAbilityByClassPath(FString classPathIn);
 
 	// Instanced servers have a different key than the originating server template and we need to keep track of them on a per-user basis.
 	// We need to keep track of the server link information and the mapping from the origin key.
@@ -166,7 +249,44 @@ public:
 		TArray<FMyApprovedServerLink> ServerLinksAuthorized;
 
 	UPROPERTY(BlueprintReadOnly)
-	TArray< AMyTravelApprovedActor* >  ServerTravelApprovedActors;
+		TArray< AMyTravelApprovedActor* >  ServerTravelApprovedActors;
+
+
+	// Custom texture url strings.
+	// THis is set via getServerInfo, and normally stored in gamestate or game instance
+	// the duplicate here is because the player needs to have a hard notification that this changes.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_OnCustomTextureChange, Category = "UETOPIA")
+		TArray<FString> customTextures;
+
+	UFUNCTION(Client, Reliable)
+		virtual void OnRep_OnCustomTextureChange();
+
+	UFUNCTION(Client, Reliable)
+		virtual void LoadTexturesOntoActors();
+
+	TArray<UTexture2D*> LoadedTextures;
+
+	/**
+	* Delegate called when a Http request completes for reading a cloud file
+	*/
+	void ReadCustomTexture_HttpRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded);
+
+	/**
+	* Save a file from a given user to disk
+	*
+	* @param FileName name of file being saved
+	* @param Data data to write to disk
+	*/
+	void SaveCloudFileToDisk(const FString& Filename, const TArray<uint8>& Data);
+
+	/**
+	* Converts filename into a local file cache path
+	*
+	* @param FileName name of file being loaded
+	*
+	* @return unreal file path to be used by file manager
+	*/
+	FString GetLocalFilePath(const FString& FileName);
 
 	// Keep track of this player's drops
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_OnDropsChange, Category = "UETOPIA")
