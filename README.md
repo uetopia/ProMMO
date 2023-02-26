@@ -1,3 +1,7 @@
+# DEPRECATED
+
+Use [unlockd ExampleGame](https://github.com/unlockd-gg/ExampleGame) instead.
+
 # ProMMO
 Multiplayer tools for persistent worlds.
 
